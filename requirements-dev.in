@@ -5,3 +5,4 @@ pyyaml>=6.0.2
 jsonschema>=4.23
 hatchling>=1.27
 build>=1.2
+editables>=0.5

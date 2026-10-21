@@ -51,11 +51,57 @@ def render_config(env: Envelope, args: argparse.Namespace) -> str:
     return f"{data['key']} = {dumps(data.get('value'), indent=None)}"
 
 
+def _yes(flag: object) -> str:
+    return "yes" if flag else ("no" if flag is not None else "?")
+
+
+def render_doctor(env: Envelope, args: argparse.Namespace) -> str:
+    d = env.data
+    cpu = d.get("cpu") or {}
+    ff = d.get("ffmpeg") or {}
+    lines = [
+        f"vidroute doctor  ({'cached' if d.get('cached') else 'fresh'}, {d.get('probe_seconds')}s)",
+        f"  system   {d.get('os', {}).get('system')} {d.get('os', {}).get('release')} {d.get('os', {}).get('machine')}"
+        f" | python {d.get('os', {}).get('python')}",
+        f"  cpu      {cpu.get('model') or '?'} | {cpu.get('logical_cores')} threads | AVX2 {_yes(cpu.get('avx2'))}",
+        f"  memory   {d.get('ram_gb')} GB (available {d.get('ram_available_gb')} GB) | disk free {d.get('disk_free_gb')} GB",
+        f"  ffmpeg   {('found ' + str(ff.get('version'))) if ff.get('found') else 'MISSING -> ' + str(ff.get('install_hint'))}",
+    ]
+    gpus = d.get("gpus") or []
+    if gpus:
+        for g in gpus:
+            vram = g.get("vram_gb") if g.get("vram_gb") is not None else g.get("vram_approx_gb")
+            lines.append(f"  gpu      {g.get('name')} | VRAM {vram if vram is not None else '?'} GB ({g.get('vram_source')})")
+    else:
+        lines.append("  gpu      none detected")
+    uv = (d.get("runtimes") or {}).get("uv") or {}
+    lines.append(f"  uv       {uv.get('version') if uv.get('found') else 'not found (installed on demand)'}")
+    for name, e in ((d.get("runtimes") or {}).get("envs") or {}).items():
+        status = "ready" if e.get("exists") and e.get("import_ok") else ("broken" if e.get("exists") else "not installed")
+        lines.append(f"  env      {name}: {status}")
+    lines.append(f"  tier     {d.get('tier')}  ({'; '.join(d.get('tier_reasons') or [])})")
+    for cap, info in (d.get("capabilities") or {}).items():
+        state_txt = ", ".join(info.get("models") or []) or "missing"
+        lines.append(f"  {cap:<8} {state_txt}" + (f"  -> {info['hint']}" if info.get("hint") else ""))
+    ext = d.get("external") or {}
+    local = [k for k, v in ext.items() if v.get("running")]
+    lines.append(f"  local    {', '.join(local) if local else 'no Ollama / LM Studio server running'}")
+    net = d.get("network") or {}
+    if net.get("checked"):
+        mir = ", ".join(f"{k} {'ok' if v.get('ok') else 'unreachable'}" for k, v in (net.get("mirrors") or {}).items())
+        lines.append(f"  network  {mir}")
+    return "\n".join(lines)
+
+
 # ------------------------------------------------------------------ handlers
 
 
 def h_version(args: argparse.Namespace, ctx: Ctx) -> Envelope:
     return api.version(ctx=ctx)
+
+
+def h_doctor(args: argparse.Namespace, ctx: Ctx) -> Envelope:
+    return api.doctor(refresh=args.refresh, offline=True if args.offline else None, ctx=ctx)
 
 
 def h_config(args: argparse.Namespace, ctx: Ctx) -> Envelope:
@@ -91,6 +137,11 @@ def build_parser() -> argparse.ArgumentParser:
         return p
 
     add("version", "Print version and data directory", h_version)
+
+    p = add("doctor", "Detect OS, CPU/GPU, memory, ffmpeg, runtimes and installed models; decide the local tier",
+            h_doctor, render_doctor)
+    p.add_argument("--refresh", action="store_true", help="ignore the cached result and probe again")
+    p.add_argument("--offline", action="store_true", help="skip download-mirror reachability checks")
 
     p = add("config", "Get or set user configuration ($VIDROUTE_HOME/config.json)", h_config, render_config)
     csub = p.add_subparsers(dest="action", metavar="ACTION", parser_class=_Parser)

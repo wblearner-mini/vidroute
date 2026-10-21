@@ -54,6 +54,20 @@ jobs:
           vidroute version --json
           python -m vidroute version --json
 
+      - name: doctor returns within 10 seconds
+        shell: bash
+        run: |
+          python - <<'EOF'
+          import json, subprocess, time
+          t = time.monotonic()
+          out = subprocess.run(["vidroute", "doctor", "--refresh", "--json"], capture_output=True, text=True, check=True).stdout
+          elapsed = time.monotonic() - t
+          d = json.loads(out)["data"]
+          print(json.dumps({k: d[k] for k in ("os", "cpu", "ram_gb", "gpus", "gpu_probe", "tier", "capabilities", "probe_seconds")}, indent=1))
+          print(f"wall time: {elapsed:.2f}s")
+          assert elapsed < 10, elapsed
+          EOF
+
   package:
     name: build and install wheel (${{ matrix.os }})
     strategy:

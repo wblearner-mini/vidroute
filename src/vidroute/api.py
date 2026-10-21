@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import functools
 import traceback
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable
 
 from vidroute import __version__
 from vidroute.core import config as _config
@@ -17,8 +17,6 @@ from vidroute.core.context import Ctx
 from vidroute.core.envelope import Envelope, failure, success
 from vidroute.core.errors import RunFailed, VidrouteError
 from vidroute.core.log import get_logger
-
-F = TypeVar("F", bound=Callable[..., Envelope])
 
 
 def command(fn: Callable[..., dict[str, Any]]) -> Callable[..., Envelope]:
@@ -51,6 +49,16 @@ def command(fn: Callable[..., dict[str, Any]]) -> Callable[..., Envelope]:
 @command
 def version(*, ctx: Ctx) -> dict[str, Any]:
     return {"version": __version__, "home": str(paths.home())}
+
+
+# ------------------------------------------------------------------- doctor
+
+
+@command
+def doctor(refresh: bool = False, offline: bool | None = None, *, ctx: Ctx) -> dict[str, Any]:
+    from vidroute.core import doctor as _doctor
+
+    return _doctor.run(refresh=refresh, offline=offline, ctx=ctx)
 
 
 # ------------------------------------------------------------------- config

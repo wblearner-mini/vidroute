@@ -6,8 +6,8 @@ commit and an update here.
 | phase | scope | status |
 |---|---|---|
 | 0 | research, decisions with evidence, scaffold, CI, schemas | ✅ done |
-| 1 | `doctor`: system/GPU/ffmpeg/runtime detection, tiers, cache | ⏳ next |
-| 2 | `install`: downloader, mirrors, verification, uv envs, smoke tests | — |
+| 1 | `doctor`: system/GPU/ffmpeg/runtime detection, tiers, cache | ✅ done |
+| 2 | `install`: downloader, mirrors, verification, uv envs, smoke tests | ⏳ next |
 | 3 | `llm resolve`, profiles, `probe`, `plan` (two-layer routing) | — |
 | 4 | local perception pipeline, `prepare` for D3/D4 | — |
 | 5 | native routes, `handoff.json`, `drill`, raw-video consent | — |
@@ -32,3 +32,23 @@ commit and an update here.
   hash-locked dev dependencies and SHA-pinned actions.
 * Tests: 58 passing (YAML loader vs PyYAML, schema validation of all data files,
   manifest integrity, CLI envelope/exit codes, no `shell=True`, stdlib-only kernel).
+
+## Phase 1 — doctor (2026-10-21)
+
+* `vidroute doctor [--refresh] [--offline] [--json]`: OS, CPU model + AVX2
+  (Linux `/proc/cpuinfo`, Windows registry + `IsProcessorFeaturePresent`,
+  macOS `sysctl`), RAM/disk, ffmpeg version/encoders/filters, GPUs
+  (`nvidia-smi` with compute capability, Windows `Win32_VideoController` via
+  PowerShell with AdapterRAM marked approximate, Linux sysfs), uv, worker envs
+  (import check), installed models, reusable Hugging Face/ModelScope caches,
+  local Ollama/LM Studio, mirror reachability.
+* All probes run concurrently with a 5 s timeout and never block; results are
+  cached in `state.json` for 6 h (`--refresh` re-probes).
+* Tier rules: `cpu-lite` (< 8 GB RAM, x86 without AVX2, or RAM unknown),
+  `cpu-full`, `gpu-cuda` only after a passed CUDA smoke test with ≥ 4 GB VRAM
+  (unknown VRAM is conservative), `gpu-vulkan` reserved.
+* This machine: 0.9 s, Ryzen 7 8745H (AVX2), 19.8 GB, Radeon 780M iGPU,
+  ffmpeg 8.0.1 → `cpu-full`. CI asserts doctor finishes in < 10 s on
+  windows-latest and ubuntu.
+* Tests: 88 passing (nvidia-smi/CIM/cpuinfo/meminfo fixtures, 14 tier boundary
+  cases, hanging-probe timeout, cache).
