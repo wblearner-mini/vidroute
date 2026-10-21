@@ -36,6 +36,9 @@ class Source:
     sha256: str | None = None
     strip_prefix: str = ""
     layout: dict[str, str] = field(default_factory=dict)
+    env_group: str | None = None  # type "bundled": files shipped inside a hash-locked wheel
+    package: str | None = None
+    subdir: str = ""
 
     def file_url(self, rel: str) -> str:
         assert self.base_url is not None
@@ -234,6 +237,9 @@ def parse_manifest(raw: Any, source: str = "manifest.yaml") -> Manifest:
                     sha256=(s.get("sha256") or None) and str(s["sha256"]).lower(),
                     strip_prefix=str(s.get("strip_prefix") or ""),
                     layout=dict(s.get("layout") or {}),
+                    env_group=s.get("env_group"),
+                    package=s.get("package"),
+                    subdir=str(s.get("subdir") or ""),
                 )
                 for s in m.get("sources") or []
             ),

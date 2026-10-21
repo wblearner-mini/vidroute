@@ -93,6 +93,39 @@ def render_doctor(env: Envelope, args: argparse.Namespace) -> str:
     return "\n".join(lines)
 
 
+def render_install(env: Envelope, args: argparse.Namespace) -> str:
+    from vidroute.core.install.planner import describe
+
+    d = env.data
+    lines = [describe(d["plan"])] if d.get("plan") else []
+    if d.get("message"):
+        lines.append(d["message"])
+    if d.get("executed"):
+        lines.append("Results:")
+        for r in d.get("results", []):
+            lines.append(f"  {r.get('kind'):<6} {r.get('id', ''):<34} {r.get('status')}"
+                         + (f"  {r.get('source')}" if r.get("source") else ""))
+        for mid, sm in (d.get("smoke") or {}).items():
+            lines.append(f"  smoke  {mid:<34} {sm.get('status')}  {sm.get('detail', '')}")
+    elif d.get("plan") and not d.get("message"):
+        lines.append(f"Dry run only. To install: {d['plan']['confirm_command']}")
+    return "\n".join(lines)
+
+
+def render_models(env: Envelope, args: argparse.Namespace) -> str:
+    d = env.data
+    if "models" in d:
+        lines = [f"{'id':<36} {'cap':<5} {'status':<12} {'size':>8}  {'license':<28} installed"]
+        for m in d["models"]:
+            lines.append(f"{m['id']:<36} {m['capability']:<5} {m['status']:<12} {m['size_mb']:>6.0f}MB  "
+                         f"{m['license']:<28} {'yes' if m['installed'] else '-'}")
+        return "\n".join(lines)
+    if "results" in d:
+        return "\n".join(f"{r['id']:<36} {'ok' if r['ok'] else 'FAILED: ' + '; '.join(r.get('problems', []))}"
+                         for r in d["results"]) or "nothing installed"
+    return dumps(d)
+
+
 # ------------------------------------------------------------------ handlers
 
 
@@ -102,6 +135,44 @@ def h_version(args: argparse.Namespace, ctx: Ctx) -> Envelope:
 
 def h_doctor(args: argparse.Namespace, ctx: Ctx) -> Envelope:
     return api.doctor(refresh=args.refresh, offline=True if args.offline else None, ctx=ctx)
+
+
+def _confirm(question: str) -> bool:
+    try:
+        answer = input(f"{question} [y/N] ")
+    except EOFError:
+        return False
+    return answer.strip().lower() in ("y", "yes")
+
+
+def h_install(args: argparse.Namespace, ctx: Ctx) -> Envelope:
+    from vidroute.core.install.planner import describe
+
+    kwargs = dict(capabilities=args.capability, profile=args.profile, models=args.model, mirror=args.mirror,
+                  accept_licenses=args.accept_license, dry_run=args.dry_run, force=args.force, smoke=not args.no_smoke)
+    env = api.install(yes=args.yes, ctx=ctx, **kwargs)
+    # Interactive terminals get a prompt instead of an exit-3 envelope; the kernel stays the decision point.
+    if (not env.ok and env.error and env.error.get("code") == "needs_confirmation" and ctx.interactive
+            and env.data.get("plan")):
+        sys.stderr.write(describe(env.data["plan"]) + "\n")
+        if _confirm("Proceed with this install?"):
+            ctx.warnings.clear()
+            env = api.install(yes=True, ctx=ctx, **kwargs)
+    return env
+
+
+def h_models(args: argparse.Namespace, ctx: Ctx) -> Envelope:
+    action = args.action or "list"
+    if action == "list":
+        return api.models_list(ctx=ctx)
+    if action == "verify":
+        return api.models_verify(args.ids or None, ctx=ctx)
+    yes = args.yes or (ctx.interactive and _confirm(f"Remove {', '.join(args.ids)}?"))
+    return api.models_remove(args.ids, yes=yes, ctx=ctx)
+
+
+def h_clean(args: argparse.Namespace, ctx: Ctx) -> Envelope:
+    return api.clean(outputs=args.outputs, yes=args.yes, ctx=ctx)
 
 
 def h_config(args: argparse.Namespace, ctx: Ctx) -> Envelope:
@@ -142,6 +213,33 @@ def build_parser() -> argparse.ArgumentParser:
             h_doctor, render_doctor)
     p.add_argument("--refresh", action="store_true", help="ignore the cached result and probe again")
     p.add_argument("--offline", action="store_true", help="skip download-mirror reachability checks")
+
+    p = add("install", "Plan and (after confirmation) install local models and runtimes", h_install, render_install)
+    p.add_argument("--capability", action="append", choices=["asr", "vad", "ocr", "scene"], help="capability to install (repeatable)")
+    p.add_argument("--profile", choices=["auto", "lite", "full"], default="auto", help="package set when no --capability/--model is given")
+    p.add_argument("--model", action="append", help="exact model id from `vidroute models list` (repeatable)")
+    p.add_argument("--mirror", choices=["auto", "github", "hf", "modelscope"], help="preferred download source")
+    p.add_argument("--accept-license", action="append", metavar="ID", help="accept a restricted model license (repeatable)")
+    p.add_argument("--yes", "-y", action="store_true", help="confirm the plan non-interactively")
+    p.add_argument("--dry-run", "--plan", dest="dry_run", action="store_true", help="only show the plan")
+    p.add_argument("--force", action="store_true", help="reinstall even if already installed")
+    p.add_argument("--no-smoke", action="store_true", help="skip smoke tests after installing")
+
+    p = add("models", "List, verify (sha256) or remove installed models", h_models, render_models)
+    msub = p.add_subparsers(dest="action", metavar="ACTION", parser_class=_Parser)
+    m = msub.add_parser("list", help="all known models and their install state")
+    _common_flags(m, suppress=True)
+    m = msub.add_parser("verify", help="re-hash installed files")
+    _common_flags(m, suppress=True)
+    m.add_argument("ids", nargs="*")
+    m = msub.add_parser("remove", help="delete installed models")
+    _common_flags(m, suppress=True)
+    m.add_argument("ids", nargs="+")
+    m.add_argument("--yes", "-y", action="store_true")
+
+    p = add("clean", "Delete download caches and logs inside VIDROUTE_HOME", h_clean)
+    p.add_argument("--outputs", action="store_true", help="also delete $VIDROUTE_HOME/out")
+    p.add_argument("--yes", "-y", action="store_true")
 
     p = add("config", "Get or set user configuration ($VIDROUTE_HOME/config.json)", h_config, render_config)
     csub = p.add_subparsers(dest="action", metavar="ACTION", parser_class=_Parser)

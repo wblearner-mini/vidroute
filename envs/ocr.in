@@ -1,0 +1,3 @@
+# Worker env "ocr": PP-OCRv6 through RapidOCR on onnxruntime (CPU).
+rapidocr==3.10.0
+onnxruntime==1.31.0

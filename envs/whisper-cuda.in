@@ -1,0 +1,4 @@
+# Worker env "whisper" (CUDA variant): CUDA 12 + cuDNN 9 runtime wheels for CTranslate2 (NVIDIA only).
+faster-whisper==1.2.1
+nvidia-cublas-cu12; sys_platform == "win32" or sys_platform == "linux"
+nvidia-cudnn-cu12==9.*; sys_platform == "win32" or sys_platform == "linux"

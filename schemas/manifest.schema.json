@@ -56,17 +56,21 @@
       "required": ["type", "kind"],
       "additionalProperties": false,
       "properties": {
-        "type": {"enum": ["github", "hf", "modelscope"]},
+        "type": {"enum": ["github", "hf", "modelscope", "bundled"]},
         "kind": {"enum": ["files", "archive"]},
         "base_url": {"type": "string", "pattern": "^https://.*/$"},
         "url": {"type": "string", "pattern": "^https://"},
         "size": {"type": "integer", "minimum": 1},
         "sha256": {"$ref": "#/$defs/sha256"},
         "strip_prefix": {"type": "string"},
-        "layout": {"type": "object", "additionalProperties": {"type": "string"}}
+        "layout": {"type": "object", "additionalProperties": {"type": "string"}},
+        "env_group": {"type": "string"},
+        "package": {"type": "string"},
+        "subdir": {"type": "string"}
       },
       "allOf": [
-        {"if": {"properties": {"kind": {"const": "files"}}}, "then": {"required": ["base_url"]}},
+        {"if": {"properties": {"type": {"const": "bundled"}}}, "then": {"required": ["env_group", "package"]},
+         "else": {"if": {"properties": {"kind": {"const": "files"}}}, "then": {"required": ["base_url"]}}},
         {"if": {"properties": {"kind": {"const": "archive"}}}, "then": {"required": ["url", "sha256", "size"]}}
       ]
     },

@@ -7,8 +7,8 @@ commit and an update here.
 |---|---|---|
 | 0 | research, decisions with evidence, scaffold, CI, schemas | ✅ done |
 | 1 | `doctor`: system/GPU/ffmpeg/runtime detection, tiers, cache | ✅ done |
-| 2 | `install`: downloader, mirrors, verification, uv envs, smoke tests | ⏳ next |
-| 3 | `llm resolve`, profiles, `probe`, `plan` (two-layer routing) | — |
+| 2 | `install`: downloader, mirrors, verification, uv envs, smoke tests | ✅ done |
+| 3 | `llm resolve`, profiles, `probe`, `plan` (two-layer routing) | ⏳ next |
 | 4 | local perception pipeline, `prepare` for D3/D4 | — |
 | 5 | native routes, `handoff.json`, `drill`, raw-video consent | — |
 | 6 | CLI/MCP/Skill shells, packaging, README | — |
@@ -52,3 +52,26 @@ commit and an update here.
   windows-latest and ubuntu.
 * Tests: 88 passing (nvidia-smi/CIM/cpuinfo/meminfo fixtures, 14 tier boundary
   cases, hanging-probe timeout, cache).
+
+## Phase 2 — install (2026-10-21)
+
+* `vidroute install [--capability ...] [--profile auto|lite|full] [--model ID]
+  [--mirror auto|github|hf|modelscope] [--accept-license ID] [--yes]
+  [--dry-run] [--force]`, plus `models list|verify|remove` and `clean`.
+* Downloader: domain allow-list checked on every redirect hop, HTTP Range
+  resume (partials keyed by SHA-256), mirror fallback, SHA-256 + size check,
+  atomic replace; safe tar/zip extraction (no traversal, no links).
+* Worker envs with uv (Python 3.12 managed, hash-locked, wheels only), uv
+  bootstrap into `$VIDROUTE_HOME/runtimes/uv` when missing.
+* Workers: `sherpa` (Silero VAD, SenseVoice, Whisper), `ocr` (RapidOCR
+  PP-OCRv6), `whisper` (faster-whisper CPU/CUDA with automatic CPU fallback);
+  JSON-lines protocol with progress, cancellation and log capture.
+* Engine adapters (`probe/ensure_installed/run/smoke_test`) + fake engines for
+  offline CI (`VIDROUTE_FAKE_ENGINES=1`).
+* **Acceptance (this Linux machine):** one command
+  `vidroute install --capability asr --capability vad --capability ocr --capability scene --yes`
+  installed the CPU baseline into `~/.vidroute` in 6 m 52 s (Python 3.12 runtime,
+  `sherpa` + `ocr` envs, SenseVoice, Silero VAD, PP-OCRv6); all smoke tests
+  passed. A download killed with SIGKILL at 87.8/112 MB resumed from 87.8 MB.
+  Windows is exercised by the manual `real-install` workflow.
+* Tests: 128 passing (+4 real-model smoke tests with `VIDROUTE_REAL_MODELS=1`).

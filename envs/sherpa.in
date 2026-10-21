@@ -1,0 +1,6 @@
+# Worker env "sherpa": VAD + ASR via sherpa-onnx (CPU wheels for Windows/Linux/macOS).
+sherpa-onnx==1.13.8
+# The platform wheels depend on sherpa-onnx-core (native libraries); pinned explicitly so
+# the universal hash lock covers it on every OS.
+sherpa-onnx-core==1.13.8
+numpy>=2.0,<3

@@ -1,0 +1,2 @@
+# Worker env "whisper" (CPU variant): faster-whisper on CTranslate2.
+faster-whisper==1.2.1

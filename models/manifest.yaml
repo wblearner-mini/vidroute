@@ -379,6 +379,13 @@ models:
       - {path: PP-OCRv6_det_small.onnx, size: 9929594, sha256: 090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f}
       - {path: PP-OCRv6_rec_small.onnx, size: 21234383, sha256: 6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884}
     sources:
+      # rapidocr 3.10.0's wheel ships these exact files (same sha256); the wheel is
+      # hash-pinned in envs/ocr.lock.txt, so copying them needs no extra download.
+      - type: bundled
+        kind: files
+        env_group: ocr
+        package: rapidocr
+        subdir: models
       - type: modelscope
         kind: files
         base_url: "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.10.0/onnx/PP-OCRv6/"

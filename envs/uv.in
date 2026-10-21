@@ -1,0 +1,2 @@
+# Bootstrap: uv itself, installed into $VIDROUTE_HOME/runtimes/uv only when no uv is found.
+uv==0.13.4

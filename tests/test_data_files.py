@@ -73,6 +73,9 @@ def test_manifest_integrity():
             assert m["files"], m["id"]
             assert not m["license"]["restricted"] and not m["license"]["gated"], m["id"]
         for src in m["sources"]:
+            if src["type"] == "bundled":
+                assert src["env_group"] == m["env_group"], m["id"]
+                continue
             url = src.get("url") or src.get("base_url")
             host = re.match(r"https://([^/]+)/", url).group(1)
             assert any(host == d or host.endswith("." + d) for d in manifest["allowed_domains"]), url

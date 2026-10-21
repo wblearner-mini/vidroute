@@ -1,0 +1,55 @@
+name: Real install (downloads models)
+
+# Manually triggered: downloads ~0.6 GB per OS, so it does not run on every push.
+on:
+  workflow_dispatch:
+    inputs:
+      capabilities:
+        description: "capabilities to install"
+        default: "--capability asr --capability vad --capability ocr --capability scene"
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+
+jobs:
+  install:
+    name: install + smoke (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install ffmpeg (Windows, pinned)
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg --version 9.0.2 -y --no-progress
+      - name: Install ffmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends ffmpeg
+      - name: Install vidroute (no uv on PATH: exercises the uv bootstrap)
+        run: |
+          python -m pip install --require-hashes -r requirements-dev.lock.txt
+          python -m pip install --no-deps --no-build-isolation -e .
+      - name: One-command CPU baseline install
+        run: vidroute install ${{ inputs.capabilities }} --yes
+      - name: doctor
+        run: vidroute doctor --refresh
+      - name: Real-model smoke tests
+        env:
+          VIDROUTE_REAL_MODELS: "1"
+        run: python -m pytest -q tests/test_real_models.py
+      - name: Upload worker logs on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vidroute-logs-${{ matrix.os }}
+          path: ~/.vidroute/cache/logs
+          if-no-files-found: ignore

@@ -259,3 +259,47 @@ time (owner's decision, 2026-10-21).
 `requires-python >= 3.10` as specified. Python 3.10 reaches end-of-life in
 October 2026 (PEP 619); CI keeps testing 3.10 until v0.2. Worker environments
 always use Python 3.12 (D-004).
+
+## D-022 OCR models come from the hash-locked RapidOCR wheel when possible
+
+The `rapidocr` 3.10.0 wheel (27 MB) ships `PP-OCRv6_det_small.onnx`,
+`PP-OCRv6_rec_small.onnx` and the v2.0 orientation classifier, byte-identical
+to the manifest entries (same SHA-256). Because the wheel itself is pinned by
+hash in `envs/ocr.lock.txt`, copying those files (and re-checking their
+SHA-256) is as trustworthy as downloading them, so `ocr-ppocrv6-small` lists a
+`type: bundled` source first and ModelScope second. RapidOCR is always given
+explicit local model paths so it never downloads anything on its own.
+
+## D-023 Everything uv writes stays in VIDROUTE_HOME
+
+Worker environments are created with `UV_PYTHON_INSTALL_DIR`, `UV_CACHE_DIR`
+inside `$VIDROUTE_HOME`, `UV_PYTHON_INSTALL_REGISTRY=0` / `--no-registry`
+(no Windows registry entries), `UV_NO_CONFIG=1` (user uv config ignored),
+`--managed-python` (python-build-standalone 3.12, identical on every OS) and
+`--no-build` (wheels only, never compile). The uv cache is deleted after a
+successful install because files are copied (`UV_LINK_MODE=copy`).
+
+Universal locks: `sherpa-onnx`'s Linux/macOS wheels depend on
+`sherpa-onnx-core`, but uv's universal resolution read metadata from a wheel
+that does not declare it; `sherpa-onnx-core==1.13.8` is therefore pinned
+explicitly so `--require-hashes` covers it on every OS.
+
+## D-024 Worker protocol
+
+Workers are stand-alone scripts run with `<env python> -I` (isolated mode, no
+user site, no cwd on `sys.path`). The protocol stream is a duplicate of the
+original stdout fd while fd 1 is redirected to stderr, so native libraries that
+print cannot corrupt JSON. stderr goes to `$VIDROUTE_HOME/cache/logs` (kept only
+when non-empty) and its tail is attached to worker errors. ASR/VAD and OCR run
+in separate processes (D-004).
+
+## D-025 Install confirmation semantics
+
+`vidroute install` always computes the plan first. Without `--yes` it returns
+the plan with error `needs_confirmation` (exit 3) and downloads nothing; an
+interactive terminal shows the plan and asks instead. Restricted licenses
+return `license_not_accepted` (exit 3) until `--accept-license <id>` is given.
+An explicitly requested model the hardware cannot run is exit 4. ffmpeg is
+never installed silently: on Windows with `--yes` the plan runs
+`winget install --id Gyan.FFmpeg` (shown in the plan); elsewhere the command is
+printed.
