@@ -103,3 +103,15 @@ def test_rules_reference_known_models():
     referenced = {mid for chains in local["asr_chains"].values() for chain in chains.values() for mid in chain}
     referenced |= set(local["ocr_chain"]) | set(local["vad_chain"]) | set(local["scene_chain"])
     assert referenced <= known, referenced - known
+
+
+def test_github_workflows_are_valid_yaml():
+    for path in sorted((ROOT / ".github" / "workflows").glob("*.yml")):
+        doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+        assert isinstance(doc, dict) and "jobs" in doc, path.name
+        for job in doc["jobs"].values():
+            for step in job.get("steps", []):
+                uses = step.get("uses")
+                if uses and not uses.startswith("./"):
+                    # Third-party actions must be pinned to a full commit SHA.
+                    assert re.match(r"^[\w.-]+/[\w.-]+@[0-9a-f]{40}$", uses), f"{path.name}: unpinned {uses}"

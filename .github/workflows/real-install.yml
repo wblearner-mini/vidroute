@@ -34,7 +34,7 @@ jobs:
       - name: Install ffmpeg (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends ffmpeg
-      - name: Install vidroute (no uv on PATH: exercises the uv bootstrap)
+      - name: "Install vidroute (no uv on PATH: exercises the uv bootstrap)"
         run: |
           python -m pip install --require-hashes -r requirements-dev.lock.txt
           python -m pip install --no-deps --no-build-isolation -e .
