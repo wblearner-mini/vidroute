@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/wblearner-mini/vidroute/schemas/envelope.schema.json",
+  "title": "vidroute command envelope",
+  "type": "object",
+  "required": ["ok", "schema", "data", "warnings", "error"],
+  "additionalProperties": false,
+  "properties": {
+    "ok": {"type": "boolean"},
+    "schema": {"const": "vidroute/1"},
+    "data": {"type": "object"},
+    "warnings": {"type": "array", "items": {"$ref": "#/$defs/warning"}},
+    "error": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["code", "message", "hint"],
+          "additionalProperties": false,
+          "properties": {
+            "code": {"type": "string", "minLength": 1},
+            "message": {"type": "string", "minLength": 1},
+            "hint": {"type": ["string", "null"]}
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"ok": {"const": true}}},
+      "then": {"properties": {"error": {"type": "null"}}},
+      "else": {"properties": {"error": {"type": "object"}}}
+    }
+  ],
+  "$defs": {
+    "warning": {
+      "type": "object",
+      "required": ["code", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {"type": "string", "minLength": 1},
+        "message": {"type": "string", "minLength": 1},
+        "hint": {"type": "string"}
+      }
+    }
+  }
+}

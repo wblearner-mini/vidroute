@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/wblearner-mini/vidroute/schemas/host-profiles.schema.json",
+  "title": "vidroute agent host profiles",
+  "type": "object",
+  "required": ["schema", "hosts"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "vidroute/host-profiles/1"},
+    "hosts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/host"}}
+  },
+  "$defs": {
+    "host": {
+      "type": "object",
+      "required": [
+        "id", "can_read_files", "can_attach_image", "can_attach_video", "can_attach_audio",
+        "video_delivery", "shell", "confidence", "verified_at", "source"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$"},
+        "aliases": {"type": "array", "items": {"type": "string"}},
+        "can_read_files": {"type": "boolean"},
+        "can_attach_image": {"type": "boolean"},
+        "can_attach_video": {"type": "boolean"},
+        "can_attach_audio": {"type": "boolean"},
+        "video_delivery": {"enum": ["native", "frame-sampled", "preprocessed", "none"]},
+        "video_includes_audio": {"type": "boolean"},
+        "delivery": {"enum": ["inline", "upload"]},
+        "image_formats": {"type": "array", "items": {"type": "string"}},
+        "max_attachment_mb": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "max_images_per_turn": {"type": ["integer", "null"], "minimum": 1},
+        "shell": {"type": "boolean"},
+        "confidence": {"enum": ["verified", "source-verified", "docs-only", "unverified"]},
+        "verified_at": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+        "source": {"type": "array", "items": {"type": "string", "pattern": "^https://"}},
+        "notes": {"type": "string"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"confidence": {"enum": ["verified", "source-verified", "docs-only"]}}},
+          "then": {"properties": {"verified_at": {"type": "string"}, "source": {"minItems": 1}}}
+        },
+        {
+          "if": {"properties": {"video_delivery": {"const": "native"}}},
+          "then": {"properties": {"can_attach_video": {"const": true}}}
+        }
+      ]
+    }
+  }
+}

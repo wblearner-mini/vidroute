@@ -1,0 +1,434 @@
+# LLM capability profiles: input modalities + per-request limits only.
+#
+# * `id` / `aliases` are fnmatch-style globs matched case-insensitively against
+#   the model id the agent reports (`vidroute llm resolve --llm <id>`), with and
+#   without any `provider/` prefix. The most specific match wins; `*` is last.
+# * Values must come from official documentation and carry `verified_at` +
+#   `evidence`. Anything that could not be verified is marked
+#   `unverified: true` and uses conservative values.
+# * Users override entries with `vidroute llm set <id> ...`; overrides win.
+# * Contributing: see docs/PROFILE_CONTRIBUTING.md (official URL + date required).
+#
+# Size fields are megabytes of the *raw file*. When a provider limit applies to
+# the base64 string, the entry says `inline_is_base64: true` and vidroute
+# budgets for the ~4/3 base64 expansion.
+schema: "vidroute/llm-profiles/1"
+
+profiles:
+  # ------------------------------------------------------------------ Qwen Omni
+  - id: "qwen3.8-omni-flash*"
+    display_name: "Qwen3.8-Omni-Flash"
+    modalities_in: [text, image, audio, video]
+    video:
+      audio_in_video: true
+      max_seconds: 7200
+      delivery: [inline_base64, upload_url]
+      inline_max_mb: 10
+      inline_is_base64: true
+      upload_max_mb: 2048
+      fps: 2
+      tokens_per_second: 640
+      max_video_tokens: 180224
+      max_files: 64
+    image:
+      max_images: 250
+      tokens_per_image: 1280
+      patch_px: 32
+      max_side_px: null
+      inline_max_mb: 10
+    audio:
+      max_seconds: 10800
+      tokens_per_second: 7
+      inline_max_mb: 10
+    context_tokens: 1000000
+    source: builtin
+    verified_at: "2026-10-21"
+    evidence:
+      - "https://www.alibabacloud.com/help/en/model-studio/qwen-omni"
+      - "https://www.alibabacloud.com/help/en/model-studio/qwen3-8-omni-flash"
+    notes: >-
+      Video files: up to 2 h, 64 files, 2 GB by public URL, base64 string < 10 MB.
+      Images: 2048 by URL, 250 by base64. Visual tokens per the official estimator:
+      FPS=2, <=640 tokens per frame pair, total visual tokens capped at 180,224;
+      audio 7 tokens/s. Context 1M (991,808 max input in non-thinking mode).
+
+  - id: "qwen3.5-omni*"
+    display_name: "Qwen3.5-Omni (Plus/Flash/Light)"
+    modalities_in: [text, image, audio, video]
+    video:
+      audio_in_video: true
+      max_seconds: 3600
+      delivery: [inline_base64, upload_url]
+      inline_max_mb: 10
+      inline_is_base64: true
+      upload_max_mb: 2048
+      fps: 2
+      tokens_per_second: 640
+      max_video_tokens: 180224
+      max_files: 250
+    image:
+      max_images: 250
+      tokens_per_image: 1280
+      patch_px: 32
+      max_side_px: null
+      inline_max_mb: 10
+    audio:
+      max_seconds: 10800
+      tokens_per_second: 7
+      inline_max_mb: 10
+    context_tokens: 262144
+    source: builtin
+    verified_at: "2026-10-21"
+    evidence:
+      - "https://www.alibabacloud.com/help/en/model-studio/qwen-omni"
+      - "https://www.alibabacloud.com/help/en/model-studio/qwen3-5-omni-flash"
+      - "https://www.alibabacloud.com/help/en/model-studio/qwen3-5-omni-plus"
+    notes: >-
+      Video up to 1 h (512 files by URL, 250 by base64); audio up to 3 h.
+      Context window 262,144 with 196,608 max input. Realtime variants use a
+      different API and are not covered.
+
+  - id: "qwen3-omni-flash*"
+    display_name: "Qwen3-Omni-Flash"
+    modalities_in: [text, image, audio, video]
+    video:
+      audio_in_video: true
+      max_seconds: 150
+      delivery: [inline_base64, upload_url]
+      inline_max_mb: 10
+      inline_is_base64: true
+      upload_max_mb: 256
+      fps: 2
+      tokens_per_second: 768
+      max_video_tokens: 16384
+      max_files: 1
+    image:
+      max_images: 1
+      tokens_per_image: 1280
+      patch_px: 32
+      max_side_px: null
+      inline_max_mb: 10
+    audio:
+      max_seconds: 1200
+      tokens_per_second: 12.5
+      inline_max_mb: 10
+    context_tokens: 65536
+    source: builtin
+    verified_at: "2026-10-21"
+    evidence:
+      - "https://www.alibabacloud.com/help/en/model-studio/qwen-omni"
+      - "https://www.alibabacloud.com/help/en/model-studio/qwen3-omni-flash"
+    notes: >-
+      Only text plus ONE other modality per request; one video file of at most
+      150 s (256 MB by URL, base64 < 10 MB); audio up to 20 min. Context 65,536
+      (49,152 max input).
+
+  # -------------------------------------------------- Qwen (vision, no audio)
+  - id: "qwen3.8-flash*"
+    aliases:
+      - "qwen3.8-max*"
+      - "qwen3.8-27b*"
+      - "qwen3.7-flash*"
+      - "qwen3.6-plus*"
+      - "qwen3.6-flash*"
+      - "qwen3.6-35b*"
+      - "qwen3.6-27b*"
+      - "qwen3.5-plus*"
+      - "qwen3.5-flash*"
+    display_name: "Qwen3.5–3.8 vision models (video without audio)"
+    modalities_in: [text, image, video]
+    video:
+      audio_in_video: false
+      max_seconds: 7200
+      delivery: [inline_base64, upload_url]
+      inline_max_mb: 10
+      inline_is_base64: true
+      upload_max_mb: 2048
+      fps: 2
+      tokens_per_second: null
+      max_video_tokens: null
+      max_files: null
+    image:
+      max_images: 256
+      tokens_per_image: null
+      patch_px: 32
+      max_side_px: null
+      inline_max_mb: 10
+    audio: null
+    context_tokens: 262144
+    source: builtin
+    verified_at: "2026-10-21"
+    evidence:
+      - "https://www.alibabacloud.com/help/en/model-studio/vision"
+      - "https://openrouter.ai/api/v1/models"
+    notes: >-
+      Video files 2 s–2 h; 2 GB by URL, 100 MB as a local path. Image count 256
+      for 3.7-Flash/3.6/3.5 (2,048 for 3.8-Max/Flash and 3.7-Plus). These models
+      do not hear the audio track, so native video routes use D2 (native-v) with
+      a local transcript. Context differs per model (262k–1M); 262,144 is used
+      as the conservative value.
+
+  - id: "qwen3-vl-plus*"
+    display_name: "Qwen3-VL-Plus"
+    modalities_in: [text, image, video]
+    video:
+      audio_in_video: false
+      max_seconds: 3600
+      delivery: [inline_base64, upload_url]
+      inline_max_mb: 10
+      inline_is_base64: true
+      upload_max_mb: 2048
+      fps: 2
+      tokens_per_second: null
+      max_video_tokens: null
+      max_files: null
+    image:
+      max_images: 256
+      tokens_per_image: null
+      patch_px: 32
+      max_side_px: null
+      inline_max_mb: 10
+    audio: null
+    context_tokens: 262144
+    source: builtin
+    verified_at: "2026-10-21"
+    evidence:
+      - "https://www.alibabacloud.com/help/en/model-studio/vision"
+    notes: "Video files 2 s–1 h. No audio understanding."
+
+  - id: "qwen3-coder*"
+    aliases: ["qwen3.7-max*", "qwen3.8-2.4t*"]
+    display_name: "Qwen text-only models (coder / max)"
+    modalities_in: [text]
+    video: null
+    image: null
+    audio: null
+    context_tokens: 262144
+    source: builtin
+    verified_at: "2026-10-21"
+    evidence:
+      - "https://openrouter.ai/api/v1/models"
+    notes: "Text-only per the OpenRouter Models API (architecture.input_modalities)."
+
+  - id: "qwen3.7-plus*"
+    display_name: "Qwen3.7-Plus"
+    modalities_in: [text, image]
+    video: null
+    image:
+      max_images: 2048
+      tokens_per_image: null
+      patch_px: 32
+      max_side_px: null
+      inline_max_mb: 10
+    audio: null
+    context_tokens: 262144
+    source: builtin
+    verified_at: "2026-10-21"
+    evidence:
+      - "https://openrouter.ai/api/v1/models"
+      - "https://www.alibabacloud.com/help/en/model-studio/vision"
+    notes: "Listed with text+image input on OpenRouter; treated as image-only."
+
+  # ------------------------------------------------------------------ Gemini
+  - id: "gemini-*"
+    display_name: "Google Gemini (video-capable chat models)"
+    modalities_in: [text, image, audio, video]
+    video:
+      audio_in_video: true
+      max_seconds: 10800
+      delivery: [inline_base64, file_api]
+      inline_max_mb: 20
+      inline_is_base64: true
+      upload_max_mb: 2048
+      fps: 1
+      tokens_per_second: 100
+      max_video_tokens: null
+      max_files: null
+    image:
+      max_images: null
+      tokens_per_image: 258
+      patch_px: null
+      max_side_px: null
+      inline_max_mb: 20
+    audio:
+      max_seconds: 34200
+      tokens_per_second: 32
+      inline_max_mb: 20
+    context_tokens: 1048576
+    source: builtin
+    verified_at: "2026-10-21"
+    evidence:
+      - "https://ai.google.dev/gemini-api/docs/video-understanding"
+      - "https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash"
+    notes: >-
+      Static mode samples 1 FPS: 66 tokens/frame at low media resolution (the
+      default) or 258 otherwise, plus 32 tokens/s of audio: ~100 tokens/s by
+      default, ~300 at high resolution. 1M-context models take up to 3 h of video
+      at low resolution (1 h at high). Use the File API when the request exceeds
+      20 MB (2 GB per file on the free tier, 20 GB paid). Image-generation, TTS
+      and Live models share the prefix but are not chat models.
+    unverified_fields: [audio.max_seconds, image.max_images]
+
+  # ---------------------------------------------------------- image-only APIs
+  - id: "claude-*"
+    aliases: ["anthropic.claude*", "*claude-opus*", "*claude-sonnet*", "*claude-haiku*", "*claude-fable*"]
+    display_name: "Anthropic Claude"
+    modalities_in: [text, image]
+    video: null
+    image:
+      max_images: 600
+      tokens_per_image: 4784
+      patch_px: 28
+      max_side_px: 2576
+      inline_max_mb: 10
+      inline_is_base64: true
+      dense_threshold: 20
+      dense_max_side_px: 2000
+    audio: null
+    context_tokens: 1000000
+    source: builtin
+    verified_at: "2026-10-21"
+    evidence:
+      - "https://platform.claude.com/docs/en/build-with-claude/vision"
+      - "https://openrouter.ai/api/v1/models"
+    notes: >-
+      Images only (PDF via documents). Up to 600 images per API request (100 for
+      200k-context models); 8000x8000 px max, stricter per-image limit when a
+      request carries more than 20 images. Cost is ceil(w/28)*ceil(h/28) visual
+      tokens; Claude 4.7+ downsizes to a 2576 px long edge / 4784 tokens
+      (older models 1568 px / 1568 tokens). Contact sheets keep requests under the
+      20-image threshold.
+
+  - id: "gpt-5*"
+    aliases: ["o3*", "o4*", "codex-*", "gpt-4.1*", "gpt-4o*"]
+    display_name: "OpenAI GPT-5 family"
+    modalities_in: [text, image]
+    video: null
+    image:
+      max_images: 1500
+      tokens_per_image: null
+      patch_px: null
+      max_side_px: null
+      inline_max_mb: null
+    audio: null
+    context_tokens: 400000
+    source: builtin
+    verified_at: "2026-10-21"
+    evidence:
+      - "https://developers.openai.com/api/docs/guides/images-vision"
+      - "https://openrouter.ai/api/v1/models"
+    notes: >-
+      Text + image (+ files). Up to 1,500 images and 512 MB per request. Context
+      400k–1.05M depending on the model; 400,000 is the conservative value.
+      Audio-capable OpenAI models are separate (gpt-realtime/gpt-audio) and not
+      covered.
+
+  - id: "grok-4*"
+    display_name: "xAI Grok 4"
+    modalities_in: [text, image]
+    video: null
+    image: {max_images: null, tokens_per_image: null, patch_px: null, max_side_px: null, inline_max_mb: null}
+    audio: null
+    context_tokens: 256000
+    source: builtin
+    verified_at: "2026-10-21"
+    evidence: ["https://openrouter.ai/api/v1/models"]
+    notes: "Modalities from the OpenRouter Models API; limits not verified."
+    unverified_fields: [image.max_images]
+
+  - id: "deepseek-v4.1-flash*"
+    aliases: ["deepseek-v4-flash-vision*", "deepseek-flash-latest"]
+    display_name: "DeepSeek V4.1 Flash (vision)"
+    modalities_in: [text, image]
+    video: null
+    image: {max_images: null, tokens_per_image: null, patch_px: null, max_side_px: null, inline_max_mb: null}
+    audio: null
+    context_tokens: 1048576
+    source: builtin
+    verified_at: "2026-10-21"
+    evidence: ["https://openrouter.ai/api/v1/models"]
+    notes: "Modalities from the OpenRouter Models API; image limits not verified."
+    unverified_fields: [image.max_images]
+
+  - id: "deepseek*"
+    display_name: "DeepSeek (text-only models)"
+    modalities_in: [text]
+    video: null
+    image: null
+    audio: null
+    context_tokens: 163840
+    source: builtin
+    verified_at: "2026-10-21"
+    evidence: ["https://openrouter.ai/api/v1/models"]
+    notes: "deepseek-v4-pro, v4-flash, v3.x and r1 are text-only on OpenRouter."
+
+  # ------------------------------------------ other video-capable (no audio)
+  - id: "kimi-k3*"
+    aliases: ["glm-5.3-flash*", "glm-5v*", "glm-4.6v*", "minimax-m3*", "gemma-4*"]
+    display_name: "Other models listing video input (Kimi K3, GLM-5.3 Flash, GLM-5V, MiniMax M3, Gemma 4)"
+    modalities_in: [text, image, video]
+    video:
+      audio_in_video: false
+      max_seconds: 600
+      delivery: [inline_base64]
+      inline_max_mb: 10
+      inline_is_base64: true
+      upload_max_mb: null
+      fps: null
+      tokens_per_second: null
+      max_video_tokens: null
+      max_files: 1
+    image: {max_images: 20, tokens_per_image: null, patch_px: null, max_side_px: null, inline_max_mb: 10}
+    audio: null
+    context_tokens: 128000
+    source: builtin
+    verified_at: null
+    unverified: true
+    evidence: ["https://openrouter.ai/api/v1/models"]
+    notes: >-
+      Video input is listed by the OpenRouter Models API (2026-10-21) but no
+      official per-request limits were verified: conservative values are used.
+      Override with `vidroute llm set`.
+
+  - id: "kimi-k2.[5-9]*"
+    aliases: ["mistral-large*", "mistral-medium*", "mistral-small*", "ministral*", "glm-4.5v*", "gemma-3*"]
+    display_name: "Other image-capable models"
+    modalities_in: [text, image]
+    video: null
+    image: {max_images: 20, tokens_per_image: null, patch_px: null, max_side_px: null, inline_max_mb: 10}
+    audio: null
+    context_tokens: 128000
+    source: builtin
+    verified_at: null
+    unverified: true
+    evidence: ["https://openrouter.ai/api/v1/models"]
+    notes: "Modalities from the OpenRouter Models API; limits are conservative guesses."
+
+  - id: "kimi-k2*"
+    aliases: ["glm-5", "glm-5.[0-3]", "glm-5.3-prime*", "glm-5-*", "glm-4.[67]*", "minimax-m2*", "devstral*", "codestral*"]
+    display_name: "Other text-only models"
+    modalities_in: [text]
+    video: null
+    image: null
+    audio: null
+    context_tokens: 128000
+    source: builtin
+    verified_at: "2026-10-21"
+    evidence: ["https://openrouter.ai/api/v1/models"]
+    notes: "Text-only per the OpenRouter Models API."
+
+  # ---------------------------------------------------------------- fallback
+  - id: "*"
+    display_name: "Unknown model (conservative default)"
+    modalities_in: [text, image]
+    video: null
+    image: {max_images: 20, tokens_per_image: 1600, patch_px: null, max_side_px: 1568, inline_max_mb: 5}
+    audio: null
+    context_tokens: 128000
+    source: builtin
+    verified_at: null
+    unverified: true
+    evidence: []
+    notes: >-
+      Unknown model: treated as image-only with small limits. Pass
+      --modalities, or run `vidroute llm set <id> --modalities ...`.

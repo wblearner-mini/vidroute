@@ -1,0 +1,279 @@
+# Agent host profiles: what the agent shell can actually hand to its model.
+#
+# "The model supports video" is not enough: many hosts can only attach images.
+# Effective capabilities = LLM profile ∩ host profile.
+#
+# video_delivery:
+#   native         the host sends the video file itself (audio track included
+#                  when video_includes_audio is true)
+#   frame-sampled  the host (or its model server) turns video into frames first;
+#                  treated exactly like "no video" (vidroute samples frames itself)
+#   preprocessed   the host converts media to text with its own pipeline
+#                  (D5-like); treated as "no video" for the current LLM
+#   none           videos cannot be attached
+#
+# confidence:
+#   verified         behaviour observed live on the stated date
+#   source-verified  behaviour read from the host's source code at the stated release
+#   docs-only        taken from official documentation, not tested
+#   unverified       no first-party evidence; conservative assumptions apply
+#
+# Unknown hosts fall back to `unknown`. Override with `vidroute host set`.
+schema: "vidroute/host-profiles/1"
+
+hosts:
+  - id: claude-code
+    aliases: [claude, claude-desktop, claude-code-cli]
+    can_read_files: true
+    can_attach_image: true
+    can_attach_video: false
+    can_attach_audio: false
+    video_delivery: none
+    video_includes_audio: false
+    delivery: inline
+    image_formats: [png, jpeg, gif, webp]
+    max_attachment_mb: 128
+    max_images_per_turn: null
+    shell: true
+    confidence: verified
+    verified_at: "2026-10-21"
+    source:
+      - "https://code.claude.com/docs/en/tools-reference.md"
+    notes: >-
+      Read returns PNG/JPEG/GIF/WebP as images (resized to the model's limits;
+      >128 MB refused). Live test 2026-10-21: an .mp4 and an .mp3 were both
+      refused as binary files. Videos therefore go through D3 (keyframes +
+      local transcript).
+
+  - id: codex-cli
+    aliases: [codex, openai-codex]
+    can_read_files: true
+    can_attach_image: true
+    can_attach_video: false
+    can_attach_audio: true
+    video_delivery: none
+    video_includes_audio: false
+    delivery: inline
+    image_formats: [png, jpeg, gif, webp]
+    max_attachment_mb: 50
+    max_images_per_turn: null
+    shell: true
+    confidence: source-verified
+    verified_at: "2026-10-21"
+    source:
+      - "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/protocol/src/local_media.rs"
+    notes: >-
+      rust-v0.163.0 snapshots local images and local audio (wav/mp3/m4a, up to
+      50 MB, the Responses API audio limit) into data URLs; there is no video
+      input type. Audio only helps when the selected model accepts audio.
+
+  - id: gemini-cli
+    aliases: [gemini]
+    can_read_files: true
+    can_attach_image: true
+    can_attach_video: true
+    can_attach_audio: true
+    video_delivery: native
+    video_includes_audio: true
+    delivery: inline
+    image_formats: [png, jpeg, gif, webp, heic, heif]
+    max_attachment_mb: 20
+    max_images_per_turn: null
+    shell: true
+    confidence: source-verified
+    verified_at: "2026-10-21"
+    source:
+      - "https://github.com/google-gemini/gemini-cli/blob/v0.65.0/packages/core/src/utils/fileUtils.ts"
+      - "https://github.com/google-gemini/gemini-cli/blob/v0.65.0/packages/core/src/utils/constants.ts"
+    notes: >-
+      v0.65.0: detectFileType() classifies video/* files and
+      processSingleFileContent() returns them as inlineData parts (the whole
+      file, audio included); MAX_FILE_SIZE_MB = 20. The read_file docs still list
+      only text/images/audio/PDF, so the docs lag the code. Not yet tested live
+      (needs a Gemini API key) — see KNOWN_ISSUES.md.
+
+  - id: qwen-code
+    aliases: [qwen, qwen-code-cli]
+    can_read_files: true
+    can_attach_image: true
+    can_attach_video: true
+    can_attach_audio: true
+    video_delivery: native
+    video_includes_audio: true
+    delivery: inline
+    image_formats: [png, jpeg, gif, webp, bmp]
+    max_attachment_mb: 7.4
+    max_images_per_turn: null
+    shell: true
+    confidence: source-verified
+    verified_at: "2026-10-21"
+    source:
+      - "https://github.com/QwenLM/qwen-code/blob/main/packages/core/src/utils/fileUtils.ts"
+    notes: >-
+      Video/audio files are sent inline only when the configured model declares
+      the modality (`modalities.video` / `modalities.audio`); the base64 data URI
+      must stay under 10 MB (about 7.4 MB of raw file). An experimental Omni mode
+      uploads up to 1 GiB through DashScope instead. If your model config does
+      not declare video, run `vidroute host set qwen-code --video-delivery none`.
+
+  - id: opencode
+    aliases: [open-code, sst-opencode]
+    can_read_files: true
+    can_attach_image: true
+    can_attach_video: false
+    can_attach_audio: false
+    video_delivery: none
+    video_includes_audio: false
+    delivery: inline
+    image_formats: [png, jpeg, gif, webp]
+    max_attachment_mb: 20
+    max_images_per_turn: null
+    shell: true
+    confidence: docs-only
+    verified_at: "2026-10-21"
+    source:
+      - "https://github.com/anomalyco/opencode/blob/dev/services/www/src/docs/content/attachments.mdx"
+    notes: >-
+      V2 sessions make only text files, directory listings and PNG/JPEG/GIF/WebP
+      images visible to the model; PDF, audio and video attachments are dropped.
+      Attachments over 20 MiB are rejected.
+
+  - id: kilo
+    aliases: [kilocode, kilo-code]
+    can_read_files: true
+    can_attach_image: true
+    can_attach_video: false
+    can_attach_audio: false
+    video_delivery: none
+    video_includes_audio: false
+    delivery: inline
+    image_formats: [png, jpeg, gif, webp]
+    max_attachment_mb: 20
+    max_images_per_turn: null
+    shell: true
+    confidence: unverified
+    verified_at: null
+    source:
+      - "https://github.com/Kilo-Org/kilocode"
+    notes: "Kilo Code 7.x builds on opencode; assumed to share its attachment rules."
+
+  - id: cline
+    aliases: [cline-cli]
+    can_read_files: true
+    can_attach_image: true
+    can_attach_video: false
+    can_attach_audio: false
+    video_delivery: none
+    video_includes_audio: false
+    delivery: inline
+    image_formats: [png, jpeg, webp]
+    max_attachment_mb: null
+    max_images_per_turn: null
+    shell: true
+    confidence: unverified
+    verified_at: null
+    source:
+      - "https://github.com/cline/cline"
+    notes: "Image attachments only; a code search of src/ on 2026-10-21 found no video handling."
+
+  - id: roo
+    aliases: [roo-code, roocode]
+    can_read_files: true
+    can_attach_image: true
+    can_attach_video: false
+    can_attach_audio: false
+    video_delivery: none
+    video_includes_audio: false
+    delivery: inline
+    image_formats: [png, jpeg, webp]
+    max_attachment_mb: null
+    max_images_per_turn: null
+    shell: true
+    confidence: unverified
+    verified_at: null
+    source:
+      - "https://github.com/RooCodeInc/Roo-Code"
+    notes: "Repository archived on 2026-05-15 (last release v3.54.0). Image attachments only."
+
+  - id: cursor
+    aliases: [cursor-agent, cursor-cli]
+    can_read_files: true
+    can_attach_image: true
+    can_attach_video: false
+    can_attach_audio: false
+    video_delivery: none
+    video_includes_audio: false
+    delivery: inline
+    image_formats: [png, jpeg, gif, webp]
+    max_attachment_mb: null
+    max_images_per_turn: null
+    shell: true
+    confidence: unverified
+    verified_at: null
+    source:
+      - "https://cursor.com/help/customization/context.md"
+    notes: "Closed source; only image attachments have been observed. Conservative assumptions."
+
+  - id: openclaw
+    aliases: [open-claw]
+    can_read_files: true
+    can_attach_image: true
+    can_attach_video: false
+    can_attach_audio: false
+    video_delivery: preprocessed
+    video_includes_audio: false
+    delivery: inline
+    image_formats: [png, jpeg, gif, webp]
+    max_attachment_mb: 50
+    max_images_per_turn: null
+    shell: true
+    confidence: docs-only
+    verified_at: "2026-10-21"
+    source:
+      - "https://docs.openclaw.ai/nodes/media-understanding"
+    notes: >-
+      Inbound media is summarized to text by a media-understanding model before
+      the reply model runs (defaults: 10 MB image, 20 MB audio, 50 MB video), a
+      D5-style preprocessing step. Chat Completions reply models configured with
+      input ["text","image","video"] can receive local video directly via
+      video_url parts; if yours is set up that way, run
+      `vidroute host set openclaw --video-delivery native --attach-video yes`.
+
+  - id: local-mistralrs
+    aliases: [mistralrs, mistral.rs]
+    can_read_files: true
+    can_attach_image: true
+    can_attach_video: true
+    can_attach_audio: false
+    video_delivery: frame-sampled
+    video_includes_audio: false
+    delivery: inline
+    image_formats: [png, jpeg, gif, webp]
+    max_attachment_mb: null
+    max_images_per_turn: null
+    shell: false
+    confidence: docs-only
+    verified_at: "2026-10-21"
+    source:
+      - "https://github.com/EricLBuehler/mistral.rs/blob/master/docs/src/content/docs/guides/models/video-setup.md"
+    notes: >-
+      mistral.rs decodes non-GIF video into frames with FFmpeg at request time;
+      whether audio is used depends on the loaded model. Frame-sampled delivery
+      is routed like images (D3), where vidroute controls the sampling.
+
+  - id: unknown
+    can_read_files: true
+    can_attach_image: true
+    can_attach_video: false
+    can_attach_audio: false
+    video_delivery: none
+    video_includes_audio: false
+    delivery: inline
+    image_formats: [png, jpeg]
+    max_attachment_mb: 5
+    max_images_per_turn: 20
+    shell: true
+    confidence: unverified
+    verified_at: null
+    source: []
+    notes: "Default for unknown hosts: images only, conservative limits. Override with `vidroute host set`."

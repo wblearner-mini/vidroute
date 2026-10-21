@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/wblearner-mini/vidroute/schemas/llm-profiles.schema.json",
+  "title": "vidroute LLM capability profiles",
+  "type": "object",
+  "required": ["schema", "profiles"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "vidroute/llm-profiles/1"},
+    "profiles": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/profile"}}
+  },
+  "$defs": {
+    "mb": {"type": ["number", "null"], "exclusiveMinimum": 0},
+    "count": {"type": ["integer", "null"], "minimum": 1},
+    "video": {
+      "type": ["object", "null"],
+      "required": ["audio_in_video", "max_seconds", "delivery"],
+      "additionalProperties": false,
+      "properties": {
+        "audio_in_video": {"type": "boolean"},
+        "max_seconds": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "delivery": {
+          "type": "array",
+          "items": {"enum": ["inline_base64", "upload_url", "file_api"]},
+          "minItems": 1
+        },
+        "inline_max_mb": {"$ref": "#/$defs/mb"},
+        "inline_is_base64": {"type": "boolean"},
+        "upload_max_mb": {"$ref": "#/$defs/mb"},
+        "fps": {"type": ["number", "string", "null"]},
+        "tokens_per_second": {"type": ["number", "null"], "minimum": 0},
+        "max_video_tokens": {"$ref": "#/$defs/count"},
+        "max_files": {"$ref": "#/$defs/count"}
+      }
+    },
+    "image": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "max_images": {"$ref": "#/$defs/count"},
+        "tokens_per_image": {"type": ["number", "null"], "minimum": 0},
+        "patch_px": {"$ref": "#/$defs/count"},
+        "max_side_px": {"$ref": "#/$defs/count"},
+        "inline_max_mb": {"$ref": "#/$defs/mb"},
+        "inline_is_base64": {"type": "boolean"},
+        "dense_threshold": {"$ref": "#/$defs/count"},
+        "dense_max_side_px": {"$ref": "#/$defs/count"}
+      }
+    },
+    "audio": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "max_seconds": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "tokens_per_second": {"type": ["number", "null"], "minimum": 0},
+        "inline_max_mb": {"$ref": "#/$defs/mb"}
+      }
+    },
+    "profile": {
+      "type": "object",
+      "required": ["id", "modalities_in", "context_tokens", "source", "verified_at"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "aliases": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "display_name": {"type": "string"},
+        "modalities_in": {
+          "type": "array",
+          "items": {"enum": ["text", "image", "audio", "video"]},
+          "contains": {"const": "text"},
+          "uniqueItems": true
+        },
+        "video": {"$ref": "#/$defs/video"},
+        "image": {"$ref": "#/$defs/image"},
+        "audio": {"$ref": "#/$defs/audio"},
+        "context_tokens": {"type": "integer", "minimum": 1024},
+        "source": {"enum": ["builtin", "user", "provider_api", "flag"]},
+        "verified_at": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+        "unverified": {"type": "boolean"},
+        "unverified_fields": {"type": "array", "items": {"type": "string"}},
+        "evidence": {"type": "array", "items": {"type": "string", "pattern": "^https://"}},
+        "notes": {"type": "string"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"verified_at": {"type": "null"}}},
+          "then": {"required": ["unverified"], "properties": {"unverified": {"const": true}}}
+        }
+      ]
+    }
+  }
+}

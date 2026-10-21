@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/wblearner-mini/vidroute/schemas/manifest.schema.json",
+  "title": "vidroute local model manifest",
+  "type": "object",
+  "required": ["schema", "allowed_domains", "env_groups", "models"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "vidroute/manifest/1"},
+    "allowed_domains": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[a-z0-9.-]+$"}},
+    "env_groups": {"type": "object", "additionalProperties": {"$ref": "#/$defs/env_group"}},
+    "models": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/model"}}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "env_group": {
+      "type": "object",
+      "required": ["description", "python", "lock", "import_check"],
+      "additionalProperties": false,
+      "properties": {
+        "description": {"type": "string"},
+        "python": {"type": "string", "pattern": "^3\\.\\d+$"},
+        "lock": {"type": "string"},
+        "lock_cuda": {"type": "string"},
+        "import_check": {"type": "string"},
+        "approx_size_mb": {"type": "number"},
+        "approx_size_mb_cuda": {"type": "number"}
+      }
+    },
+    "license": {
+      "type": "object",
+      "required": ["spdx", "restricted", "gated", "name", "url"],
+      "additionalProperties": false,
+      "properties": {
+        "spdx": {"type": "string", "minLength": 1},
+        "restricted": {"type": "boolean"},
+        "gated": {"type": "boolean"},
+        "name": {"type": "string"},
+        "url": {"type": "string", "pattern": "^https://"},
+        "notes": {"type": "string"}
+      }
+    },
+    "file": {
+      "type": "object",
+      "required": ["path", "size", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string", "pattern": "^[^/\\\\][^\\\\]*$"},
+        "size": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "optional": {"type": "boolean"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": ["type", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {"enum": ["github", "hf", "modelscope"]},
+        "kind": {"enum": ["files", "archive"]},
+        "base_url": {"type": "string", "pattern": "^https://.*/$"},
+        "url": {"type": "string", "pattern": "^https://"},
+        "size": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "strip_prefix": {"type": "string"},
+        "layout": {"type": "object", "additionalProperties": {"type": "string"}}
+      },
+      "allOf": [
+        {"if": {"properties": {"kind": {"const": "files"}}}, "then": {"required": ["base_url"]}},
+        {"if": {"properties": {"kind": {"const": "archive"}}}, "then": {"required": ["url", "sha256", "size"]}}
+      ]
+    },
+    "model": {
+      "type": "object",
+      "required": [
+        "id", "capability", "engine", "env_group", "package", "status", "languages",
+        "size_mb", "tiers", "license", "files", "sources", "verified_at"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$"},
+        "capability": {"enum": ["asr", "vad", "ocr", "scene", "vlm"]},
+        "engine": {"type": "string"},
+        "env_group": {"type": ["string", "null"]},
+        "package": {"enum": ["base", "optional", "builtin"]},
+        "status": {"enum": ["default", "alt", "experimental"]},
+        "requires_gpu": {"enum": ["cuda", "vulkan"]},
+        "languages": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "size_mb": {"type": "number", "minimum": 0},
+        "min_ram_gb": {"type": ["number", "null"]},
+        "min_vram_gb": {"type": ["number", "null"]},
+        "tiers": {"type": "array", "items": {"enum": ["cpu-lite", "cpu-full", "gpu-cuda", "gpu-vulkan"]}},
+        "timestamps": {"enum": ["word", "segment", "none"]},
+        "whisper_prefix": {"type": "string"},
+        "license": {"$ref": "#/$defs/license"},
+        "files": {"type": "array", "items": {"$ref": "#/$defs/file"}},
+        "sources": {"type": "array", "items": {"$ref": "#/$defs/source"}},
+        "smoke_test": {"type": ["string", "null"]},
+        "verified_at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+        "notes": {"type": "string"}
+      }
+    }
+  }
+}

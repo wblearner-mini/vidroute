@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local tooling
+.uv-python/
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Runtime data must never be committed: models, envs, outputs, test media
+.vidroute/
+vidroute-out/
+*.part
+*.part.json
+tests/.media/
+tests/_out/
+
+# Model weights and third-party binaries are downloaded on demand, never vendored
+*.onnx
+*.bin
+*.gguf
+*.safetensors
+*.tar.bz2

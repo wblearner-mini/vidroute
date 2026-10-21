@@ -1,0 +1,105 @@
+# Thresholds for the deterministic two-layer router (src/vidroute/core/plan).
+# Every value here is overridable per user via config; the code never asks an
+# LLM to make routing decisions. See references/routing.md for the rationale.
+schema: "vidroute/rules/1"
+
+delivery:
+  # D1 (native-av): attach the local transcript as a reference/anchor when the
+  # video is longer than this, when it has to be segmented, or when the task
+  # needs verbatim text with timestamps (minutes, transcript).
+  native_only_max_minutes: 10
+  transcript_tasks: [minutes, transcript]
+  # Native routes may split an over-limit video into at most this many parts.
+  max_segments: 8
+  segment_overlap_seconds: 3
+  # Input-token budget = context window * budget_fraction (config: budget_fraction
+  # or budget_tokens). Over budget: degrade (prefer=cost) or ask (others).
+  budget_fraction: 0.5
+  over_budget_action:
+    quality: confirm
+    privacy: confirm
+    cost: degrade
+  transcode:
+    target_heights: [720, 540, 480, 360]
+    max_fps: 10
+    min_fps: 2
+    audio_kbps: 64
+    min_audio_kbps: 24
+    min_video_kbps: 120
+    size_safety: 0.9
+    video_codec: libx264
+    audio_codec: aac
+    crf: 28
+  # "Frames + audio track" (the D3 variant used when LLM ∩ host accepts audio):
+  # audio is re-encoded as 16 kHz mono MP3 on this bitrate ladder until it fits.
+  audio_attachment:
+    enabled: true
+    sample_rate: 16000
+    mp3_kbps_ladder: [64, 48, 40, 32, 24, 16]
+
+frames:
+  max_frames: 60
+  base_interval_seconds: 4
+  min_interval_seconds: 2
+  max_interval_seconds: 30
+  # Candidate frames = scene changes + a periodic grid; the grid interval grows
+  # with duration so candidates stay under this cap.
+  max_candidates: 360
+  scene_threshold: 0.3
+  dhash_max_distance: 5
+  frame_max_side_px: 1280
+  ocr_frame_max_side_px: 1920
+  jpeg_qscale: 3
+  contact_sheet:
+    cols: 4
+    rows: 3
+    tile_width: 400
+    label: true
+
+local:
+  embedded_subtitle_min_coverage: 0.7
+  speech_ratio_skip_asr: 0.05
+  ocr_text_density_threshold: 0.3
+  long_video_minutes: 30
+  asr_chunk_max_seconds: 25
+  vad_min_silence_seconds: 0.4
+  vad_min_speech_seconds: 0.25
+  language_probe_seconds: 30
+  # R3: languages that use the "zh" selector; everything else uses "multi".
+  zh_languages: [zh, yue, cmn, zh-cn, zh-tw, zh-hk, zh-hans, zh-hant]
+  # Ordered ASR preferences per selector and tier. The first entry that is
+  # installed, supports the language and passes its smoke test wins; failures
+  # fall back down the list (GPU -> CPU, large -> small, engine A -> B).
+  asr_chains:
+    zh:
+      gpu-cuda: [asr-sensevoice-small-int8, asr-faster-whisper-large-v3-turbo, asr-whisper-small-int8]
+      gpu-vulkan: [asr-sensevoice-small-int8, asr-whisper-small-int8]
+      cpu-full: [asr-sensevoice-small-int8, asr-sensevoice-yue-int8, asr-whisper-small-int8]
+      cpu-lite: [asr-sensevoice-small-int8, asr-whisper-small-int8]
+    multi:
+      gpu-cuda: [asr-faster-whisper-large-v3-turbo, asr-whisper-small-int8, asr-sensevoice-small-int8]
+      gpu-vulkan: [asr-whisper-small-int8, asr-sensevoice-small-int8]
+      cpu-full: [asr-whisper-small-int8, asr-faster-whisper-small, asr-sensevoice-small-int8]
+      cpu-lite: [asr-whisper-small-int8, asr-sensevoice-small-int8]
+  ocr_chain: [ocr-ppocrv6-small, ocr-ppocrv6-tiny]
+  vad_chain: [vad-silero, vad-energy]
+  scene_chain: [scene-ffmpeg]
+
+# Rough planning estimates (documented in references/routing.md); they only
+# drive est_seconds / est_input_tokens in plan.json, never correctness.
+estimates:
+  transcript_tokens_per_speech_second: 3.5
+  ocr_tokens_per_frame: 120
+  timeline_overhead_tokens: 800
+  asr_rtf:
+    cpu-lite: 0.25
+    cpu-full: 0.08
+    gpu-cuda: 0.03
+    gpu-vulkan: 0.08
+  ocr_seconds_per_frame:
+    cpu-lite: 1.5
+    cpu-full: 0.5
+    gpu-cuda: 0.5
+    gpu-vulkan: 0.5
+  transcode_rtf: 0.2
+  frame_extract_seconds: 0.12

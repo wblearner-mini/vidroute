@@ -1,0 +1,98 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vidroute"
+dynamic = ["version"]
+description = "Give coding agents eyes and ears for local video: route each video to what the agent's LLM and host can actually consume (native video, keyframes + transcript, or text)."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "wblearner-mini" }]
+keywords = ["video", "agent", "agent-skill", "mcp", "asr", "ocr", "llm", "multimodal", "keyframes", "transcript"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+# The orchestrator is deliberately standard-library only. Heavy dependencies
+# (onnxruntime, sherpa-onnx, OCR, faster-whisper) live in isolated worker
+# environments under $VIDROUTE_HOME/envs and are created only after the user
+# confirms an install plan.
+dependencies = []
+
+[project.scripts]
+vidroute = "vidroute.cli:main"
+vidroute-mcp = "vidroute.mcp_server:main"
+
+[project.urls]
+Homepage = "https://github.com/wblearner-mini/vidroute"
+Issues = "https://github.com/wblearner-mini/vidroute/issues"
+Changelog = "https://github.com/wblearner-mini/vidroute/blob/main/CHANGELOG.md"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pyyaml>=6.0.2",
+    "jsonschema>=4.23",
+]
+
+[tool.hatch.version]
+path = "src/vidroute/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vidroute"]
+
+# Data files live at the repository root (so the repo doubles as an Agent
+# Skill folder and profiles are easy to review in PRs) and are copied into the
+# wheel under vidroute/_data. vidroute.core.resources resolves both layouts.
+[tool.hatch.build.targets.wheel.force-include]
+"routing" = "vidroute/_data/routing"
+"models" = "vidroute/_data/models"
+"schemas" = "vidroute/_data/schemas"
+"references" = "vidroute/_data/references"
+"envs" = "vidroute/_data/envs"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/",
+    "routing/",
+    "models/",
+    "schemas/",
+    "references/",
+    "envs/",
+    "scripts/",
+    "tests/",
+    "docs/",
+    "SKILL.md",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE",
+    "THIRD_PARTY_LICENSES.md",
+    "CHANGELOG.md",
+    "CITATION.cff",
+]
+exclude = ["tests/.media", "tests/_out"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "ffmpeg: needs ffmpeg/ffprobe on PATH",
+    "real_models: needs downloaded models; enabled with VIDROUTE_REAL_MODELS=1",
+    "slow: long-running integration test",
+]
