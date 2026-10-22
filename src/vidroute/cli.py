@@ -126,6 +126,62 @@ def render_models(env: Envelope, args: argparse.Namespace) -> str:
     return dumps(d)
 
 
+def render_resolve(env: Envelope, args: argparse.Namespace) -> str:
+    d = env.data
+    if "effective" not in d:
+        return dumps(d)
+    llm, host, eff = d["llm"], d["host"], d["effective"]
+    flags = [m for m in ("image", "video", "audio") if eff.get(m)]
+    lines = [
+        f"LLM   {llm['model']} -> profile {llm['matched']} ({', '.join(llm['modalities_in'])}; "
+        f"context {llm['context_tokens']:,}; {'UNVERIFIED' if llm['unverified'] else 'verified ' + str(llm['verified_at'])})",
+        f"host  {host['id']} (source {host['source']}, confidence {host.get('confidence')}): image={host.get('can_attach_image')} "
+        f"video={host.get('can_attach_video')}/{host.get('video_delivery')} audio={host.get('can_attach_audio')}",
+        f"effective  text + {', '.join(flags) or 'nothing else'}" + ("  (video includes audio)" if eff.get("audio_in_video") else ""),
+    ]
+    for b in eff.get("blocked_by_host") or []:
+        lines.append(f"  blocked: {b['modality']}: {b['why']}")
+    if eff.get("video_limits"):
+        v = eff["video_limits"]
+        lines.append(f"  video limits: {v['max_seconds']} s, {v['max_file_mb']} MB per file, {v['max_files']} files/request")
+    if eff.get("image_limits"):
+        i = eff["image_limits"]
+        lines.append(f"  image limits: {i['max_images']} images, {i['max_file_mb']} MB each")
+    lines.append("  sources: " + ", ".join(f"{k}={v}" for k, v in llm["sources"].items()))
+    return "\n".join(lines)
+
+
+def render_probe(env: Envelope, args: argparse.Namespace) -> str:
+    d = env.data
+    v = d.get("video") or {}
+    lines = [
+        f"{d['name']}: {d['duration']:.1f} s, {d['size_mb']} MB, {d.get('format')}",
+        f"  video   {v.get('codec')} {v.get('width')}x{v.get('height')} @ {v.get('fps')} fps" if v else "  video   none",
+        f"  audio   {'yes' if d['has_audio'] else 'no'}; speech_ratio {d['speech_ratio']} ({d['speech']['method']})",
+        f"  text    text_density {d['text_density']} ({d['pictures'].get('method', 'n/a')}); visual_change {d['visual_change']}",
+        f"  subs    {', '.join(s['codec'] + '/' + str(s.get('language')) for s in d['subtitles']) or 'none'}",
+        f"  probe   {d['probe_seconds']} s{' (cached)' if d.get('cached') else ''}",
+    ]
+    return "\n".join(lines)
+
+
+def render_plan(env: Envelope, args: argparse.Namespace) -> str:
+    from vidroute.core.plan import summarize
+
+    d = env.data
+    lines = summarize(d)
+    lines.append("Steps:")
+    for st in d["steps"]:
+        lines.append(f"  {st['id']:<16} {st['status']:<13} {str(st['engine'] or '-'):<28} ~{st['est_seconds']:>6}s  {st['reason']}")
+    for n in d.get("needs_confirmation") or []:
+        lines.append(f"Needs confirmation: {n['message']}")
+    for n in d.get("needs_install") or []:
+        lines.append(f"Needs install ({n['capability']}): {n['hint']}")
+    if d.get("plan_path"):
+        lines.append(f"Plan written to {d['plan_path']}")
+    return "\n".join(lines)
+
+
 # ------------------------------------------------------------------ handlers
 
 
@@ -173,6 +229,43 @@ def h_models(args: argparse.Namespace, ctx: Ctx) -> Envelope:
 
 def h_clean(args: argparse.Namespace, ctx: Ctx) -> Envelope:
     return api.clean(outputs=args.outputs, yes=args.yes, ctx=ctx)
+
+
+def h_llm(args: argparse.Namespace, ctx: Ctx) -> Envelope:
+    action = args.action or "list"
+    if action == "resolve":
+        return api.llm_resolve(args.llm, args.host, args.modalities, args.audio_in_video, ctx=ctx)
+    if action == "set":
+        return api.llm_set(args.model_id, modalities=args.modalities, audio_in_video=args.audio_in_video,
+                           video_max_seconds=args.video_max_seconds, video_max_mb=args.video_max_mb,
+                           video_tokens_per_second=args.video_tokens_per_second, max_images=args.max_images,
+                           context_tokens=args.context_tokens, notes=args.notes, ctx=ctx)
+    if action == "unset":
+        return api.llm_unset(args.model_id, ctx=ctx)
+    if action == "sync":
+        return api.llm_sync(args.provider, ctx=ctx)
+    return api.llm_list(ctx=ctx)
+
+
+def h_host(args: argparse.Namespace, ctx: Ctx) -> Envelope:
+    action = args.action or "list"
+    if action == "set":
+        return api.host_set(args.host_id, attach_image=args.attach_image, attach_video=args.attach_video,
+                            attach_audio=args.attach_audio, video_delivery=args.video_delivery,
+                            video_includes_audio=args.video_includes_audio, max_attachment_mb=args.max_attachment_mb,
+                            notes=args.notes, ctx=ctx)
+    if action == "unset":
+        return api.host_unset(args.host_id, ctx=ctx)
+    return api.host_list(ctx=ctx)
+
+
+def h_probe(args: argparse.Namespace, ctx: Ctx) -> Envelope:
+    return api.probe(args.video, refresh=args.refresh, ctx=ctx)
+
+
+def h_plan(args: argparse.Namespace, ctx: Ctx) -> Envelope:
+    return api.plan(args.video, args.llm, args.host, args.task, args.prefer, args.language, args.modalities,
+                    args.audio_in_video, args.ocr, args.route, args.force_asr, args.out, ctx=ctx)
 
 
 def h_config(args: argparse.Namespace, ctx: Ctx) -> Envelope:
@@ -240,6 +333,68 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("clean", "Delete download caches and logs inside VIDROUTE_HOME", h_clean)
     p.add_argument("--outputs", action="store_true", help="also delete $VIDROUTE_HOME/out")
     p.add_argument("--yes", "-y", action="store_true")
+
+    def sub_parser(subs: Any, name: str, help_text: str) -> argparse.ArgumentParser:
+        sp = subs.add_parser(name, help=help_text, description=help_text)
+        _common_flags(sp, suppress=True)
+        return sp
+
+    def llm_flags(sp: argparse.ArgumentParser) -> None:
+        sp.add_argument("--modalities", help="comma list overriding the profile, e.g. text,image,video,audio")
+        sp.add_argument("--audio-in-video", choices=["yes", "no"], help="can the model hear a video's audio track?")
+
+    p = add("llm", "Resolve LLM x host capabilities, or override/sync LLM profiles", h_llm, render_resolve)
+    lsub = p.add_subparsers(dest="action", metavar="ACTION", parser_class=_Parser)
+    sp = sub_parser(lsub, "resolve", "effective capabilities of an LLM on a host")
+    sp.add_argument("--llm", required=True, help="model id the agent runs on (e.g. claude-opus-5-5)")
+    sp.add_argument("--host", help="agent host id (claude-code, codex-cli, gemini-cli, qwen-code, opencode, ...)")
+    llm_flags(sp)
+    sp = sub_parser(lsub, "set", "override a model's profile in config.json")
+    sp.add_argument("model_id", help="model id or glob (quote globs)")
+    llm_flags(sp)
+    sp.add_argument("--video-max-seconds", type=float)
+    sp.add_argument("--video-max-mb", type=float, help="max raw file size per video")
+    sp.add_argument("--video-tokens-per-second", type=float)
+    sp.add_argument("--max-images", type=int)
+    sp.add_argument("--context-tokens", type=int)
+    sp.add_argument("--notes")
+    sp = sub_parser(lsub, "unset", "remove a user override")
+    sp.add_argument("model_id")
+    sub_parser(lsub, "list", "bundled and user profiles")
+    sp = sub_parser(lsub, "sync", "download a public model list to learn modalities (explicit, opt-in)")
+    sp.add_argument("--provider", default="openrouter", choices=["openrouter"])
+
+    p = add("host", "Override or list agent host profiles", h_host)
+    hsub = p.add_subparsers(dest="action", metavar="ACTION", parser_class=_Parser)
+    sp = sub_parser(hsub, "set", "override what a host can attach")
+    sp.add_argument("host_id")
+    sp.add_argument("--attach-image", choices=["yes", "no"])
+    sp.add_argument("--attach-video", choices=["yes", "no"])
+    sp.add_argument("--attach-audio", choices=["yes", "no"])
+    sp.add_argument("--video-delivery", choices=["native", "frame-sampled", "preprocessed", "none"])
+    sp.add_argument("--video-includes-audio", choices=["yes", "no"])
+    sp.add_argument("--max-attachment-mb", type=float)
+    sp.add_argument("--notes")
+    sp = sub_parser(hsub, "unset", "remove a user override")
+    sp.add_argument("host_id")
+    sub_parser(hsub, "list", "bundled and user host profiles")
+
+    p = add("probe", "Fast facts about a video: streams, speech ratio, text density, visual change", h_probe, render_probe)
+    p.add_argument("video")
+    p.add_argument("--refresh", action="store_true", help="ignore the cached probe")
+
+    p = add("plan", "Two-layer routing plan for a video (writes plan.json with --out)", h_plan, render_plan)
+    p.add_argument("video")
+    p.add_argument("--llm", help="model id the agent runs on (or config default_llm)")
+    p.add_argument("--host", help="agent host id (or config default_host / auto-detected)")
+    p.add_argument("--task", default="summary", choices=["minutes", "summary", "qa", "transcript"])
+    p.add_argument("--prefer", default="quality", choices=["quality", "privacy", "cost"])
+    p.add_argument("--language", default="auto", help="spoken language (zh, en, ...) or auto")
+    p.add_argument("--ocr", default="auto", choices=["auto", "on", "off"])
+    p.add_argument("--route", default="auto", choices=["auto", "native-av", "native-v", "frames", "text"])
+    p.add_argument("--force-asr", action="store_true", help="run ASR even with subtitles / no detected speech")
+    p.add_argument("--out", help="output root; plan.json is written to <out>/<slug>/plan.json")
+    llm_flags(p)
 
     p = add("config", "Get or set user configuration ($VIDROUTE_HOME/config.json)", h_config, render_config)
     csub = p.add_subparsers(dest="action", metavar="ACTION", parser_class=_Parser)

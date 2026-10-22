@@ -303,3 +303,39 @@ An explicitly requested model the hardware cannot run is exit 4. ffmpeg is
 never installed silently: on Windows with `--yes` the plan runs
 `winget install --id Gyan.FFmpeg` (shown in the plan); elsewhere the command is
 printed.
+
+## D-026 RAM tolerance for the 8 GB boundary
+
+The brief defines `cpu-lite` as "< 8 GB RAM". Machines sold with 8 GB report
+7.5–7.99 GB usable (firmware/iGPU reservations); GitHub's windows-latest runner
+reports 7.99 GB. vidroute therefore treats ≥ 7.5 GB as the 8 GB class; below
+7.5 GB is `cpu-lite`.
+
+## D-027 Probe: text density from OCR detection when available
+
+`text_density` drives R4 (OCR on/off). A pure-Python block heuristic
+(contrast + edge density + bimodal histogram) is always computed, but it has
+known failure modes on synthetic calibration clips: high-contrast random
+texture (`life`) reads as text (0.875) and a burned-in subtitle over a busy
+background is missed (0.0). When an OCR model is installed, probe runs the
+PP-OCR **detector only** (no recognition, ~0.16 s per 640 px frame) on the same
+8 frames and discards boxes that cannot be text lines (taller than 20 % of the
+frame, tiny slivers, whole-frame blobs). On the calibration set this classified
+slides, code, subtitles-only, testsrc2 (has a timecode), mandelbrot and life all
+correctly; probe stays at ~3 s. The heuristic remains the fallback and is
+reported as such (`pictures.method`).
+
+## D-028 Segment count vs. per-request file limits
+
+Native routes split over-limit videos into at most `max_segments` (8)
+segments with 3 s overlap. A model's per-request file limit (`max_files`, e.g. 1
+for Qwen3-Omni-Flash) does not cap the segment count — segments can be sent in
+separate turns — and is reported to the agent instead.
+
+## D-029 Audio attachments need the same consent as raw video
+
+The "frames + audio" variant (D-014) hands the audio track to the LLM provider.
+It is planned only when LLM ∩ host accept audio and speech is present, and
+`prepare` only attaches it with `--accept-raw-video-handoff`; without the flag it
+silently falls back to frames without audio (still a valid, more private
+delivery) instead of failing.

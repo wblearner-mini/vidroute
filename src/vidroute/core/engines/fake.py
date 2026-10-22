@@ -52,6 +52,9 @@ class FakeOcr(Engine):
         return [{"image": str(p), "lines": [{"text": f"[fake ocr {Path(p).stem}]", "score": 1.0,
                                              "box": [[0, 0], [10, 0], [10, 10], [0, 10]]}]} for p in images]
 
+    def detect_text(self, ctx: Ctx, pool: WorkerPool, images: list[Path]) -> list[dict[str, Any]]:
+        return [{"image": str(p), "width": 640, "height": 360, "boxes": [[40, 300, 600, 340]]} for p in images]
+
     def smoke_test(self, ctx: Ctx) -> dict[str, Any]:
         return {"status": "passed", "detail": "fake engine"}
 

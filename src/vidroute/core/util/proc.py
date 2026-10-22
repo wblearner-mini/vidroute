@@ -84,6 +84,24 @@ def run(
     return Result(argv, cp.returncode, _decode(cp.stdout), _decode(cp.stderr), False, time.monotonic() - start)
 
 
+def run_bytes(
+    args: Sequence[str | os.PathLike[str]],
+    *,
+    timeout: float | None = None,
+    env: Mapping[str, str] | None = None,
+) -> tuple[int, bytes, str]:
+    """Like :func:`run` but returns raw stdout bytes (for rawvideo/rawaudio pipes)."""
+    argv = [os.fspath(a) for a in args]
+    try:
+        cp = subprocess.run(argv, capture_output=True, timeout=timeout, env=child_env(env),
+                            stdin=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW, check=False)
+    except subprocess.TimeoutExpired:
+        return -1, b"", "timed out"
+    except OSError as exc:
+        return 127, b"", str(exc)
+    return cp.returncode, cp.stdout, _decode(cp.stderr)
+
+
 def popen(
     args: Sequence[str | os.PathLike[str]],
     *,

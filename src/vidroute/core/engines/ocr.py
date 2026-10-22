@@ -28,6 +28,15 @@ class RapidOcr(Engine):
         res = client.call("ocr", {"key": key, "images": [str(p) for p in images], "min_score": min_score})
         return res["results"]
 
+    def detect_text(self, ctx: Ctx, pool: WorkerPool, images: list[Path]) -> list[dict[str, Any]]:
+        """Bounding rectangles of text lines (detection only, no recognition)."""
+        if not images:
+            return []
+        client = self.client(pool)
+        det, rec = self._files()
+        key = client.call("ocr_load", {"det": det, "rec": rec})["key"]
+        return client.call("detect", {"key": key, "images": [str(p) for p in images]})["results"]
+
     def smoke_test(self, ctx: Ctx) -> dict[str, Any]:
         with WorkerPool(ctx) as pool, tempfile.TemporaryDirectory() as tmp:
             img = Path(tmp) / "smoke.png"

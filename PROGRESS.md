@@ -8,8 +8,8 @@ commit and an update here.
 | 0 | research, decisions with evidence, scaffold, CI, schemas | ✅ done |
 | 1 | `doctor`: system/GPU/ffmpeg/runtime detection, tiers, cache | ✅ done |
 | 2 | `install`: downloader, mirrors, verification, uv envs, smoke tests | ✅ done |
-| 3 | `llm resolve`, profiles, `probe`, `plan` (two-layer routing) | ⏳ next |
-| 4 | local perception pipeline, `prepare` for D3/D4 | — |
+| 3 | `llm resolve`, profiles, `probe`, `plan` (two-layer routing) | ✅ done |
+| 4 | local perception pipeline, `prepare` for D3/D4 | ⏳ next |
 | 5 | native routes, `handoff.json`, `drill`, raw-video consent | — |
 | 6 | CLI/MCP/Skill shells, packaging, README | — |
 | 6.5 | open-source release checklist, v0.1.0 | — |
@@ -75,3 +75,33 @@ commit and an update here.
   passed. A download killed with SIGKILL at 87.8/112 MB resumed from 87.8 MB.
   Windows is exercised by the manual `real-install` workflow.
 * Tests: 128 passing (+4 real-model smoke tests with `VIDROUTE_REAL_MODELS=1`).
+* **Clean Windows acceptance (GitHub `windows-latest`, real-install workflow):**
+  uv bootstrapped from PyPI, Python 3.12 + `sherpa`/`ocr` envs, SenseVoice,
+  Silero VAD and PP-OCRv6 installed by one command; all smoke tests passed
+  (job ≈ 2 min). Ubuntu passed too.
+
+## Phase 3 — profiles, probe, plan (2026-10-22)
+
+* `vidroute llm resolve|set|unset|list|sync`, `vidroute host set|unset|list`:
+  capability precedence flag > user config > provider cache (opt-in
+  `llm sync --provider openrouter`) > bundled profile > conservative default;
+  every field reports its source. Effective capabilities = LLM ∩ host, with
+  "limited by the host, not the model" made explicit. Host guessed from
+  `CLAUDECODE`, `GEMINI_CLI`, `QWEN_CODE_*`, `CODEX_SANDBOX` when `--host` is
+  missing (with a warning).
+* `vidroute probe`: streams/subtitles/rotation via ffprobe, `speech_ratio` from
+  Silero VAD on sampled windows (energy fallback), `text_density` from PP-OCR
+  detection on 8 frames (heuristic fallback), `visual_change`; ~3 s, cached.
+* `vidroute plan`: layer 1 picks native-av / native-v / frames / text from
+  LLM ∩ host, then admission (privacy, limits after transcode/segmentation,
+  token budget) with the explicit chain native → frames → text and a D5
+  suggestion when the host is the bottleneck; layer 2 plans R1–R6 steps
+  (subtitles first, no ASR without speech, ASR chain by language and tier, OCR
+  by text density, keyframe budget). Each step carries reason, alternatives,
+  est. seconds, est. input tokens and `uploads_raw_video`; `plan.json` matches
+  `schemas/plan.schema.json`.
+* Same synthetic video, different plans: gemini/gemini-cli → native-av,
+  qwen3.6-plus/qwen-code → native-v, claude/claude-code → frames,
+  deepseek-v4-pro/opencode → text.
+* Tests: 179 passing (41 table-driven routing cases covering D1–D4 and every
+  degradation; probe on synthetic media incl. a Chinese path with spaces).

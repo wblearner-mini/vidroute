@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/wblearner-mini/vidroute/schemas/plan.schema.json",
+  "title": "vidroute plan.json",
+  "type": "object",
+  "required": ["schema", "created_at", "vidroute_version", "request", "video", "llm", "host", "effective", "local",
+               "route", "delivery", "steps", "budget", "uploads_raw_video", "needs_confirmation", "needs_install"],
+  "properties": {
+    "schema": {"const": "vidroute/plan/1"},
+    "route": {"$ref": "#/$defs/route"},
+    "uploads_raw_video": {"type": "boolean"},
+    "request": {
+      "type": "object",
+      "required": ["video", "llm", "host", "task", "prefer", "language"],
+      "properties": {
+        "task": {"enum": ["minutes", "summary", "qa", "transcript"]},
+        "prefer": {"enum": ["quality", "privacy", "cost"]}
+      }
+    },
+    "local": {"type": "object", "required": ["tier"],
+              "properties": {"tier": {"enum": ["cpu-lite", "cpu-full", "gpu-cuda", "gpu-vulkan"]}}},
+    "delivery": {
+      "type": "object",
+      "required": ["route", "reasons", "degraded_from", "uploads_raw_video", "transcript", "budget",
+                   "needs_confirmation", "suggestions"],
+      "properties": {
+        "route": {"$ref": "#/$defs/route"},
+        "reasons": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "degraded_from": {
+          "type": "array",
+          "items": {"type": "object", "required": ["route", "why"], "additionalProperties": false,
+                    "properties": {"route": {"$ref": "#/$defs/route"}, "why": {"type": "string", "minLength": 1}}}
+        },
+        "transcript": {
+          "type": "object", "required": ["role", "attach"],
+          "properties": {"role": {"enum": ["none", "reference", "sole_source"]}, "attach": {"type": "boolean"}}
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "engine", "status", "reason", "alternatives", "est_seconds", "est_input_tokens",
+                     "uploads_raw_video"],
+        "properties": {
+          "id": {"type": "string"},
+          "engine": {"type": ["string", "null"]},
+          "status": {"enum": ["planned", "skipped", "needs_install", "note"]},
+          "reason": {"type": "string", "minLength": 1},
+          "alternatives": {"type": "array", "items": {"type": "string"}},
+          "est_seconds": {"type": "number", "minimum": 0},
+          "est_input_tokens": {"type": "integer", "minimum": 0},
+          "uploads_raw_video": {"type": "boolean"}
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "required": ["budget_tokens", "est_input_tokens", "over_budget"],
+      "properties": {"budget_tokens": {"type": "integer"}, "est_input_tokens": {"type": "integer"},
+                     "over_budget": {"type": "boolean"}}
+    },
+    "needs_confirmation": {"type": "array", "items": {"type": "object", "required": ["code", "message"]}},
+    "needs_install": {"type": "array", "items": {"type": "object", "required": ["capability", "hint"]}}
+  },
+  "$defs": {
+    "route": {"enum": ["native-av", "native-v", "frames", "text", "delegate"]}
+  }
+}

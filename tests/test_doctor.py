@@ -116,7 +116,9 @@ def nv(vram):
     [
         (16, X86, [], None, "cpu-full"),
         (8.0, X86, [], None, "cpu-full"),
-        (7.9, X86, [], None, "cpu-lite"),
+        (7.99, X86, [], None, "cpu-full"),  # "8 GB" machines report slightly less
+        (7.5, X86, [], None, "cpu-full"),
+        (7.4, X86, [], None, "cpu-lite"),
         (None, X86, [], None, "cpu-lite"),
         (32, {"x86": True, "avx2": False}, [], None, "cpu-lite"),
         (32, {"x86": False, "avx2": None}, [], None, "cpu-full"),  # ARM: AVX2 irrelevant

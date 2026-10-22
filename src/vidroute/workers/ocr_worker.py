@@ -68,6 +68,27 @@ def m_ocr(p, rid):
     return {"results": results}
 
 
+def m_detect(p, rid):
+    """Text detection only (no recognition): fast presence/area check used by probe."""
+    from PIL import Image
+
+    eng = ENGINES[p["key"]]
+    results = []
+    images = p["images"]
+    for i, img in enumerate(images):
+        with Image.open(img) as im:
+            width, height = im.size
+        r = eng(img, use_det=True, use_cls=False, use_rec=False)
+        boxes = []
+        for box in (r.boxes if getattr(r, "boxes", None) is not None else []):
+            xs = [float(x) for x, _ in box.tolist()]
+            ys = [float(y) for _, y in box.tolist()]
+            boxes.append([round(min(xs)), round(min(ys)), round(max(xs)), round(max(ys))])
+        results.append({"image": img, "width": width, "height": height, "boxes": boxes})
+        P.progress(rid, i + 1, len(images), "ocr-detect")
+    return {"results": results}
+
+
 def m_render_text(p, rid):
     """Render a test image (used by the OCR smoke test)."""
     from PIL import Image, ImageDraw, ImageFont
@@ -81,5 +102,5 @@ def m_render_text(p, rid):
 
 
 if __name__ == "__main__":
-    P.serve({"ping": m_ping, "ocr_load": m_ocr_load, "ocr": m_ocr, "render_text": m_render_text},
+    P.serve({"ping": m_ping, "ocr_load": m_ocr_load, "ocr": m_ocr, "detect": m_detect, "render_text": m_render_text},
             {"worker": "ocr", "python": sys.version.split()[0]})

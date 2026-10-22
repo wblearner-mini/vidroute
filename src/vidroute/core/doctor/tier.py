@@ -1,6 +1,7 @@
 """Local capability tier: how the *local* half of the pipeline can run.
 
-* ``cpu-lite``  : < 8 GB RAM, no AVX2 on x86, or RAM unknown
+* ``cpu-lite``  : < 8 GB RAM, no AVX2 on x86, or RAM unknown (machines sold as
+  8 GB report 7.5–7.99 GB usable, so 7.5 GB counts as the 8 GB class)
 * ``cpu-full``  : everything else without a verified GPU
 * ``gpu-cuda``  : NVIDIA GPU with >= 4 GB VRAM **and** a passed CUDA smoke test
 * ``gpu-vulkan``: AMD/Intel GPU with a passed Vulkan smoke test (no engine yet)
@@ -15,6 +16,9 @@ from typing import Any
 
 TIERS = ("cpu-lite", "cpu-full", "gpu-cuda", "gpu-vulkan")
 MIN_RAM_FULL_GB = 8.0
+# Firmware/iGPU reservations make "8 GB" machines report ~7.5-7.99 GB (e.g. 7.99 GB on
+# GitHub's windows-latest runners); treat those as the 8 GB class.
+RAM_TOLERANCE_GB = 0.5
 MIN_VRAM_CUDA_GB = 4.0
 
 
@@ -63,7 +67,7 @@ def decide(
     if ram_gb is None:
         reasons.append("RAM unknown: conservative cpu-lite")
         tier = "cpu-lite"
-    elif ram_gb < MIN_RAM_FULL_GB:
+    elif ram_gb < MIN_RAM_FULL_GB - RAM_TOLERANCE_GB:
         reasons.append(f"{ram_gb} GB RAM < {MIN_RAM_FULL_GB} GB")
         tier = "cpu-lite"
     elif cpu.get("x86") and cpu.get("avx2") is False:

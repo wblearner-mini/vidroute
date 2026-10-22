@@ -197,6 +197,93 @@ def clean(downloads: bool = True, logs: bool = True, outputs: bool = False, yes:
     return {"removed": removed}
 
 
+# --------------------------------------------------------- llm / host / plan
+
+
+@command
+def llm_resolve(llm: str | None, host: str | None = None, modalities: str | None = None,
+                audio_in_video: str | None = None, *, ctx: Ctx) -> dict[str, Any]:
+    from vidroute.core.llm.resolve import resolve
+
+    return resolve(llm, host, modalities, audio_in_video, ctx)
+
+
+@command
+def llm_set(model_id: str, *, ctx: Ctx, **opts: Any) -> dict[str, Any]:
+    from vidroute.core.llm import manage
+
+    return {"profile": manage.llm_set(model_id, **opts)}
+
+
+@command
+def llm_unset(model_id: str, *, ctx: Ctx) -> dict[str, Any]:
+    from vidroute.core.llm import manage
+
+    return {"removed": manage.unset("llm_profiles", model_id), "id": model_id}
+
+
+@command
+def llm_list(*, ctx: Ctx) -> dict[str, Any]:
+    from vidroute.core.llm import manage
+
+    return manage.llm_list()
+
+
+@command
+def llm_sync(provider: str = "openrouter", *, ctx: Ctx) -> dict[str, Any]:
+    from vidroute.core.errors import UsageError
+    from vidroute.core.llm import manage
+
+    if provider != "openrouter":
+        raise UsageError("Only --provider openrouter is supported")
+    return manage.sync_openrouter()
+
+
+@command
+def host_set(host_id: str, *, ctx: Ctx, **opts: Any) -> dict[str, Any]:
+    from vidroute.core.llm import manage
+
+    return {"profile": manage.host_set(host_id, **opts)}
+
+
+@command
+def host_unset(host_id: str, *, ctx: Ctx) -> dict[str, Any]:
+    from vidroute.core.llm import manage
+
+    return {"removed": manage.unset("host_profiles", host_id), "id": host_id}
+
+
+@command
+def host_list(*, ctx: Ctx) -> dict[str, Any]:
+    from vidroute.core.llm import manage
+
+    return manage.host_list()
+
+
+@command
+def probe(video: str, refresh: bool = False, *, ctx: Ctx) -> dict[str, Any]:
+    from vidroute.core.probe import probe as _probe
+
+    return _probe(video, ctx, refresh=refresh)
+
+
+@command
+def plan(video: str, llm: str | None, host: str | None = None, task: str = "summary", prefer: str = "quality",
+         language: str = "auto", modalities: str | None = None, audio_in_video: str | None = None, ocr: str = "auto",
+         route: str = "auto", force_asr: bool = False, out: str | None = None, *, ctx: Ctx) -> dict[str, Any]:
+    from pathlib import Path
+
+    from vidroute.core.plan import make_plan
+    from vidroute.core.util.jsonio import write_json_atomic
+
+    result = make_plan(video, llm, host, task, prefer, language, modalities, audio_in_video, ocr, route, force_asr, ctx)
+    if out:
+        target = Path(out).expanduser().resolve() / paths.video_slug(Path(video)) / "plan.json"
+        write_json_atomic(target, result)
+        result = {**result, "plan_path": str(target)}
+    return result
+
+
 # ------------------------------------------------------------------- config
 
 
