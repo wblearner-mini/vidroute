@@ -36,13 +36,9 @@ users and what would close it.
 
 ## Local pipeline
 
-* **No real English video in the acceptance set yet.** English ASR is verified
-  end to end with real speech (the SenseVoice/Whisper sample recordings dubbed
-  onto slides, `tests/test_real_models.py`), and real Chinese videos (a 4-minute
-  1080p screen recording, a 19-minute classroom lecture) ran through the whole
-  pipeline. A real English talk is still to be run.
 * **Machine transcripts contain the usual ASR errors** (product names, homophones,
-  e.g. "Obsidian" → "opseing"). This is by design handled downstream: the
+  e.g. "Obsidian" → "opseing", "Kate Rubins" → "Kate Rubens", SenseVoice hearing
+  "pieces of code" for "pieces of gold"). This is by design handled downstream: the
   analysis guide makes the LLM correct only with on-screen evidence and keep a
   correction list. Two-pass ASR with on-screen terms as hotwords (R7) is a
   Phase 7 extension.

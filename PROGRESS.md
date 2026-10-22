@@ -216,3 +216,17 @@ commit and an update here.
   and runs `doctor`, the bundled skill launcher and an MCP handshake on both OSes.
 * **Waiting for the owner:** making the repository public, tagging `v0.1.0`
   (GitHub pre-release with sources and checksums) and the first PyPI upload.
+
+## Acceptance follow-ups (2026-10-22)
+
+* **Real English video** (owner-approved download): NASA's public-domain
+  "Kate Rubins: Science on the Space Station" (Wikimedia Commons, 159 s, 1080p
+  VP9/Opus WebM, 30 MB, SHA-1 checked; kept outside the repository).
+  `frames` for Claude: 67 s end to end — language ID switched to Whisper, 9
+  accurate segments, 40/40 keyframes from 309 shots, 4 contact sheets, OCR read
+  the title cards. The one ASR slip ("Kate Rubens") is contradicted by OCR on
+  frame 1 ("Kate Rubins") — exactly what the guide's correction list is for.
+  `native-av` for Gemini: WebM → H.264 540p@10 fps + AAC, 12.3 MB under the
+  14.6 MB limit, one part. `drill 02:10-02:20 --fps 1 --ocr`: 10 frames in 6 s.
+* Timestamps now truncate like a player's clock (two frames at 137.5 s and
+  138.5 s were both labelled 02:18 by rounding to even).
