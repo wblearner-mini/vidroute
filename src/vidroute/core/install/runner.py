@@ -64,7 +64,8 @@ def execute(plan: dict[str, Any], ctx: Ctx, mirror: str = "auto", smoke: bool = 
             continue
         ctx.check_cancelled()
         try:
-            res = envmod.create_env(manifest.env_groups[item["id"]], ctx, variant=item["variant"])
+            res = envmod.create_env(manifest.env_groups[item["id"]], ctx, variant=item["variant"],
+                                    force=bool(plan.get("force")))
             results.append({"kind": "env", "id": item["id"], "status": res["status"], "variant": item["variant"]})
         except VidrouteError as exc:
             failed = True

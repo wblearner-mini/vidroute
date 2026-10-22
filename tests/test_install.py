@@ -222,3 +222,19 @@ def test_bundled_manifest_entries_point_at_real_env_groups():
         for s in m.sources:
             if s.type == "bundled":
                 assert s.env_group in manifest.env_groups and s.package
+
+
+def test_force_rebuilds_worker_environments(monkeypatch):
+    from vidroute.core.install import envs as envmod
+    from vidroute.core.install import runner
+
+    seen = []
+
+    def fake_create_env(group, ctx, variant="cpu", force=False):
+        seen.append((group.name, variant, force))
+        return {"group": group.name, "status": "created", "path": "x"}
+
+    monkeypatch.setattr(envmod, "create_env", fake_create_env)
+    plan = {"items": [{"kind": "env", "id": "ocr", "variant": "cpu"}], "force": True}
+    runner.execute(plan, Ctx(), smoke=False)
+    assert seen == [("ocr", "cpu", True)]

@@ -25,4 +25,10 @@ All notable changes are documented here. The format follows
   manifests; `vidroute skill path`.
 - Documentation in English and Chinese; Windows troubleshooting; routing reference.
 
+### Fixed
+
+- Error hints named flags that do not exist (`install --retry`, `install --repair`); a test now checks
+  every `vidroute ...` command quoted in the source against the real CLI.
+- `vidroute install --force` now really rebuilds worker environments.
+
 [Unreleased]: https://github.com/wblearner-mini/vidroute/commits/main

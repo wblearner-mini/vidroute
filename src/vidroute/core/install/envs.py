@@ -73,7 +73,8 @@ def _run_uv(args: list[str], ctx: Ctx, what: str, timeout: float = UV_TIMEOUT) -
     if not res.ok:
         tail = "\n".join((res.stderr or res.stdout).strip().splitlines()[-12:])
         raise RunFailed(f"{what} failed:\n{tail}" if tail else f"{what} failed (timed out)", code="env_failed",
-                        hint="vidroute install --retry  (check network/proxy; set UV_DEFAULT_INDEX for a PyPI mirror)")
+                        hint="vidroute install --yes  (run it again: finished parts are kept; if PyPI is slow or "
+                             "blocked, set UV_DEFAULT_INDEX to a PyPI mirror or HTTPS_PROXY to your proxy)")
     return res
 
 
@@ -134,7 +135,8 @@ def create_env(group: EnvGroup, ctx: Ctx, variant: str = "cpu", force: bool = Fa
             f"Environment {group.name} was created but `{group.import_check}` failed: "
             f"{(check.stderr or '').strip().splitlines()[-1:] or ['?']}",
             code="env_import_failed",
-            hint=f"vidroute install --repair {group.name}",
+            hint=f"vidroute install --yes  (run your install command again: the broken {group.name} "
+                 "environment is rebuilt)",
         )
     return {"group": group.name, "status": "created", "path": str(group.path), **record}
 
