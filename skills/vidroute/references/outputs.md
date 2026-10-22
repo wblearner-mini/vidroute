@@ -31,7 +31,7 @@ All times are **global** seconds of the original video.
   "uploads_raw_audio": false,
   "attachments": [{"type": "image", "path": "contact-sheets/sheet-01.jpg", "note": "...", "est_tokens": 1500}],
   "text_context": [{"type": "transcript", "path": "transcript.md", "role": "sole_source", "attach": true}],
-  "on_demand": [{"type": "image", "path": "frames/001_0m03s.jpg", "t": 2.75, "span": [0.0, 6.0]}],
+  "on_demand": [{"type": "image", "path": "frames/001_0m02s.jpg", "t": 2.75, "span": [0.0, 6.0]}],
   "guide": "ANALYSIS_GUIDE.md",
   "transcript_role": "sole_source",
   "budget": {"est_input_tokens": 1775, "images": 1, "video_seconds": 0, "budget_tokens": 100000, "over_budget": false},

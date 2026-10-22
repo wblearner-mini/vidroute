@@ -8,8 +8,11 @@ from vidroute.core.errors import UsageError
 
 
 def fmt_ts(seconds: float) -> str:
-    """``mm:ss`` below one hour, ``h:mm:ss`` above (used in transcripts and minutes)."""
-    total = max(0, int(round(seconds)))
+    """``mm:ss`` below one hour, ``h:mm:ss`` above (used in transcripts and minutes).
+
+    Truncates like a video player's clock: 138.9 s is 02:18, never 02:19.
+    """
+    total = max(0, int(seconds))
     h, rem = divmod(total, 3600)
     m, s = divmod(rem, 60)
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
@@ -24,8 +27,8 @@ def fmt_srt(seconds: float) -> str:
 
 
 def fmt_compact(seconds: float) -> str:
-    """Filesystem-friendly timestamp such as ``0m05s`` or ``1h02m03s``."""
-    total = max(0, int(round(seconds)))
+    """Filesystem-friendly timestamp such as ``0m05s`` or ``1h02m03s`` (truncated, like :func:`fmt_ts`)."""
+    total = max(0, int(seconds))
     h, rem = divmod(total, 3600)
     m, s = divmod(rem, 60)
     return f"{h}h{m:02d}m{s:02d}s" if h else f"{m}m{s:02d}s"
