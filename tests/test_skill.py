@@ -74,3 +74,16 @@ def test_skill_path_command_points_at_the_bundled_skill():
     env = skill_path()
     assert env.ok and Path(env.data["skill_md"]).is_file()
     assert Path(env.data["path"]).name == "vidroute"
+
+
+def test_launcher_uses_the_installed_package_outside_the_source_tree(tmp_path):
+    import shutil
+
+    copy = tmp_path / "skills" / "vidroute"
+    shutil.copytree(SKILL, copy)  # no ../../src next to it: like the copy bundled in the wheel
+    env = {**os.environ, "VIDROUTE_HOME": str(tmp_path / "home"), "PYTHONPATH": str(ROOT / "src"),
+           "PATH": os.defpath}  # no vidroute executable on PATH either
+    out = subprocess.run([sys.executable, str(copy / "scripts" / "vidroute.py"), "version", "--json"],
+                         capture_output=True, text=True, env=env, timeout=60)
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert json.loads(out.stdout)["data"]["version"] == __version__
