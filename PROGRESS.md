@@ -10,8 +10,8 @@ commit and an update here.
 | 2 | `install`: downloader, mirrors, verification, uv envs, smoke tests | ✅ done |
 | 3 | `llm resolve`, profiles, `probe`, `plan` (two-layer routing) | ✅ done |
 | 4 | local perception pipeline, `prepare` for D3/D4 | ✅ done |
-| 5 | native routes, `handoff.json`, `drill`, raw-video consent | ⏳ next |
-| 6 | CLI/MCP/Skill shells, packaging, README | — |
+| 5 | native routes, `handoff.json`, `drill`, raw-video consent | ✅ done |
+| 6 | CLI/MCP/Skill shells, packaging, README | ⏳ next |
 | 6.5 | open-source release checklist, v0.1.0 | — |
 | 8 | desktop app (optional, v0.2+) | — |
 | 7 | extensions (D5 delegate, two-pass ASR, VLM, diarization) | — |
@@ -138,3 +138,31 @@ commit and an update here.
   shots/dedup/budget, timeline sections, template rendering, handoff schema,
   budget from `max_images`, text route without audio/speech, resume, plan reuse,
   exit 3 for native routes, Unicode paths with spaces.
+
+## Phase 5 — native routes, handoff and drill (2026-10-22)
+
+* `prepare` for D1 `native-av` / D2 `native-v` (D-034): copy when the file fits,
+  audio-free remux for `native-v`, otherwise H.264 transcode (shorter side,
+  fps cap, ABR within the per-file limit, mono AAC) and up to 8 segments with
+  3 s overlap; every file is measured against the limit, over-size encodes are
+  redone smaller (≤ 3 passes), and a part that still does not fit sends the
+  run down the chain to `frames` with the reason in `degraded_from`.
+  `segments.json` (`vidroute/segments/1`) keeps every part's global offset.
+* Raw-media consent: native routes exit 3 without `--accept-raw-video-handoff`
+  (interactive terminals get a y/N prompt); the "frames + audio track" variant
+  uses the same flag and otherwise falls back to frames without audio.
+* `ANALYSIS_GUIDE.md` now keys its proofreading rules on whether the model can
+  hear (native-av, attached audio) rather than on the route name.
+* `vidroute drill <out-dir> --range START-END [--fps N] [--asr] [--ocr]
+  [--max-frames N]` (D-035): denser frames + contact sheet, fresh transcript and
+  OCR for the range, global timestamps, paths relative to the output folder.
+* Energy VAD ignores sound bursts < 0.25 s (fixes a Windows-only CI failure:
+  an AAC encoder transient in a silent clip counted as speech).
+* **Acceptance:** 78 s clip with a 30 s / 1 MB profile → 3 parts of 28 s
+  (offsets 0/25/50 s, 0.3 MB each); the 19-minute 201 MB HEVC lecture for
+  `gemini-3.8-flash` → 2 parts of 13.1 MB (limit 14.6 MB raw after base64),
+  360p@10 fps, encoded in 16 s; files forced not to fit → frames with the
+  reason recorded; drill on the 4-minute recording (40 s range: 10 frames,
+  re-transcribed and OCR'd in 15 s).
+* Tests: 210 passing (native copy/remux/segments, fallback, consent for audio,
+  drill ranges, energy VAD bursts).

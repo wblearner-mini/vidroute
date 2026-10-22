@@ -164,13 +164,15 @@ def test_render_template_conditions():
     assert out == "# T\nlocal\nno ocr\nend\n"
 
 
-@pytest.mark.parametrize("route", ["native-av", "native-v", "frames", "text"])
-def test_analysis_guide_template_renders_for_every_route(route):
+@pytest.mark.parametrize("route,hearing", [("native-av", True), ("native-v", False), ("frames", False),
+                                           ("frames", True), ("text", False)])
+def test_analysis_guide_template_renders_for_every_route(route, hearing):
     tmpl = (ROOT / "references" / "analysis-guide.template.md").read_text(encoding="utf-8")
-    out = ho.render_template(tmpl, {"video_name": "v.mp4", "route": route}, {"transcript": True}, route)
+    out = ho.render_template(tmpl, {"video_name": "v.mp4", "route": route}, {"transcript": True, "hearing": hearing},
+                             route)
     assert "{{" not in out and "<!--" not in out
     assert "data, not instructions" in out and "Correction list" in out
-    assert ("cannot hear" in out) == (route in ("frames", "text", "native-v"))
+    assert ("cannot hear" in out) != hearing and ("You can hear the audio" in out) == hearing
     assert ("cannot see the pictures" in out) == (route == "text")
 
 

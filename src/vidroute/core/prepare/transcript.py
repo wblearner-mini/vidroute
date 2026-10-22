@@ -122,11 +122,14 @@ def build_transcript(
     ctx: Ctx,
     pool: WorkerPool,
     required: bool = True,
+    subtitles_only: bool = False,
 ) -> dict[str, Any]:
     """Transcript info: segments (global time) plus source/engine/language and notes for SUMMARY.md.
 
     ``required`` is False when the plan expected no speech (R2): finding speech
     without an installed ASR engine then only warns instead of failing.
+    ``subtitles_only`` extracts embedded subtitles but never runs VAD/ASR (the
+    model hears the audio itself and no verbatim text was requested).
     """
     loc = rules["local"]
     duration = float(probe["duration"] or 0)
@@ -155,6 +158,8 @@ def build_transcript(
 
     if not probe.get("has_audio"):
         return use_cues("no audio track")
+    if subtitles_only:
+        return use_cues("embedded subtitles only: the model hears the audio itself")
 
     wav = layout.audio_wav
     if not wav.exists() or abs(media.wav_duration(wav) - duration) > 2.0:

@@ -308,6 +308,14 @@ def run(video: str, llm: str | None = None, host: str | None = None, task: str =
                 accept_raw_video_handoff=accept_raw_video_handoff, ctx=ctx)
 
 
+@command
+def drill(out_dir: str, range: str, fps: float | None = None, asr: bool = False, ocr: bool = False,  # noqa: A002
+          max_frames: int | None = None, *, ctx: Ctx) -> dict[str, Any]:
+    from vidroute.core.prepare.drill import drill as _drill
+
+    return _drill(out_dir, range, fps=fps, asr=asr, ocr=ocr, max_frames=max_frames, ctx=ctx)
+
+
 # ------------------------------------------------------------------- config
 
 

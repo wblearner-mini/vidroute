@@ -397,3 +397,31 @@ grabbed at `ocr_frame_max_side_px` (1920) for OCR only; the attached frames stay
 at 1280. RapidOCR's default detector does not downscale a 1080p frame, so small
 UI text survives. Lines of a single character are dropped: in screen recordings
 they are nearly always icons read as text ("×", "□", "Q").
+
+## D-034 Native routes: check the files, not just the plan
+
+The plan's bitrate arithmetic (D-028) decides copy / audio-free remux /
+transcode and the segment boundaries, but encoders overshoot on short or busy
+segments. `prepare` therefore measures every produced file against
+`max_file_mb` (97 % margin: container overhead, MB vs MiB). An over-size encode
+is redone at a proportionally lower bitrate, up to three passes; if a part
+still does not fit, `prepare` plans again with the route forced to `frames`,
+records `{"route": "native-…", "why": "prepared files exceed the limit …"}` in
+`degraded_from` and removes `native/`. Encoders: `libx264` (veryfast,
+ABR with maxrate/bufsize, or CRF without a size limit), else `libopenh264`,
+else MPEG-4 Part 2; hardware encoders are never used. Audio for `native-av` is
+mono AAC; `native-v` never ships an audio track. `segments.json`
+(`vidroute/segments/1`) gives every part its `offset_sec` so times inside a
+part map back to global time. `native-av` only runs ASR when the plan asks for
+a verbatim reference (long video, segments, minutes/transcript task); embedded
+subtitles are still extracted because they are free.
+
+## D-035 Drill works on an output folder
+
+`vidroute drill <out-dir> --range START-END` reads the folder's `plan.json`
+(video path, route, LLM image limits) and writes `drill/<start>-<end>[-Nfps]/`
+with denser keyframes (change-based with a default budget of 24, or a fixed
+`--fps` up to 10 and 120 frames, both capped by `max_images`), a labelled
+contact sheet, and on request a fresh transcript (`--asr`, VAD restricted to
+the range) and OCR (`--ocr`). Paths in `drill.json` are relative to the main
+output folder and all times are global, so the agent never converts time.

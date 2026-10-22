@@ -81,6 +81,20 @@ def build_handoff(layout: Layout, plan: dict[str, Any], outcome: dict[str, Any],
                                     f"{fmt_ts(sheet['start'])}–{fmt_ts(sheet['end'])}, tiles labelled with global time"})
         images += 1
         tokens += est
+    video_seconds = 0.0
+    parts = outcome.get("native_parts") or []
+    for part in parts:
+        span = f"{fmt_ts(part['start'])}–{fmt_ts(part['end'])}"
+        note = (f"the video ({'with' if outcome.get('includes_audio') else 'without'} audio), global {span}"
+                if len(parts) == 1 else
+                f"part {part['id']}/{len(parts)}: global {span}; add {fmt_ts(part['start'])} to times inside "
+                f"this part (see segments.json)")
+        attachments.append({"type": "video", "path": part["file"], "bytes": part["bytes"],
+                            "est_tokens": part.get("est_tokens", 0), "note": note,
+                            "segment": {"id": part["id"], "start": part["start"], "end": part["end"],
+                                        "offset_sec": part["start"]}})
+        video_seconds += part["end"] - part["start"]
+        tokens += part.get("est_tokens", 0)
     audio_seconds = 0.0
     for part in outcome.get("audio_parts") or []:
         p = layout.root / part["file"]
@@ -97,7 +111,11 @@ def build_handoff(layout: Layout, plan: dict[str, Any], outcome: dict[str, Any],
     has_t = layout.file("transcript.md").exists()
     has_o = layout.file("ocr.md").exists()
     has_tl = layout.file("timeline.md").exists()
-    if route == "text":
+    if route.startswith("native"):
+        if has_t:
+            text_context.append({"type": "transcript", "path": "transcript.md", "role": role if role != "none"
+                                 else "reference", "attach": bool(outcome.get("transcript_attach"))})
+    elif route == "text":
         if has_tl:
             text_context.append({"type": "timeline", "path": "timeline.md",
                                  "role": "sole_source" if role == "sole_source" else "reference", "attach": True,
@@ -142,14 +160,15 @@ def build_handoff(layout: Layout, plan: dict[str, Any], outcome: dict[str, Any],
         "reasons": list(plan["delivery"]["reasons"]) or [f"route {route}"],
         "degraded_from": list(plan["delivery"]["degraded_from"]) + list(outcome.get("degraded_from") or []),
         "uploads_raw_video": route.startswith("native"),
-        "uploads_raw_audio": route == "native-av" or bool(outcome.get("audio_parts")),
+        "uploads_raw_audio": (route == "native-av" and bool(outcome.get("includes_audio")))
+                             or bool(outcome.get("audio_parts")),
         "attachments": attachments,
         "text_context": text_context,
         "on_demand": on_demand,
         "guide": "ANALYSIS_GUIDE.md",
         "summary": "SUMMARY.md",
         "transcript_role": role,
-        "budget": {"est_input_tokens": int(tokens), "images": images, "video_seconds": 0.0,
+        "budget": {"est_input_tokens": int(tokens), "images": images, "video_seconds": round(video_seconds, 1),
                    "audio_seconds": round(audio_seconds, 1), "budget_tokens": budget_tokens,
                    "over_budget": tokens > budget_tokens},
         "needs_confirmation": [n for n in plan.get("needs_confirmation") or [] if n.get("code") != "raw_video_handoff"],
@@ -200,7 +219,17 @@ def reading_order(route: str, layout: Layout, outcome: dict[str, Any], guide_not
     sheets = outcome.get("sheets") or []
     role = outcome.get("transcript_role", "none")
     t_role = {"sole_source": "the only record of speech", "reference": "reference for what you hear"}.get(role, "")
-    if route == "text":
+    if route.startswith("native"):
+        parts = outcome.get("native_parts") or []
+        if len(parts) == 1:
+            steps.append(f"the video `{parts[0]['file']}`")
+        elif parts:
+            steps.append(f"the video parts `{parts[0]['file']}` … `{parts[-1]['file']}` ({len(parts)} parts, "
+                         "in order; `segments.json` maps their times to global time)")
+        if layout.file("transcript.md").exists():
+            steps.append("`transcript.md`" + (f" — {t_role}" if t_role else "")
+                         + ("" if outcome.get("transcript_attach") else " (only if you need exact wording)"))
+    elif route == "text":
         if layout.file("timeline.md").exists():
             steps.append("`timeline.md` — transcript and on-screen text merged by time")
     else:
@@ -222,8 +251,9 @@ def reading_order(route: str, layout: Layout, outcome: dict[str, Any], guide_not
 def write_guide(layout: Layout, plan: dict[str, Any], outcome: dict[str, Any]) -> Path:
     route = outcome["route"]
     tmpl = data_file("references/analysis-guide.template.md").read_text(encoding="utf-8")
-    hears = route == "native-av" or bool(outcome.get("audio_parts"))
+    hears = (route == "native-av" and bool(outcome.get("includes_audio", True))) or bool(outcome.get("audio_parts"))
     flags = {"transcript": layout.file("transcript.md").exists(), "ocr": layout.file("ocr.md").exists(),
+             "hearing": hears,
              "frames": bool(outcome.get("frames")), "sheets": bool(outcome.get("sheets")),
              "audio_attachment": bool(outcome.get("audio_parts"))}
     evidence = {"frames": " (keyframes, contact sheets, `ocr.md`)",
@@ -239,6 +269,7 @@ def write_guide(layout: Layout, plan: dict[str, Any], outcome: dict[str, Any]) -
         "route_label": ROUTE_LABELS.get(route, route),
         "duration": fmt_ts(float(plan["video"].get("duration") or 0)),
         "can_hear": " and hear" if hears else "",
+        "hearing_source": " (it is in the video)" if route == "native-av" else " (attached as a separate audio file)",
         "can_hear_short": " or the audio" if hears else "",
         "evidence_sources": evidence,
         "no_transcript_reason": outcome.get("transcript_skip_reason") or "no speech was transcribed",

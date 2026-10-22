@@ -195,6 +195,17 @@ def render_prepare(env: Envelope, args: argparse.Namespace) -> str:
     return "\n".join(lines)
 
 
+def render_drill(env: Envelope, args: argparse.Namespace) -> str:
+    d = env.data
+    lines = [f"Drill {d['range'][0]:.1f}-{d['range'][1]:.1f} s  ->  {d['drill_dir']}",
+             f"  frames: {len(d['frames'])} ({d['sampling'].get('method', '-')})"]
+    for a in d["attachments"]:
+        lines.append(f"  attach: {a['path']}  ({a['note']})")
+    for t in d["text_context"]:
+        lines.append(f"  {t['type']}: {t['path']}" + ("" if t["attach"] else "  (optional)"))
+    return "\n".join(lines)
+
+
 # ------------------------------------------------------------------ handlers
 
 
@@ -307,6 +318,11 @@ def h_run(args: argparse.Namespace, ctx: Ctx) -> Envelope:
                        args.audio_in_video, args.ocr, args.route, args.force_asr, args.out, accept, ctx=ctx)
 
     return _with_handoff_consent(call, ctx, args.accept_raw_video_handoff)
+
+
+def h_drill(args: argparse.Namespace, ctx: Ctx) -> Envelope:
+    return api.drill(args.out_dir, args.range, fps=args.fps, asr=args.asr, ocr=args.ocr, max_frames=args.max_frames,
+                     ctx=ctx)
 
 
 def h_config(args: argparse.Namespace, ctx: Ctx) -> Envelope:
@@ -461,6 +477,15 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("run", "plan + prepare in one go", h_run, render_prepare)
     p.add_argument("video")
     routing_flags(p)
+
+    p = add("drill", "More frames / a fresh transcript / OCR for one time range of a prepared video", h_drill,
+            render_drill)
+    p.add_argument("out_dir", help="the output folder of the video (<out>/<slug>, where handoff.json is)")
+    p.add_argument("--range", required=True, help="START-END in global time, e.g. 01:20-02:00 or 80-120")
+    p.add_argument("--fps", type=float, help="fixed frame rate instead of change-based frames (max 10)")
+    p.add_argument("--asr", action="store_true", help="transcribe the range again")
+    p.add_argument("--ocr", action="store_true", help="read on-screen text of the drilled frames")
+    p.add_argument("--max-frames", type=int, help="frame budget for the range (default 24, or 120 with --fps)")
 
     p = add("config", "Get or set user configuration ($VIDROUTE_HOME/config.json)", h_config, render_config)
     csub = p.add_subparsers(dest="action", metavar="ACTION", parser_class=_Parser)

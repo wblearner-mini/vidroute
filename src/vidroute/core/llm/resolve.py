@@ -74,17 +74,12 @@ def resolve_llm(
     if builtin is None or builtin["id"] == "*":
         prof = dict(fallback)
         origin = "default"
-        ctx.warn("unknown_model", f"Unknown model {model_id!r}: treated as image-only with conservative limits.",
-                 f"vidroute llm set {model_id} --modalities text,image,video  (or pass --modalities)")
     else:
         prof = dict(builtin)
         origin = "builtin"
     for key in ("modalities_in", "video", "image", "audio", "context_tokens"):
         sources[key] = origin
-    if prof.get("unverified"):
-        ctx.warn("unverified_profile",
-                 f"The profile for {model_id!r} ({prof['id']}) is unverified; limits are conservative guesses.",
-                 f"vidroute llm set {model_id} --video-max-seconds N ...")
+    unverified = bool(prof.get("unverified"))
 
     provider = P.provider_lookup(model_id)
     if provider:
@@ -108,6 +103,14 @@ def resolve_llm(
         prof["modalities_in"] = flag_mods
         sources["modalities_in"] = "flag"
     flag_aiv = parse_yes_no(audio_in_video)
+    # Warn only about what nobody told us: the user's own profile (config) or flags take responsibility.
+    if origin == "default" and sources["modalities_in"] == "default":
+        ctx.warn("unknown_model", f"Unknown model {model_id!r}: treated as image-only with conservative limits.",
+                 f"vidroute llm set {model_id} --modalities text,image,video  (or pass --modalities)")
+    elif unverified and not user_prof:
+        ctx.warn("unverified_profile",
+                 f"The profile for {model_id!r} ({prof.get('id')}) is unverified; limits are conservative guesses.",
+                 f"vidroute llm set {model_id} --video-max-seconds N ...")
 
     mods = list(prof.get("modalities_in") or ["text"])
     if "video" in mods and not prof.get("video"):

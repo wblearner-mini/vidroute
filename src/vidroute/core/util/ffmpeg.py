@@ -23,7 +23,7 @@ from vidroute.core.util import proc
 PROBE_TIMEOUT = 5.0
 
 INTERESTING_ENCODERS = (
-    "libx264", "aac", "libmp3lame", "libopus", "mjpeg",
+    "libx264", "aac", "libmp3lame", "libopus", "mjpeg", "libopenh264", "mpeg4",
     "h264_nvenc", "h264_qsv", "h264_amf", "h264_videotoolbox", "h264_mf",
 )
 INTERESTING_FILTERS = ("select", "scdet", "silencedetect", "drawtext", "tile", "scale", "showinfo", "aresample")

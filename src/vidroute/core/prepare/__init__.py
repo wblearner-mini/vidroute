@@ -28,7 +28,7 @@ from vidroute.core.plan.local import asr_candidates, first_installed, installed
 from vidroute.core.plan.rules import load_rules
 from vidroute.core.prepare import handoff as ho
 from vidroute.core.prepare import keyframes as kf
-from vidroute.core.prepare import media
+from vidroute.core.prepare import media, native
 from vidroute.core.prepare import ocr as ocr_mod
 from vidroute.core.prepare import timeline
 from vidroute.core.prepare import transcript as tr
@@ -113,6 +113,8 @@ def prepare(
     kw = {"llm": llm, "host": host, "task": task, "prefer": prefer, "language": language, "modalities": modalities,
           "audio_in_video": audio_in_video, "ocr": ocr, "force_asr": force_asr}
     the_plan, source = _plan_for(path, layout, plan, route, replan, kw, ctx)
+    if accept_raw_video_handoff:  # consent given: the planner's "ask the user first" warning is settled
+        ctx.warnings[:] = [w for w in ctx.warnings if w.get("code") != "raw_video_handoff"]
     plan_path = layout.file("plan.json")
     write_json_atomic(plan_path, the_plan)
     chosen = the_plan["route"]
@@ -126,11 +128,30 @@ def prepare(
                   "alternative": f'vidroute prepare "{path}" --out "{layout.root.parent}" --route frames'},
         )
     if chosen.startswith("native"):
-        raise RunFailed(f"The {chosen} route is not implemented in this version.", code="not_implemented",
-                        hint=f'vidroute prepare "{path}" --out "{layout.root.parent}" --route frames')
-    if chosen not in ("frames", "text"):
+        try:
+            result = _prepare_native(path, layout, the_plan, ctx)
+        except native.DoesNotFit as exc:
+            # Fall back along the chain (native -> frames): plan again with the route forced, keep the reason.
+            ctx.warn("native_does_not_fit", f"{exc.message}: falling back to keyframes + transcript.")
+            req = the_plan["request"]
+            the_plan = make_plan(path, req["llm"], req["host"], req["task"], req["prefer"], req["language"],
+                                 req.get("modalities"), req.get("audio_in_video"), req.get("ocr", "auto"), "frames",
+                                 bool(req.get("force_asr")), ctx)
+            the_plan["delivery"]["degraded_from"] = [
+                {"route": chosen, "why": f"prepared files exceed the limit: {exc.message}"}] + [
+                g for g in the_plan["delivery"]["degraded_from"] if g["route"] != chosen]
+            the_plan["route_changed_by_prepare"] = True
+            write_json_atomic(plan_path, the_plan)
+            remove_dir(layout.native, layout)
+            layout.file("segments.json").unlink(missing_ok=True)
+            result = _prepare_local(path, layout, the_plan, accept_raw_video_handoff, ctx)
+    elif chosen in ("frames", "text"):
+        for stale in (layout.native,):
+            remove_dir(stale, layout)
+        layout.file("segments.json").unlink(missing_ok=True)
+        result = _prepare_local(path, layout, the_plan, accept_raw_video_handoff, ctx)
+    else:
         raise UsageError(f"Route {chosen!r} cannot be prepared locally.")
-    result = _prepare_local(path, layout, the_plan, accept_raw_video_handoff, ctx)
     result.update(plan_path=str(plan_path), plan_source=source, elapsed_seconds=round(time.monotonic() - started, 1))
     return result
 
@@ -157,14 +178,14 @@ def _files_exist(layout: Layout, rels: list[str]) -> bool:
 
 def _transcript(video: Path, layout: Layout, plan: dict[str, Any], info: dict[str, Any], rules: dict[str, Any],
                 manifest: Manifest, state: StepState, role_if_any: str, ctx: Ctx, pool: WorkerPool,
-                outcome: dict[str, Any]) -> list[dict[str, Any]]:
+                outcome: dict[str, Any], asr_allowed: bool = True) -> list[dict[str, Any]]:
     req = plan["request"]
     tier = plan["local"]["tier"]
     language = req.get("language") or "auto"
     force_asr = bool(req.get("force_asr"))
     loc = rules["local"]
     required = force_asr or float(info.get("speech_ratio") or 0) >= float(loc["speech_ratio_skip_asr"])
-    fp = fingerprint("transcript", PIPELINE_VERSION, layout.root.name, language, force_asr, role_if_any,
+    fp = fingerprint("transcript", PIPELINE_VERSION, layout.root.name, language, force_asr, role_if_any, asr_allowed,
                      asr_candidates(language, tier, rules, manifest), first_installed(loc["vad_chain"], manifest),
                      loc)
     prev = state.get("transcript")
@@ -174,12 +195,12 @@ def _transcript(video: Path, layout: Layout, plan: dict[str, Any], info: dict[st
         tinfo["segments"] = data.get("segments", []) if prev.get("files") else []
         status = "cached"
     else:
-        if (required and not (info.get("text_subtitles")) and info.get("has_audio")
+        if (asr_allowed and required and not info.get("text_subtitles") and info.get("has_audio")
                 and not asr_candidates(language, tier, rules, manifest)):
             raise NeedsInstall("No ASR engine is installed, so the speech cannot be transcribed.",
                                hint="vidroute install --capability asr", data={"needs": ["asr"]})
         tinfo = tr.build_transcript(video, layout, info, rules, manifest, tier, language, force_asr, ctx, pool,
-                                    required=required)
+                                    required=required, subtitles_only=not asr_allowed)
         if tinfo.get("engine") and not str(tinfo["engine"]).startswith("subtitle:"):
             tinfo["engine"] = _label(tinfo["engine"])
         for name in ("transcript.json", "transcript.srt", "transcript.md"):
@@ -387,9 +408,15 @@ def _prepare_local(video: Path, layout: Layout, plan: dict[str, Any], accepted: 
                            _label(ocr_id) if ocr_id else None, outcome["sheets"])
     layout.file("timeline.md").write_text(text, encoding="utf-8")
     _step(outcome, "timeline", "done", f"{sum(1 for s in secs if s.frame or s.said)} sections")
+    return _finish(layout, plan, outcome, manifest, ctx)
+
+
+def _finish(layout: Layout, plan: dict[str, Any], outcome: dict[str, Any], manifest: Manifest,
+            ctx: Ctx) -> dict[str, Any]:
+    """Guide, handoff, summary and manifest — the same for every route."""
+    route = outcome["route"]
     for note in outcome["notes"]:
         ctx.warn("note", note)
-
     ho.write_guide(layout, plan, outcome)
     handoff = ho.build_handoff(layout, plan, outcome, ctx.warnings)
     write_json_atomic(layout.file("handoff.json"), handoff)
@@ -405,6 +432,50 @@ def _prepare_local(video: Path, layout: Layout, plan: dict[str, Any], accepted: 
         "steps": outcome["steps"],
         "timings": outcome["timings"],
     }
+
+
+def _prepare_native(video: Path, layout: Layout, plan: dict[str, Any], ctx: Ctx) -> dict[str, Any]:
+    """D1/D2: the (transcoded, maybe segmented) video, plus the local transcript when the plan asks for it."""
+    rules = load_rules()
+    manifest = load_manifest()
+    info = run_probe(video, ctx)
+    route = plan["route"]
+    state = StepState(layout)
+    outcome: dict[str, Any] = {"route": route, "steps": [], "engines": {}, "timings": {}, "notes": [],
+                               "frames": [], "sheets": [], "audio_parts": [], "degraded_from": [],
+                               "fake_engines": fake_mode()}
+    for stale in (layout.frames, layout.sheets, layout.root / "audio" / "attach"):
+        remove_dir(stale, layout)
+    for name in ("ocr.json", "ocr.md", "timeline.md"):
+        layout.file(name).unlink(missing_ok=True)
+    t0 = time.monotonic()
+    nat = native.produce(video, layout, plan, info, float(rules["delivery"]["segment_overlap_seconds"]), ctx)
+    outcome["timings"]["native"] = round(time.monotonic() - t0, 2)
+    tokens = native.video_tokens_per_part(plan, nat["parts"])
+    outcome["native_parts"] = [{**p, "est_tokens": t} for p, t in zip(nat["parts"], tokens)]
+    outcome["includes_audio"] = nat["includes_audio"]
+    _step(outcome, "native_video", "done", f"{nat['method']}: {native.describe(nat['parts'])}"
+          + ("" if nat["includes_audio"] else "; no audio track in the attachment"))
+    asr_step = _plan_step(plan, "asr")
+    role = "reference" if route == "native-av" else "sole_source"
+    segments: list[dict[str, Any]] = []
+    asr_allowed = asr_step.get("status") in ("planned", "needs_install")
+    if asr_allowed or info.get("text_subtitles"):
+        with WorkerPool(ctx) as pool:
+            t0 = time.monotonic()
+            segments = _transcript(video, layout, plan, info, rules, manifest, state, role, ctx, pool, outcome,
+                                   asr_allowed=asr_allowed)
+            outcome["timings"]["transcript"] = round(time.monotonic() - t0, 2)
+    else:
+        for name in ("transcript.json", "transcript.srt", "transcript.md"):
+            layout.file(name).unlink(missing_ok=True)
+        reason = asr_step.get("reason") or "not needed"
+        outcome["transcript_skip_reason"] = reason
+        _step(outcome, "transcript", "skipped", reason)
+    outcome["transcript_role"] = role if segments else "none"
+    outcome["transcript_attach"] = bool(segments) and (route == "native-v" or
+                                                       bool(plan["delivery"]["transcript"].get("attach")))
+    return _finish(layout, plan, outcome, manifest, ctx)
 
 
 def run(video: str | os.PathLike[str], llm: str | None = None, **kwargs: Any) -> dict[str, Any]:

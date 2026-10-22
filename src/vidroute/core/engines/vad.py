@@ -50,8 +50,12 @@ _SILENCE_START = re.compile(r"silence_start:\s*(-?[\d.]+)")
 _SILENCE_END = re.compile(r"silence_end:\s*(-?[\d.]+)")
 
 
-def parse_silencedetect(stderr: str, duration: float, offset: float = 0.0) -> list[list[float]]:
-    """Turn ffmpeg silencedetect output into non-silent spans (global time)."""
+MIN_SOUND_SECONDS = 0.25  # shorter bursts are clicks / encoder transients, not speech (cf. Silero min_speech)
+
+
+def parse_silencedetect(stderr: str, duration: float, offset: float = 0.0,
+                        min_span: float = MIN_SOUND_SECONDS) -> list[list[float]]:
+    """Turn ffmpeg silencedetect output into non-silent spans (global time), dropping spans < ``min_span``."""
     silences: list[list[float]] = []
     start = None
     for line in stderr.splitlines():
@@ -68,10 +72,10 @@ def parse_silencedetect(stderr: str, duration: float, offset: float = 0.0) -> li
     spans = []
     cursor = 0.0
     for s, e in silences:
-        if s - cursor > 0.05:
+        if s - cursor >= min_span:
             spans.append([round(offset + cursor, 3), round(offset + s, 3)])
         cursor = max(cursor, e)
-    if duration - cursor > 0.05:
+    if duration - cursor >= min_span:
         spans.append([round(offset + cursor, 3), round(offset + duration, 3)])
     return spans
 

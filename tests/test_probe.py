@@ -126,3 +126,13 @@ def test_missing_video_is_not_found():
 
     env = api_probe("/definitely/not/here.mp4")
     assert env.exit_code == 1 and env.error["code"] == "not_found"
+
+
+def test_energy_vad_ignores_short_bursts():
+    from vidroute.core.engines.vad import parse_silencedetect
+
+    # A 70 ms encoder transient at the start, then silence, then 1.5 s of sound, then silence to the end.
+    stderr = ("[silencedetect @ 0x1] silence_start: 0.07\n[silencedetect @ 0x1] silence_end: 5 | silence_duration: 4.93\n"
+              "[silencedetect @ 0x1] silence_start: 6.5\n")
+    assert parse_silencedetect(stderr, 20.0, offset=100.0) == [[105.0, 106.5]]
+    assert parse_silencedetect("", 3.0) == [[0.0, 3.0]]  # no silence at all: everything is sound

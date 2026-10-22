@@ -18,7 +18,7 @@ When sources disagree, the higher level wins. Never present transcript wording a
 
 ## 2. Proofreading rules for this route
 
-<!-- if:route=frames,text,native-v -->
+<!-- if:!has:hearing -->
 **You cannot hear the audio.** The transcript is the only record of what was said, and speech
 recognition gets names, technical terms, numbers and homophones wrong.
 
@@ -32,14 +32,11 @@ recognition gets names, technical terms, numbers and homophones wrong.
 - Speaker names: only when they are visible (name tag, slide, caption) or stated in the transcript;
   otherwise say "a speaker".
 <!-- endif -->
-<!-- if:route=native-av -->
-**You can hear the audio.** The local transcript is a timestamped reference. When it conflicts with
-what you hear, what you hear wins: correct it and record the change in a **correction list**
-(`[mm:ss] transcript → heard (evidence: audio)`). Use on-screen text to confirm spellings of names and terms.
-<!-- endif -->
-<!-- if:has:audio_attachment -->
-**You can hear the audio track** (attached separately). When the transcript conflicts with what you
-hear, what you hear wins: record the change in the correction list (`evidence: audio at mm:ss`).
+<!-- if:has:hearing -->
+**You can hear the audio**{{hearing_source}}. The local transcript is a timestamped reference. When it
+conflicts with what you hear, what you hear wins: correct it and record the change in a **correction
+list** (`[mm:ss] transcript → heard (evidence: audio at mm:ss)`). Use on-screen text to confirm the
+spelling of names and terms.
 <!-- endif -->
 <!-- if:!has:transcript -->
 **There is no transcript** ({{no_transcript_reason}}). Do not attribute statements to anyone or
