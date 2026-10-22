@@ -33,3 +33,21 @@ users and what would close it.
 
 * OCR models have a single mirror (ModelScope `RapidAI/RapidOCR@v3.10.0`); the
   PaddlePaddle ONNX files on Hugging Face are different files and are not used.
+
+## Local pipeline
+
+* **No real English video in the acceptance set yet.** English ASR is verified
+  end to end with real speech (the SenseVoice/Whisper sample recordings dubbed
+  onto slides, `tests/test_real_models.py`), and real Chinese videos (a 4-minute
+  1080p screen recording, a 19-minute classroom lecture) ran through the whole
+  pipeline. A real English talk is still to be run.
+* **Machine transcripts contain the usual ASR errors** (product names, homophones,
+  e.g. "Obsidian" → "opseing"). This is by design handled downstream: the
+  analysis guide makes the LLM correct only with on-screen evidence and keep a
+  correction list. Two-pass ASR with on-screen terms as hotwords (R7) is a
+  Phase 7 extension.
+* **Contact-sheet tiles are too small for UI text** in 1080p screen recordings;
+  OCR and the full-resolution `frames/` cover it. The guide tells the agent to
+  open single frames.
+* **OCR cost** is ~1.2 s per dense 1080p frame on an 8-core CPU (60 frames max,
+  so ~1–2 minutes at worst).

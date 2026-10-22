@@ -13,7 +13,8 @@ from vidroute.core.util.yamlish import YamlError, load_file
 REQUIRED = {
     "delivery": ("native_only_max_minutes", "max_segments", "segment_overlap_seconds", "budget_fraction",
                  "over_budget_action", "transcode", "audio_attachment", "transcript_tasks"),
-    "frames": ("max_frames", "base_interval_seconds", "max_candidates", "scene_threshold", "contact_sheet"),
+    "frames": ("max_frames", "base_interval_seconds", "min_interval_seconds", "max_interval_seconds", "max_candidates",
+               "change_threshold", "frame_max_side_px", "ocr_frame_max_side_px", "contact_sheet"),
     "local": ("embedded_subtitle_min_coverage", "speech_ratio_skip_asr", "ocr_text_density_threshold",
               "long_video_minutes", "asr_chains", "ocr_chain", "vad_chain", "zh_languages"),
     "estimates": ("transcript_tokens_per_speech_second", "asr_rtf", "ocr_seconds_per_frame"),

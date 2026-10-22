@@ -9,8 +9,8 @@ commit and an update here.
 | 1 | `doctor`: system/GPU/ffmpeg/runtime detection, tiers, cache | ✅ done |
 | 2 | `install`: downloader, mirrors, verification, uv envs, smoke tests | ✅ done |
 | 3 | `llm resolve`, profiles, `probe`, `plan` (two-layer routing) | ✅ done |
-| 4 | local perception pipeline, `prepare` for D3/D4 | ⏳ next |
-| 5 | native routes, `handoff.json`, `drill`, raw-video consent | — |
+| 4 | local perception pipeline, `prepare` for D3/D4 | ✅ done |
+| 5 | native routes, `handoff.json`, `drill`, raw-video consent | ⏳ next |
 | 6 | CLI/MCP/Skill shells, packaging, README | — |
 | 6.5 | open-source release checklist, v0.1.0 | — |
 | 8 | desktop app (optional, v0.2+) | — |
@@ -105,3 +105,36 @@ commit and an update here.
   deepseek-v4-pro/opencode → text.
 * Tests: 179 passing (41 table-driven routing cases covering D1–D4 and every
   degradation; probe on synthetic media incl. a Chinese path with spaces).
+
+## Phase 4 — local pipeline and `prepare` for D3/D4 (2026-10-22)
+
+* `vidroute prepare <video> [--plan] [--route] [--out] [--accept-raw-video-handoff]`
+  and `vidroute run` (= plan + prepare). Output folder per brief §9:
+  `SUMMARY.md`, `ANALYSIS_GUIDE.md`, `handoff.json` (schema
+  `vidroute/handoff/1`), `plan.json`, `manifest.json` (files + SHA-256, engines
+  with licenses), `audio/16k.wav`, `transcript.{md,srt,json}`, `frames/`,
+  `contact-sheets/` (+ `index.md`), `ocr.{md,json}`, `timeline.md`.
+* Transcript: embedded text subtitles first (R1, coverage against VAD speech),
+  no ASR without speech (R2), language identification on the first 30 s and
+  the ASR chain by language and tier with fallback (R3); VAD chunks ≤ 25 s,
+  resumable per 5-minute batch; global timestamps everywhere.
+* Keyframes (D-030): one decoding pass into 64 px thumbnails, cell-difference
+  shots, repeated-picture folding, coverage-first budget
+  `min(max_frames, max_images)`; full-resolution JPEGs, labelled thumbnails and
+  sharper OCR copies in one parallel ffmpeg pass per frame; contact sheets
+  with ffmpeg `tile`.
+* OCR on keyframes only (R4), timeline merging pictures/on-screen text/speech,
+  analysis guide rendered per route from `references/analysis-guide.template.md`.
+* Every step is fingerprinted in `.work/steps.json`: re-runs reuse finished
+  steps; native routes stop with exit 3 unless `--accept-raw-video-handoff`.
+* **Acceptance (real models, this machine):** synthetic clips (slides with
+  subtitles, silent, no audio, Chinese path with spaces); speech clips with the
+  real SenseVoice zh/en recordings (zh → SenseVoice, en → language ID switches
+  to Whisper); a real 4-minute 1080p Chinese screen-recording tutorial (57 s,
+  37 frames, 4 sheets); a real 19-minute Chinese classroom lecture (64 s:
+  ASR 42 s for 13 min of speech, keyframes 3 s, OCR 16 s; 60/60 frames). A real
+  English video is still pending (KNOWN_ISSUES.md).
+* Tests: 201 passing (+1 real-model end-to-end test): chunking, SRT, keyframe
+  shots/dedup/budget, timeline sections, template rendering, handoff schema,
+  budget from `max_images`, text route without audio/speech, resume, plan reuse,
+  exit 3 for native routes, Unicode paths with spaces.

@@ -42,11 +42,15 @@ frames:
   base_interval_seconds: 4
   min_interval_seconds: 2
   max_interval_seconds: 30
-  # Candidate frames = scene changes + a periodic grid; the grid interval grows
-  # with duration so candidates stay under this cap.
+  # Keyframe selection analyses at most this many tiny candidate thumbnails
+  # (the video's own keyframes when they are dense enough, otherwise an evenly
+  # decoded grid of at most 4 per second); see core/prepare/keyframes.py.
   max_candidates: 360
-  scene_threshold: 0.3
-  dhash_max_distance: 5
+  # A candidate frame starts a new shot when any 4x4 cell of its 64 px gray
+  # thumbnail differs from the previous candidate (or the shot's first one) by
+  # more than this mean absolute difference (0-255). Compression noise stays
+  # well below; a new line of slide text or a cut is well above.
+  change_threshold: 10
   frame_max_side_px: 1280
   ocr_frame_max_side_px: 1920
   jpeg_qscale: 3
@@ -96,10 +100,12 @@ estimates:
     cpu-full: 0.08
     gpu-cuda: 0.03
     gpu-vulkan: 0.08
+  # Measured: ~1.2 s per 1080p screen-recording frame (dense UI text) on an
+  # 8-core desktop; slides are faster. OCR always runs on the CPU.
   ocr_seconds_per_frame:
-    cpu-lite: 1.5
-    cpu-full: 0.5
-    gpu-cuda: 0.5
-    gpu-vulkan: 0.5
+    cpu-lite: 3.0
+    cpu-full: 1.2
+    gpu-cuda: 1.2
+    gpu-vulkan: 1.2
   transcode_rtf: 0.2
   frame_extract_seconds: 0.12

@@ -284,6 +284,30 @@ def plan(video: str, llm: str | None, host: str | None = None, task: str = "summ
     return result
 
 
+@command
+def prepare(video: str, plan: str | None = None, route: str = "auto", out: str | None = None,
+            accept_raw_video_handoff: bool = False, llm: str | None = None, host: str | None = None,
+            task: str = "summary", prefer: str = "quality", language: str = "auto", modalities: str | None = None,
+            audio_in_video: str | None = None, ocr: str = "auto", force_asr: bool = False, *,
+            ctx: Ctx) -> dict[str, Any]:
+    from vidroute.core.prepare import prepare as _prepare
+
+    return _prepare(video, plan, route, out, accept_raw_video_handoff, llm, host, task, prefer, language, modalities,
+                    audio_in_video, ocr, force_asr, ctx=ctx)
+
+
+@command
+def run(video: str, llm: str | None = None, host: str | None = None, task: str = "summary", prefer: str = "quality",
+        language: str = "auto", modalities: str | None = None, audio_in_video: str | None = None, ocr: str = "auto",
+        route: str = "auto", force_asr: bool = False, out: str | None = None, accept_raw_video_handoff: bool = False,
+        *, ctx: Ctx) -> dict[str, Any]:
+    from vidroute.core.prepare import run as _run
+
+    return _run(video, llm, host=host, task=task, prefer=prefer, language=language, modalities=modalities,
+                audio_in_video=audio_in_video, ocr=ocr, route=route, force_asr=force_asr, out=out,
+                accept_raw_video_handoff=accept_raw_video_handoff, ctx=ctx)
+
+
 # ------------------------------------------------------------------- config
 
 

@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/wblearner-mini/vidroute/schemas/handoff.schema.json",
+  "title": "vidroute handoff.json",
+  "description": "What the agent hands its LLM. Paths are relative to the directory that holds handoff.json; all times are global video seconds.",
+  "type": "object",
+  "required": ["schema", "created_at", "vidroute_version", "video", "llm", "host", "route", "reasons", "degraded_from",
+               "uploads_raw_video", "uploads_raw_audio", "attachments", "text_context", "on_demand", "guide", "summary",
+               "budget", "needs_confirmation", "warnings"],
+  "properties": {
+    "schema": {"const": "vidroute/handoff/1"},
+    "created_at": {"type": "string"},
+    "vidroute_version": {"type": "string"},
+    "out_dir": {"type": "string"},
+    "video": {
+      "type": "object",
+      "required": ["name", "duration"],
+      "properties": {"name": {"type": "string"}, "duration": {"type": "number", "minimum": 0}}
+    },
+    "llm": {"type": "string"},
+    "host": {"type": "string"},
+    "task": {"enum": ["minutes", "summary", "qa", "transcript"]},
+    "route": {"$ref": "#/$defs/route"},
+    "reasons": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "degraded_from": {
+      "type": "array",
+      "items": {"type": "object", "required": ["route", "why"],
+                "properties": {"route": {"$ref": "#/$defs/route"}, "why": {"type": "string", "minLength": 1}}}
+    },
+    "uploads_raw_video": {"type": "boolean"},
+    "uploads_raw_audio": {"type": "boolean"},
+    "attachments": {"type": "array", "items": {"$ref": "#/$defs/attachment"}},
+    "text_context": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "path", "role", "attach"],
+        "properties": {
+          "type": {"enum": ["transcript", "ocr", "timeline", "contact_sheet_index"]},
+          "path": {"$ref": "#/$defs/relpath"},
+          "role": {"enum": ["sole_source", "reference", "navigation"]},
+          "attach": {"type": "boolean"},
+          "est_tokens": {"type": "integer", "minimum": 0},
+          "note": {"type": "string"}
+        }
+      }
+    },
+    "on_demand": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "path"],
+        "properties": {
+          "type": {"enum": ["image", "video", "audio"]},
+          "path": {"$ref": "#/$defs/relpath"},
+          "t": {"type": "number", "minimum": 0},
+          "span": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}
+        }
+      }
+    },
+    "guide": {"const": "ANALYSIS_GUIDE.md"},
+    "summary": {"const": "SUMMARY.md"},
+    "transcript_role": {"enum": ["none", "reference", "sole_source"]},
+    "budget": {
+      "type": "object",
+      "required": ["est_input_tokens", "images", "video_seconds", "budget_tokens"],
+      "properties": {
+        "est_input_tokens": {"type": "integer", "minimum": 0},
+        "images": {"type": "integer", "minimum": 0},
+        "video_seconds": {"type": "number", "minimum": 0},
+        "audio_seconds": {"type": "number", "minimum": 0},
+        "budget_tokens": {"type": "integer", "minimum": 0},
+        "over_budget": {"type": "boolean"}
+      }
+    },
+    "needs_confirmation": {"type": "array", "items": {"type": "object", "required": ["code", "message"]}},
+    "warnings": {"type": "array", "items": {"type": "object", "required": ["code", "message"]}},
+    "drill": {"type": "string"}
+  },
+  "$defs": {
+    "route": {"enum": ["native-av", "native-v", "frames", "text", "delegate"]},
+    "relpath": {"type": "string", "minLength": 1, "pattern": "^(?![/\\\\])(?![A-Za-z]:)(?!\\.\\.[/\\\\])"},
+    "attachment": {
+      "type": "object",
+      "required": ["type", "path", "note"],
+      "properties": {
+        "type": {"enum": ["video", "image", "audio"]},
+        "path": {"$ref": "#/$defs/relpath"},
+        "note": {"type": "string"},
+        "bytes": {"type": "integer", "minimum": 0},
+        "est_tokens": {"type": "integer", "minimum": 0},
+        "segment": {
+          "type": "object",
+          "required": ["id", "start", "end", "offset_sec"],
+          "properties": {
+            "id": {"type": "integer", "minimum": 1},
+            "start": {"type": "number", "minimum": 0},
+            "end": {"type": "number", "minimum": 0},
+            "offset_sec": {"type": "number", "minimum": 0}
+          }
+        }
+      }
+    }
+  }
+}

@@ -182,6 +182,19 @@ def render_plan(env: Envelope, args: argparse.Namespace) -> str:
     return "\n".join(lines)
 
 
+def render_prepare(env: Envelope, args: argparse.Namespace) -> str:
+    d = env.data
+    h = d["handoff"]
+    lines = [f"Route: {d['route']}  ->  {d['out_dir']}"]
+    for st in d["steps"]:
+        lines.append(f"  {st['id']:<17} {st['status']:<8} {st['detail']}")
+    attach = [a["path"] for a in h["attachments"]] + [t["path"] for t in h["text_context"] if t["attach"]]
+    lines.append(f"Uploads raw video: {'YES' if h['uploads_raw_video'] else 'no'}")
+    lines.append(f"Attach: {', '.join(attach) or '(nothing)'}  (~{h['budget']['est_input_tokens']:,} input tokens)")
+    lines.append(f"Next: read {d['summary_path']}")
+    return "\n".join(lines)
+
+
 # ------------------------------------------------------------------ handlers
 
 
@@ -266,6 +279,34 @@ def h_probe(args: argparse.Namespace, ctx: Ctx) -> Envelope:
 def h_plan(args: argparse.Namespace, ctx: Ctx) -> Envelope:
     return api.plan(args.video, args.llm, args.host, args.task, args.prefer, args.language, args.modalities,
                     args.audio_in_video, args.ocr, args.route, args.force_asr, args.out, ctx=ctx)
+
+
+def _with_handoff_consent(call: Callable[[bool], Envelope], ctx: Ctx, accepted: bool) -> Envelope:
+    env = call(accepted)
+    # Interactive terminals get a prompt instead of an exit-3 envelope; agents must ask their user themselves.
+    if (not env.ok and env.error and env.error.get("code") == "raw_video_handoff" and ctx.interactive):
+        sys.stderr.write((env.error.get("message") or "") + "\n")
+        if _confirm("Hand the raw video to the LLM provider?"):
+            ctx.warnings.clear()
+            env = call(True)
+    return env
+
+
+def h_prepare(args: argparse.Namespace, ctx: Ctx) -> Envelope:
+    def call(accept: bool) -> Envelope:
+        return api.prepare(args.video, args.plan, args.route, args.out, accept, args.llm, args.host, args.task,
+                           args.prefer, args.language, args.modalities, args.audio_in_video, args.ocr, args.force_asr,
+                           ctx=ctx)
+
+    return _with_handoff_consent(call, ctx, args.accept_raw_video_handoff)
+
+
+def h_run(args: argparse.Namespace, ctx: Ctx) -> Envelope:
+    def call(accept: bool) -> Envelope:
+        return api.run(args.video, args.llm, args.host, args.task, args.prefer, args.language, args.modalities,
+                       args.audio_in_video, args.ocr, args.route, args.force_asr, args.out, accept, ctx=ctx)
+
+    return _with_handoff_consent(call, ctx, args.accept_raw_video_handoff)
 
 
 def h_config(args: argparse.Namespace, ctx: Ctx) -> Envelope:
@@ -395,6 +436,31 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--force-asr", action="store_true", help="run ASR even with subtitles / no detected speech")
     p.add_argument("--out", help="output root; plan.json is written to <out>/<slug>/plan.json")
     llm_flags(p)
+
+    def routing_flags(sp: argparse.ArgumentParser, task_default: str | None = "summary") -> None:
+        sp.add_argument("--llm", help="model id the agent runs on (or config default_llm)")
+        sp.add_argument("--host", help="agent host id (or config default_host / auto-detected)")
+        sp.add_argument("--task", default=task_default, choices=["minutes", "summary", "qa", "transcript"])
+        sp.add_argument("--prefer", default="quality", choices=["quality", "privacy", "cost"])
+        sp.add_argument("--language", default="auto", help="spoken language (zh, en, ...) or auto")
+        sp.add_argument("--ocr", default="auto", choices=["auto", "on", "off"])
+        sp.add_argument("--route", default="auto", choices=["auto", "native-av", "native-v", "frames", "text"])
+        sp.add_argument("--force-asr", action="store_true", help="run ASR even with subtitles / no detected speech")
+        sp.add_argument("--out", help="output root (default: config out_root or $VIDROUTE_HOME/out); "
+                                      "files go to <out>/<slug>/")
+        sp.add_argument("--accept-raw-video-handoff", action="store_true",
+                        help="the user agreed that the raw video/audio may be handed to the LLM provider")
+        llm_flags(sp)
+
+    p = add("prepare", "Prepare what the agent hands its LLM (frames, transcript, OCR, handoff.json)", h_prepare,
+            render_prepare)
+    p.add_argument("video")
+    p.add_argument("--plan", help="plan.json from 'vidroute plan --out' (default: <out>/<slug>/plan.json if present)")
+    routing_flags(p)
+
+    p = add("run", "plan + prepare in one go", h_run, render_prepare)
+    p.add_argument("video")
+    routing_flags(p)
 
     p = add("config", "Get or set user configuration ($VIDROUTE_HOME/config.json)", h_config, render_config)
     csub = p.add_subparsers(dest="action", metavar="ACTION", parser_class=_Parser)

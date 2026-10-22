@@ -339,3 +339,61 @@ It is planned only when LLM ∩ host accept audio and speech is present, and
 `prepare` only attaches it with `--accept-raw-video-handoff`; without the flag it
 silently falls back to frames without audio (still a valid, more private
 delivery) instead of failing.
+
+## D-030 Keyframes: cell-difference shots instead of a global scene score
+
+R5 asks for "scene changes + a timed grid + perceptual-hash dedup". Measured on
+the synthetic calibration set (slides with crossfades, code, Game of Life,
+Mandelbrot zoom) and a real 4-minute 1080p screen recording:
+
+* ffmpeg's `scene` score is a global frame difference; adding one bullet to a
+  slide or opening a menu in a screen recording stays far below the usual 0.3
+  threshold, so such changes were missed.
+* A 64-bit dHash is decided by noise on flat pictures (blank slides, dark
+  screens): two identical blank frames can differ in > 20 bits, so dedup
+  failed exactly where it matters (A–B–A decks).
+
+vidroute therefore decodes once into 64 px gray thumbnails (the video's own
+keyframes when they are dense enough, otherwise a decoded grid of at most 4 fps
+and `max_candidates` frames), starts a new shot when any 4×4 cell differs by
+more than `change_threshold` (10/255) from the previous candidate or the shot's
+first one, and folds repeated pictures using a perceptual signature (the mean of
+every cell) whose largest difference is a provable lower bound of the cell
+difference — a cheap prefilter that cannot miss a true twin. The budget
+(`min(max_frames, max_images)`, fewer for short videos) is filled coverage
+first: the longest-on-screen shot of each of N equal time bins, then the longest
+remaining shots, never two picks closer than `min_interval_seconds`.
+Result on the slides clip: exactly the four slides, no crossfade frames; the
+4-minute recording: 47 distinct shots, 23 returns to an earlier screen folded.
+
+## D-031 Output contract of `prepare` (handoff.json v1)
+
+`handoff.json` (schema `vidroute/handoff/1`, `schemas/handoff.schema.json`)
+extends brief §7 with `on_demand` (single keyframes the agent may open),
+`text_context[].attach` and `est_tokens`, `transcript_role`, `uploads_raw_audio`
+and a `drill` example. All paths are relative to the output folder and all times
+are global. What is marked for attaching depends on the route:
+
+* frames (D3): contact sheets + `transcript.md` + `ocr.md`; `timeline.md` and
+  `contact-sheets/index.md` are navigation only (they repeat content);
+* text (D4): `timeline.md` only — transcript and on-screen text merged by time
+  — with `transcript.md` / `ocr.md` available on demand.
+
+`ANALYSIS_GUIDE.md` is rendered from `references/analysis-guide.template.md`
+with route blocks, so contributors can edit the guidance without touching code.
+
+## D-032 `prepare` reuses the plan in the output folder
+
+`vidroute plan --out DIR` writes `DIR/<slug>/plan.json`; a later
+`vidroute prepare <video> --out DIR` without `--llm/--host` uses that plan (with
+a `plan_reused` warning) so the agent's "plan → ask the user → prepare" flow
+needs no extra arguments, and the exit-3 hint for native routes is a plain
+re-run with `--accept-raw-video-handoff`. `vidroute run` always plans afresh.
+
+## D-033 OCR on sharper copies; single-character lines dropped
+
+When the source is larger than `frame_max_side_px` (1280), keyframes are also
+grabbed at `ocr_frame_max_side_px` (1920) for OCR only; the attached frames stay
+at 1280. RapidOCR's default detector does not downscale a 1080p frame, so small
+UI text survives. Lines of a single character are dropped: in screen recordings
+they are nearly always icons read as text ("×", "□", "Q").

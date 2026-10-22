@@ -68,6 +68,24 @@ def choose_asr(language: str | None, tier: str, rules: dict[str, Any], manifest:
     return {"selected": None, "selector": sel, "chain": order[0], "tried": tried}
 
 
+def asr_candidates(language: str | None, tier: str, rules: dict[str, Any], manifest: Manifest) -> list[str]:
+    """Every installed ASR engine that supports the language, in preference order (the fallback chain)."""
+    sel = selector_for(language, rules)
+    chains = rules["local"]["asr_chains"]
+    tier_key = tier if tier in chains["zh"] else "cpu-full"
+    out: list[str] = []
+    for chain_name in (["zh", "multi"] if sel in ("auto", "zh") else ["multi", "zh"]):
+        for mid in chains[chain_name][tier_key]:
+            if mid in out:
+                continue
+            lang = None if sel == "auto" else language
+            if lang and not manifest.model(mid).supports_language(lang):
+                continue
+            if installed(mid, manifest):
+                out.append(mid)
+    return out
+
+
 def first_installed(chain: list[str], manifest: Manifest) -> str | None:
     for mid in chain:
         if installed(mid, manifest):
@@ -148,12 +166,12 @@ def plan_steps(
     want_frames = route in ("frames", "text") and probe.get("has_video")
     if want_frames:
         target = (frames or {}).get("target_frames") or min(rules["frames"]["max_frames"], int(duration // 4) + 1)
-        steps.append(_step("scene", "scene-ffmpeg", "scene-change candidates (ffmpeg scene score"
-                           + (", keyframes only for a long video" if long_video else "") + ")",
+        steps.append(_step("scene", "scene-ffmpeg", "one decoding pass into tiny thumbnails (the video's keyframes "
+                           "when dense enough); a visible change in any cell starts a new shot",
                            est_seconds=duration * (0.005 if long_video else 0.02)))
         attach = route == "frames"
         steps.append(_step("keyframes", "ffmpeg",
-                           f"R5: scene changes + periodic grid + dHash dedup, up to {target} frames"
+                           f"R5: shots + coverage grid + repeated-picture dedup, up to {target} frames"
                            + ("; attached via contact sheets first, single frames on demand (drill)" if attach
                               else "; used for OCR/timeline only (not attached)"),
                            est_seconds=target * float(est["frame_extract_seconds"]),

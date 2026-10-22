@@ -39,3 +39,38 @@ def test_smoke(model_id):
         pytest.skip(f"{model_id} not installed")
     res = run_smoke(model_id, Ctx())
     assert res["status"] in ("passed", "fallback_cpu"), res
+
+
+@pytest.fixture(scope="module")
+def speech_videos(tmp_path_factory):
+    """Slides narrated with the real speech recordings shipped with SenseVoice (zh.wav, en.wav)."""
+    import shutil
+    import sys
+
+    if not (shutil.which("ffmpeg") and shutil.which("ffprobe")):
+        pytest.skip("ffmpeg/ffprobe not on PATH")
+    home = Path(os.environ.get("VIDROUTE_REAL_HOME") or Path.home() / ".vidroute")
+    wavs = home / "models" / "asr-sensevoice-small-int8" / "test_wavs"
+    if not (wavs / "zh.wav").exists() or not (wavs / "en.wav").exists():
+        pytest.skip("SenseVoice test WAVs not installed")
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import media
+
+    root = tmp_path_factory.mktemp("speech")
+    return {lang: media.make_speech_video(root / f"speech_{lang}.mp4", [wavs / f"{lang}.wav"] * 2) for lang in ("zh", "en")}
+
+
+def test_prepare_end_to_end_with_real_models(speech_videos, tmp_path):
+    from vidroute.api import prepare
+
+    zh = prepare(str(speech_videos["zh"]), llm="claude-opus-5-5", host="claude-code", task="minutes", out=str(tmp_path))
+    assert zh.ok, zh.error
+    root = Path(zh.data["out_dir"])
+    transcript = (root / "transcript.md").read_text(encoding="utf-8")
+    assert "9点" in transcript or "九点" in transcript, transcript
+    if (root / "ocr.md").exists():
+        assert "Quarterly Review" in (root / "ocr.md").read_text(encoding="utf-8")
+    en = prepare(str(speech_videos["en"]), llm="deepseek-v4-pro", host="opencode", out=str(tmp_path))
+    assert en.ok, en.error
+    text = (Path(en.data["out_dir"]) / "timeline.md").read_text(encoding="utf-8").lower()
+    assert "chieftain" in text and "gold" in text, text
