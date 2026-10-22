@@ -349,3 +349,15 @@ def test_sampler_uses_dense_keyframes_and_bounds_all_intra(tmp_path):
     cands, meta = kf.sample(clip("intra.mp4", 1), 20.0, (64, 36), rules, Ctx())
     assert meta["keyframes_truncated"] and meta["method"].startswith("decoded@")
     assert len(cands) == pytest.approx(10, abs=1) and cands[-1].t < 20.0
+
+
+@needs_ffmpeg
+def test_prepare_with_a_plan_path_writes_next_to_the_plan(media, tmp_path, fake):
+    from vidroute.api import plan, prepare
+
+    planned = plan(str(media["slides"]), "claude-opus-5-5", "claude-code", out=str(tmp_path / "chosen"))
+    assert planned.ok
+    env = prepare(str(media["slides"]), plan=planned.data["plan_path"])  # no out: keep outputs with the plan
+    assert env.ok, env.error
+    assert Path(env.data["out_dir"]) == Path(planned.data["plan_path"]).parent
+    assert env.data["plan_source"] == planned.data["plan_path"]

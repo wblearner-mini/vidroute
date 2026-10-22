@@ -131,7 +131,7 @@ vidroute llm sync --provider openrouter     # opt-in: modalities/context from Op
 | Codex CLI | ✅ | ✅ | — | source-verified |
 | Gemini CLI | ✅ | ✅ | ✅ native, ≤ 20 MB/file | source-verified |
 | Qwen Code | ✅ | ✅* | ✅* native (*if the model config declares it) | source-verified |
-| opencode | ✅ | — | — | docs |
+| opencode | ✅ | — | — | verified (live test) |
 | Cursor, Cline, Roo Code, Kilo Code | ✅ | — | — | unverified (conservative) |
 
 Same video, different plans: Gemini on Gemini CLI → `native-av`; Qwen3.6-Plus on Qwen Code →

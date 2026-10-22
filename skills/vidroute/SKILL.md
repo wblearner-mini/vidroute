@@ -29,10 +29,12 @@ this machine, and writes a reading guide. You stay the one who analyses; vidrout
 
 ## Running vidroute
 
-Run the launcher in this skill (it finds a source tree, an installed `vidroute`, or says how to install):
+Run the launcher in this skill (it finds a source tree, an installed `vidroute`, or says how to install).
+Use the skill folder's absolute path; the interpreter is `python3` on Linux/macOS, `python` or `py -3`
+on Windows:
 
 ```
-python scripts/vidroute.py <command> [options] --json
+python3 <skill folder>/scripts/vidroute.py <command> [options] --json
 ```
 
 `vidroute <command> ...` works the same when vidroute is installed. Always pass `--json` and parse
@@ -97,6 +99,9 @@ short mention to the user when they change the result (e.g. `unverified_profile`
 - **Timestamps are global** everywhere (also inside drill output and segments: `segments.json` gives each
   part's `offset_sec`).
 - **Do not guess what you cannot see or hear.** Unknown speaker → "a speaker"; unreadable → "items to verify".
+- **Do not debug vidroute.** If an output looks wrong (e.g. the transcript does not fit the pictures), say so
+  in "items to verify" and tell the user, citing `SUMMARY.md` and the warnings; do not inspect vidroute's
+  code, models or environments.
 - Outputs stay in `<dir>/<slug>/`; vidroute never writes elsewhere except its own home (`~/.vidroute`).
 
 ## MCP alternative

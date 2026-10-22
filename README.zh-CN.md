@@ -124,7 +124,7 @@ vidroute llm sync --provider openrouter     # 可选：从 OpenRouter 模型列�
 | Codex CLI | ✅ | ✅ | — | 已核对源码 |
 | Gemini CLI | ✅ | ✅ | ✅ 原生，≤ 20 MB/文件 | 已核对源码 |
 | Qwen Code | ✅ | ✅* | ✅* 原生（*需模型配置声明该模态） | 已核对源码 |
-| opencode | ✅ | — | — | 文档 |
+| opencode | ✅ | — | — | 已实测 |
 | Cursor、Cline、Roo Code、Kilo Code | ✅ | — | — | 未核实（保守） |
 
 同一个视频、不同计划：Gemini + Gemini CLI → `native-av`；Qwen3.6-Plus + Qwen Code → `native-v`；

@@ -129,14 +129,17 @@ hosts:
     max_attachment_mb: 20
     max_images_per_turn: null
     shell: true
-    confidence: docs-only
-    verified_at: "2026-10-21"
+    confidence: verified
+    verified_at: "2026-10-22"
     source:
       - "https://github.com/anomalyco/opencode/blob/dev/services/www/src/docs/content/attachments.mdx"
     notes: >-
       V2 sessions make only text files, directory listings and PNG/JPEG/GIF/WebP
       images visible to the model; PDF, audio and video attachments are dropped.
-      Attachments over 20 MiB are rejected.
+      Attachments over 20 MiB are rejected. Live test 2026-10-22 (opencode 1.19.3):
+      the read tool returned a JPEG contact sheet as an image, and image content
+      from the vidroute MCP tool read_outputs reached the model; audio/video were
+      not tested live (from the docs).
 
   - id: kilo
     aliases: [kilocode, kilo-code]

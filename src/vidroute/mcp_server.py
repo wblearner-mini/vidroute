@@ -110,7 +110,8 @@ TOOLS: list[dict[str, Any]] = [
      "description": "Run the plan locally and write SUMMARY.md, ANALYSIS_GUIDE.md, handoff.json and the files to "
                     "attach. Native routes hand the raw video to the LLM provider: they fail with "
                     "raw_video_handoff unless accept_raw_video_handoff=true, which you may only pass after the user "
-                    "agreed. Without llm/host it reuses plan.json from the output folder.",
+                    "agreed. Without llm/host it reuses plan.json from the output folder; with plan and no out, the "
+                    "outputs go next to that plan.",
      "inputSchema": _schema({"video": _STR, "plan": {"type": "string", "description": "Path of a plan.json"},
                              "accept_raw_video_handoff": _BOOL, **_ROUTING}, ("video",)),
      "annotations": {"title": "Prepare a video for the LLM", "readOnlyHint": False, "destructiveHint": False,

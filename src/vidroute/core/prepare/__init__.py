@@ -19,6 +19,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from vidroute.core import paths
 from vidroute.core.context import Ctx
 from vidroute.core.engines import WorkerPool, fake_mode
 from vidroute.core.errors import NeedsConfirmation, NeedsInstall, NotFoundError, RunFailed, UsageError
@@ -109,6 +110,10 @@ def prepare(
     path = path.resolve()
     if route not in ROUTES:
         raise UsageError(f"--route must be one of {', '.join(ROUTES)} (got {route!r})")
+    if plan and not out:  # a plan written by `plan --out DIR` lives in DIR/<slug>/: keep the outputs next to it
+        plan_dir = Path(plan).expanduser().resolve().parent
+        if plan_dir.name == paths.video_slug(path):
+            out = str(plan_dir.parent)
     layout = layout_for(path, out)
     kw = {"llm": llm, "host": host, "task": task, "prefer": prefer, "language": language, "modalities": modalities,
           "audio_in_video": audio_in_video, "ocr": ocr, "force_asr": force_asr}

@@ -11,7 +11,7 @@ commit and an update here.
 | 3 | `llm resolve`, profiles, `probe`, `plan` (two-layer routing) | ✅ done |
 | 4 | local perception pipeline, `prepare` for D3/D4 | ✅ done |
 | 5 | native routes, `handoff.json`, `drill`, raw-video consent | ✅ done |
-| 6 | CLI/MCP/Skill shells, packaging, README | ✅ done (live host runs pending) |
+| 6 | CLI/MCP/Skill shells, packaging, README | ✅ done |
 | 6.5 | open-source release checklist, v0.1.0 | ⏳ next |
 | 8 | desktop app (optional, v0.2+) | — |
 | 7 | extensions (D5 delegate, two-pass ASR, VLM, diarization) | — |
@@ -191,9 +191,8 @@ commit and an update here.
 * Tests: 219 passing (raw JSON-RPC, in-process progress/cancellation,
   `read_outputs` path safety, SDK end to end, skill spec and validator, plugin
   manifests, launcher).
-* **Pending:** the brief's live acceptance in two agent hosts (Claude Code and
-  an open-source host, via MCP and via the skill) runs real model sessions on
-  the owner's accounts and is waiting for the owner's go-ahead.
+* **Live host acceptance (owner-approved, 2026-10-22):** see "Acceptance
+  follow-ups" below.
 
 ## Phase 6.5 — release preparation (2026-10-22)
 
@@ -230,3 +229,20 @@ commit and an update here.
   14.6 MB limit, one part. `drill 02:10-02:20 --fps 1 --ocr`: 10 frames in 6 s.
 * Timestamps now truncate like a player's clock (two frames at 137.5 s and
   138.5 s were both labelled 02:18 by rounding to even).
+* **Live acceptance in two agent hosts**, headless, on a synthetic clip (slides
+  + sample speech), with the models configured in each host:
+
+  | host | shell | model (host config) | route | result |
+  |---|---|---|---|---|
+  | Claude Code 2.1.303 | MCP (`--mcp-config`, vidroute only) | deepseek-flash | text | ✅ resolve → doctor → plan → prepare → read guide/handoff/timeline → drill → minutes; 15 turns, 65 s |
+  | Claude Code 2.1.303 | Skill (repo loaded with `--plugin-dir`) | deepseek-flash | text | ✅ same flow via `vidroute:vidroute`; 37 turns, 90 s |
+  | opencode 1.19.3 | MCP (project `opencode.json`) | deepseek-v4.1-flash-free | frames | ✅ `read_outputs` delivered the contact sheet as image content; 6 steps |
+  | opencode 1.19.3 | Skill (`.opencode/skills/vidroute`, vidroute on PATH) | deepseek-v4.1-flash-free | frames | ✅ read the contact sheet image directly |
+
+  Every run wrote minutes with global `[mm:ss]` timestamps, a correction list
+  and items to verify, and flagged that the sample speech does not match the
+  slides instead of inventing content. Fixes from these runs: the skill now says
+  `python3` (no `python` on many Linux/macOS systems) and tells agents not to
+  debug vidroute internals (one run spent ~20 turns doing so); `prepare` with a
+  `plan` path and no `out` writes next to that plan (an agent's outputs had
+  landed in the default folder); the opencode host profile is now `verified`.
