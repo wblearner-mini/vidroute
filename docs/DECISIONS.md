@@ -425,3 +425,35 @@ with denser keyframes (change-based with a default budget of 24, or a fixed
 contact sheet, and on request a fresh transcript (`--asr`, VAD restricted to
 the range) and OCR (`--ocr`). Paths in `drill.json` are relative to the main
 output folder and all times are global, so the agent never converts time.
+
+## D-036 MCP server: handshake protocol versions, no SDK at runtime
+
+`vidroute-mcp` speaks newline-delimited JSON-RPC 2.0 over stdio with the
+`initialize` handshake for protocol versions 2024-11-05, 2025-03-26,
+2025-06-18 and 2025-11-25 (it echoes a supported request and counter-offers
+2025-11-25 otherwise). The official SDK (`mcp` 2.3.0, PyPI 2026-10-02) also
+knows 2026-07-28, which replaces the handshake with `server/discover` and
+per-request `_meta`; vidroute does not implement it yet (`server/discover` gets
+-32601, after which clients use the handshake). Tool results carry the envelope
+as `structuredContent` and as JSON text, `isError` mirrors `ok`; progress
+notifications use a strictly increasing counter; a cancelled request gets no
+response, per the cancellation rules. `read_outputs` returns output files as
+image/audio/text content (audio only from 2025-03-26 on) and refuses paths
+outside the output folder. Conformance is tested with the SDK's own stdio
+client (test-only dependency).
+
+## D-037 Agent Skill and Claude Code plugin layout
+
+The skill lives in `skills/vidroute/` (Agent Skills spec: `name` = folder,
+description with "Use when", < 500 lines, references one level deep) and passes
+`skills-ref validate` (`skills-ref` 0.1.1, Python ≥ 3.11, test-only). Its
+launcher `scripts/vidroute.py` runs, in order, the source tree it belongs to
+(the orchestrator is pure stdlib, so a plugin checkout needs no install), a
+`vidroute` executable on PATH, or the installed package; otherwise it returns a
+`needs_install` envelope. The repository root is also a Claude Code plugin
+(`.claude-plugin/plugin.json`) and a one-plugin marketplace
+(`.claude-plugin/marketplace.json`, `claude plugin validate .` passes). The
+plugin ships no `.mcp.json`: there is no Python command name that works on
+Windows, macOS and Linux alike, so the README documents
+`claude mcp add vidroute -- vidroute-mcp` instead. The wheel bundles the skill;
+`vidroute skill path` prints its folder for copying into any host's skills folder.

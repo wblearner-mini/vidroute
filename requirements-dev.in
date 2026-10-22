@@ -6,3 +6,7 @@ jsonschema>=4.23
 hatchling>=1.27
 build>=1.2
 editables>=0.5
+# Official MCP SDK, used only as a test client for protocol conformance (D-002)
+mcp>=1.20
+# Agent Skills reference validator (skills/vidroute must pass `skills-ref validate`)
+skills-ref>=0.1.1; python_version >= "3.11"

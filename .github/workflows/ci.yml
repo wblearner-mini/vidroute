@@ -93,6 +93,12 @@ jobs:
           "$PY" -m pip install dist/*.whl
           "$PY" -m vidroute version --json
           "$PY" -c "import vidroute.core.resources as r; print(r.data_file('routing/llm-profiles.yaml'))"
+          "$PY" -m vidroute doctor --offline --json > doctor.json
+          SKILL_DIR=$("$PY" -m vidroute skill path)
+          test -f "$SKILL_DIR/SKILL.md"
+          "$PY" "$SKILL_DIR/scripts/vidroute.py" version --json
+          printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
+            | "$PY" -m vidroute.mcp_server | grep -q '"serverInfo"'
       - name: Checksums
         shell: bash
         run: |

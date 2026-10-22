@@ -1,0 +1,10 @@
+{
+  "name": "vidroute",
+  "version": "0.1.0-dev.0",
+  "description": "See and hear local videos: picks native video, keyframes + a local transcript, or text for your model and host, prepares it on your machine (speech recognition, OCR, keyframes) and guides the analysis with global timestamps.",
+  "author": {"name": "wblearner-mini", "url": "https://github.com/wblearner-mini"},
+  "homepage": "https://github.com/wblearner-mini/vidroute",
+  "repository": "https://github.com/wblearner-mini/vidroute",
+  "license": "MIT",
+  "keywords": ["video", "transcription", "speech-recognition", "ocr", "keyframes", "meeting-minutes", "mcp"]
+}

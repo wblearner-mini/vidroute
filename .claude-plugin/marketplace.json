@@ -1,0 +1,14 @@
+{
+  "name": "vidroute",
+  "description": "vidroute: give coding agents eyes and ears for local video.",
+  "owner": {"name": "wblearner-mini", "url": "https://github.com/wblearner-mini"},
+  "plugins": [
+    {
+      "name": "vidroute",
+      "source": "./",
+      "description": "See and hear local videos: route, prepare locally, analyse with global timestamps.",
+      "category": "productivity",
+      "tags": ["video", "transcription", "ocr", "minutes"]
+    }
+  ]
+}

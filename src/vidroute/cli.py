@@ -325,6 +325,14 @@ def h_drill(args: argparse.Namespace, ctx: Ctx) -> Envelope:
                      ctx=ctx)
 
 
+def h_skill(args: argparse.Namespace, ctx: Ctx) -> Envelope:
+    return api.skill_path(ctx=ctx)
+
+
+def render_skill(env: Envelope, args: argparse.Namespace) -> str:
+    return env.data["path"]
+
+
 def h_config(args: argparse.Namespace, ctx: Ctx) -> Envelope:
     from vidroute.core.config import parse_value
 
@@ -486,6 +494,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--asr", action="store_true", help="transcribe the range again")
     p.add_argument("--ocr", action="store_true", help="read on-screen text of the drilled frames")
     p.add_argument("--max-frames", type=int, help="frame budget for the range (default 24, or 120 with --fps)")
+
+    p = add("skill", "Print the folder of the bundled Agent Skill (copy it into your host's skills folder)",
+            h_skill, render_skill)
+    ssub = p.add_subparsers(dest="action", metavar="ACTION", parser_class=_Parser)
+    sp = ssub.add_parser("path", help="print the skill folder")
+    _common_flags(sp, suppress=True)
 
     p = add("config", "Get or set user configuration ($VIDROUTE_HOME/config.json)", h_config, render_config)
     csub = p.add_subparsers(dest="action", metavar="ACTION", parser_class=_Parser)

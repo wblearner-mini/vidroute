@@ -11,8 +11,8 @@ commit and an update here.
 | 3 | `llm resolve`, profiles, `probe`, `plan` (two-layer routing) | ✅ done |
 | 4 | local perception pipeline, `prepare` for D3/D4 | ✅ done |
 | 5 | native routes, `handoff.json`, `drill`, raw-video consent | ✅ done |
-| 6 | CLI/MCP/Skill shells, packaging, README | ⏳ next |
-| 6.5 | open-source release checklist, v0.1.0 | — |
+| 6 | CLI/MCP/Skill shells, packaging, README | ✅ done (live host runs pending) |
+| 6.5 | open-source release checklist, v0.1.0 | ⏳ next |
 | 8 | desktop app (optional, v0.2+) | — |
 | 7 | extensions (D5 delegate, two-pass ASR, VLM, diarization) | — |
 
@@ -166,3 +166,31 @@ commit and an update here.
   re-transcribed and OCR'd in 15 s).
 * Tests: 210 passing (native copy/remux/segments, fallback, consent for audio,
   drill ranges, energy VAD bursts).
+
+## Phase 6 — shells and distribution (2026-10-22)
+
+* **MCP server** `vidroute-mcp` (D-036): stdlib JSON-RPC over stdio, tools
+  `doctor`, `install` (`confirm`), `list_models`, `resolve_llm`, `probe_video`,
+  `plan_video`, `prepare_video` (`accept_raw_video_handoff`), `drill_video`,
+  `read_outputs`; progress notifications, cancellation, server instructions with
+  the workflow. Verified with the official MCP SDK client (handshake 2025-11-25,
+  tool calls, progress, image content, consent error).
+* **Agent Skill** `skills/vidroute/` (D-037): SKILL.md (112 lines) with the
+  workflow, consent rules, exit codes and hints; `references/hosts.md` (how to
+  attach in each host) and `references/outputs.md`; launcher
+  `scripts/vidroute.py` that runs from the plugin checkout, PATH or the installed
+  package (`mcp` starts the server). Passes `skills-ref validate`.
+* **Claude Code plugin + marketplace** manifests; `claude plugin validate .`
+  passes. `vidroute skill path` prints the bundled skill folder.
+* **README.md / README.zh-CN.md**: routes, 30-second start, agent setup (plugin,
+  skill, MCP), CLI table, output layout, model/host support matrix, models and
+  licenses, privacy and safety, platforms, known issues, development.
+* **Packaging:** wheel 262 KB / sdist 248 KB; a clean venv runs `vidroute`,
+  `doctor`, the bundled skill launcher and an MCP handshake (also in CI on
+  Windows and Ubuntu).
+* Tests: 219 passing (raw JSON-RPC, in-process progress/cancellation,
+  `read_outputs` path safety, SDK end to end, skill spec and validator, plugin
+  manifests, launcher).
+* **Pending:** the brief's live acceptance in two agent hosts (Claude Code and
+  an open-source host, via MCP and via the skill) runs real model sessions on
+  the owner's accounts and is waiting for the owner's go-ahead.

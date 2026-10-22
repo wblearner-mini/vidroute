@@ -316,6 +316,15 @@ def drill(out_dir: str, range: str, fps: float | None = None, asr: bool = False,
     return _drill(out_dir, range, fps=fps, asr=asr, ocr=ocr, max_frames=max_frames, ctx=ctx)
 
 
+@command
+def skill_path(*, ctx: Ctx) -> dict[str, Any]:
+    """Where the bundled Agent Skill lives (copy or link it into your host's skills folder)."""
+    from vidroute.core.resources import data_file
+
+    skill_md = data_file("skills/vidroute/SKILL.md")
+    return {"path": str(skill_md.parent), "skill_md": str(skill_md)}
+
+
 # ------------------------------------------------------------------- config
 
 

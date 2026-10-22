@@ -66,6 +66,7 @@ packages = ["src/vidroute"]
 "schemas" = "vidroute/_data/schemas"
 "references" = "vidroute/_data/references"
 "envs" = "vidroute/_data/envs"
+"skills" = "vidroute/_data/skills"
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -75,10 +76,10 @@ include = [
     "schemas/",
     "references/",
     "envs/",
-    "scripts/",
+    "skills/",
+    ".claude-plugin/",
     "tests/",
     "docs/",
-    "SKILL.md",
     "README.md",
     "README.zh-CN.md",
     "LICENSE",
