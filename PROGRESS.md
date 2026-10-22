@@ -209,5 +209,10 @@ commit and an update here.
   Dependabot for SHA-pinned actions, `release.yml` (tag → build, checksums,
   GitHub release; PyPI only by manual dispatch with trusted publishing).
 * Hygiene test: no model weights, media or binaries tracked in git.
+* **Clean-machine re-test (GitHub `windows-latest` and `ubuntu-latest`, Real install
+  workflow, 2026-10-22):** one-command CPU baseline install, `doctor` → `cpu-full`,
+  smoke tests and the real-model end-to-end `prepare` (Chinese and English speech
+  clips, OCR) passed on both. The CI package job installs the wheel in a clean venv
+  and runs `doctor`, the bundled skill launcher and an MCP handshake on both OSes.
 * **Waiting for the owner:** making the repository public, tagging `v0.1.0`
   (GitHub pre-release with sources and checksums) and the first PyPI upload.
