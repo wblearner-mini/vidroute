@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use vidroute in your work, please cite it as below."
+title: "vidroute: routing local video to what an agent's LLM can consume"
+type: software
+authors:
+  - name: "vidroute contributors"
+    website: "https://github.com/wblearner-mini/vidroute"
+repository-code: "https://github.com/wblearner-mini/vidroute"
+license: MIT
+version: "0.1.0.dev0"
+keywords:
+  - video understanding
+  - speech recognition
+  - OCR
+  - LLM agents
+  - Model Context Protocol
+abstract: >-
+  vidroute decides what to hand an AI agent's language model for a local video — the video itself,
+  keyframes with a local transcript, or text — from the model's and the host's capabilities, prepares
+  it locally (speech recognition, OCR, keyframes, transcoding) and guides the analysis with global
+  timestamps and evidence-based proofreading.

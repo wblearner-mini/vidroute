@@ -1,0 +1,2 @@
+# OSV ids to ignore in tools/vuln_check.py, one per line, each with a reason:
+# GHSA-xxxx-xxxx-xxxx  not reachable: the affected API is never used by vidroute

@@ -1,0 +1,38 @@
+name: Supply chain
+
+on:
+  push:
+    branches: [main]
+    paths: ["envs/**", "requirements-dev.*", "tools/**", ".github/workflows/supply-chain.yml"]
+  pull_request:
+    paths: ["envs/**", "requirements-dev.*", "tools/**"]
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  licenses-and-vulnerabilities:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Licenses of every locked package are on the allow-list
+        run: python tools/license_report.py --check envs/*.lock.txt requirements-dev.lock.txt > licenses.md
+      - name: No known vulnerabilities in locked packages (osv.dev)
+        run: python tools/vuln_check.py envs/*.lock.txt requirements-dev.lock.txt
+      - name: Locked packages are hash-pinned
+        run: |
+          for f in envs/*.lock.txt requirements-dev.lock.txt; do
+            python - "$f" <<'PY'
+          import re, sys
+          text = open(sys.argv[1], encoding="utf-8").read()
+          blocks = re.split(r"\n(?=[A-Za-z0-9_.-]+==)", text)
+          missing = [b.split()[0] for b in blocks if re.match(r"[A-Za-z0-9_.-]+==", b) and "--hash=sha256:" not in b]
+          sys.exit(f"{sys.argv[1]}: no hash for {missing}" if missing else 0)
+          PY
+          done

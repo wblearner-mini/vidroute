@@ -4,6 +4,8 @@ import ast
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "vidroute"
 STDLIB = set(getattr(sys, "stdlib_module_names", ()))
@@ -49,3 +51,18 @@ def test_sources_are_utf8_and_lf():
         raw = path.read_bytes()
         raw.decode("utf-8")
         assert b"\r\n" not in raw, f"CRLF in {path}"
+
+
+def test_no_model_weights_or_binaries_in_the_repository():
+    import shutil
+    import subprocess
+
+    if shutil.which("git") is None or not (ROOT / ".git").exists():
+        pytest.skip("not a git checkout")
+    files = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.split("\n")
+    banned = (".onnx", ".bin", ".pt", ".pth", ".safetensors", ".gguf", ".ckpt", ".exe", ".dll", ".so", ".dylib",
+              ".whl", ".mp4", ".mkv", ".mov", ".webm", ".wav", ".mp3", ".m4a", ".zip", ".tar", ".bz2", ".gz")
+    offenders = [f for f in files if f and f.lower().endswith(banned)]
+    assert not offenders, offenders
+    big = [f for f in files if f and (ROOT / f).is_file() and (ROOT / f).stat().st_size > 512 * 1024]
+    assert not big, f"unexpectedly large files: {big}"

@@ -48,6 +48,7 @@ tier, OCR seconds per frame, transcode real-time factor. They never change a res
 
 ## Changing the rules
 
-Edit `routing/rules.yaml` in a checkout, or override single keys in `$VIDROUTE_HOME/config.json`
-(`vidroute config set budget_fraction 0.3`). Profile changes need an official source URL and the
-date you checked it; see `docs/DECISIONS.md` for how existing values were verified.
+Edit `routing/rules.yaml` in a checkout. Per user, a few settings live in `$VIDROUTE_HOME/config.json`
+(`vidroute config get` lists them), e.g. `vidroute config set budget_fraction 0.3`,
+`budget_tokens`, `allow_raw_video_handoff`, `default_llm`, `default_host`. Profile changes need an
+official source URL and the date you checked it; see `docs/PROFILE_CONTRIBUTING.md`.

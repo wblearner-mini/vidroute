@@ -194,3 +194,20 @@ commit and an update here.
 * **Pending:** the brief's live acceptance in two agent hosts (Claude Code and
   an open-source host, via MCP and via the skill) runs real model sessions on
   the owner's accounts and is waiting for the owner's go-ahead.
+
+## Phase 6.5 — release preparation (2026-10-22)
+
+* Release documents: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (adopts Contributor
+  Covenant 2.1), `SECURITY.md` (private advisories), `CHANGELOG.md`,
+  `CITATION.cff`, `THIRD_PARTY_LICENSES.md` (models, external tools, every
+  worker-env and dev package with its license), `docs/PROFILE_CONTRIBUTING.md`,
+  `docs/RELEASING.md` (the §11.5 checklist), issue templates (bug, profile
+  correction with required official source and date, feature) and a PR template.
+* Supply chain (D-038): `tools/license_report.py` (all 87 pinned packages on the
+  allow-list) and `tools/vuln_check.py` (osv.dev: no known vulnerabilities),
+  `supply-chain.yml` (weekly + on lock changes, also checks hash pinning),
+  Dependabot for SHA-pinned actions, `release.yml` (tag → build, checksums,
+  GitHub release; PyPI only by manual dispatch with trusted publishing).
+* Hygiene test: no model weights, media or binaries tracked in git.
+* **Waiting for the owner:** making the repository public, tagging `v0.1.0`
+  (GitHub pre-release with sources and checksums) and the first PyPI upload.

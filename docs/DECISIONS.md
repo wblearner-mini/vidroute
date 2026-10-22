@@ -457,3 +457,18 @@ plugin ships no `.mcp.json`: there is no Python command name that works on
 Windows, macOS and Linux alike, so the README documents
 `claude mcp add vidroute -- vidroute-mcp` instead. The wheel bundles the skill;
 `vidroute skill path` prints its folder for copying into any host's skills folder.
+
+## D-038 Data schema versions and supply-chain checks
+
+Every data file and output declares `schema: vidroute/<kind>/<major>` (rules,
+manifest, profiles, plan, handoff, segments, drill, output manifest). Loaders
+reject an unknown major version with an error naming the expected one; a
+migration function will be added alongside the first `/2`. Supply chain:
+`tools/license_report.py` reads every pinned package's license from PyPI
+metadata (PEP 639 expression, else classifiers) and fails outside an allow-list
+of permissive and weak-copyleft licenses (NVIDIA CUDA libraries are reviewed
+exceptions for the optional GPU path); `tools/vuln_check.py` queries osv.dev for
+all pinned versions. Both are standard-library scripts run by the
+`supply-chain` workflow (on lock changes and weekly). Releases are built by
+`release.yml` on version tags with `SHA256SUMS.txt`; PyPI uploads use trusted
+publishing and only run on a manual dispatch.

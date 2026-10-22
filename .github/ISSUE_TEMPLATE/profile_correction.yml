@@ -1,0 +1,31 @@
+name: LLM or host profile correction
+description: A model's modalities/limits or a host's attachment behaviour is wrong or missing
+labels: [profiles]
+body:
+  - type: input
+    id: subject
+    attributes:
+      label: Model id or host id
+      placeholder: gemini-3.8-flash / qwen-code
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: What should change?
+      description: Field, current value, correct value.
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Official source URL
+      description: Provider/host documentation, API reference, model card or a specific source file and version.
+    validations:
+      required: true
+  - type: input
+    id: checked
+    attributes:
+      label: Date you checked it (YYYY-MM-DD)
+    validations:
+      required: true
