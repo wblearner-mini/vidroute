@@ -292,4 +292,13 @@ hosts; the repository stays private for now (D-039 … D-046).
   passed in 5.4 s. The copied skill's sh launcher ran `doctor` with an empty
   PATH through the recorded interpreter. With the existing models in
   `~/.vidroute` the self-test passes in 6.0 s.
+* **Clean machines (GitHub `windows-latest` / `ubuntu-latest`, 2026-10-23):**
+  CI on every push runs installer → `setup --host claude-code` → the copied
+  skill's launcher with no Python on PATH → `setup --remove` (green on both).
+  Real install workflow, new installer job: `install.ps1 -Source . -Yes`
+  downloaded uv, installed vidroute, then `setup` installed FFmpeg through
+  winget (found at once in `WinGet\Links`), the envs and models, created the
+  Claude Code skill and passed the self-test (speech and OCR) in 12.6 s — about
+  1 min 45 s for the whole job; Ubuntu passed the same way. The portable FFmpeg
+  path is covered by tests with a local server; the runner had winget.
 
