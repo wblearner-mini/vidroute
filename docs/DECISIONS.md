@@ -485,7 +485,8 @@ confirmation — so it is always part of that plan, never implicit. Defaults:
 capabilities asr + vad + ocr + scene (the README's CPU baseline), hosts `auto`
 (every host detected), skill on, MCP off. A machine that is already set up gets
 the self-test only. Exit codes: 2 when ffmpeg is still missing (Linux/macOS,
-where it is the user's package manager's job), 5 when an install step,
+where it is the user's package manager's job; only a warning with
+`--no-install`, which skips installing on purpose), 5 when an install step,
 integration or the self-test failed; re-running resumes. `setup --remove` takes
 out exactly what state.json and the folder markers say vidroute added; models
 stay.

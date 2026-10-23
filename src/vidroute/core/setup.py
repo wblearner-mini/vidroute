@@ -91,9 +91,11 @@ def execute(the_plan: dict[str, Any], ctx: Ctx, mirror: str = "auto") -> dict[st
             problems.append("the self-test")
     out["next_steps"] = out["integration"].get("next_steps", [])
     if not ffmpeg.detect().found:
-        hint = ffmpeg.install_hint()
-        raise NeedsInstall("ffmpeg/ffprobe are still missing: vidroute cannot read videos without them.",
-                           code="ffmpeg_missing", hint=hint, data=out)
+        message = "ffmpeg/ffprobe are still missing: vidroute cannot read videos without them."
+        if inst is None:  # --no-install: the user chose not to install anything now
+            ctx.warn("ffmpeg_missing", message, ffmpeg.install_hint())
+        else:
+            raise NeedsInstall(message, code="ffmpeg_missing", hint=ffmpeg.install_hint(), data=out)
     if problems:
         raise RunFailed("Setup finished with problems in " + ", ".join(problems) + ".", code="setup_failed",
                         hint="vidroute doctor --refresh   (then run vidroute setup again: finished parts are kept)",

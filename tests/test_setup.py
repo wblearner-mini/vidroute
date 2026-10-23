@@ -51,12 +51,17 @@ def test_cli_setup_and_remove_round_trip(user_home, monkeypatch, capsys):
 
 
 def test_missing_ffmpeg_after_setup_is_reported_with_the_fix(user_home, monkeypatch):
+    from vidroute.core.install import runner
     from vidroute.core.util import ffmpeg
 
     monkeypatch.setattr(ffmpeg, "detect", lambda timeout=5: ffmpeg.FFmpegInfo(False, error="ffmpeg not found"))
-    env = api.setup(hosts=["claude-code"], install=False, yes=True)
+    monkeypatch.setattr(runner, "execute", lambda plan, ctx, mirror="auto": {"results": [], "ok": True})
+    env = api.setup(hosts=["claude-code"], yes=True)  # installs (faked), but ffmpeg is still not there
     assert not env.ok and env.error["code"] == "ffmpeg_missing" and int(env.exit_code) == 2
     assert env.data["integration"]["ok"] and env.data["selftest"]["status"] == "skipped"
+    # with --no-install the user chose not to install anything: a warning, not an error
+    env = api.setup(hosts=["claude-code"], install=False, selftest=False, yes=True, force=True)
+    assert env.ok and any(w["code"] == "ffmpeg_missing" for w in env.warnings)
 
 
 @needs_ffmpeg
