@@ -53,3 +53,49 @@ jobs:
           name: vidroute-logs-${{ matrix.os }}
           path: ~/.vidroute/cache/logs
           if-no-files-found: ignore
+
+  # A new user's path end to end: the one-line installer (uv download, uv-managed Python), `vidroute
+  # setup --yes` (ffmpeg on Windows: winget, or the portable build when the runner has no winget;
+  # models; the skill for Claude Code) and the self-test, which must pass.
+  user-path:
+    name: installer + setup + self-test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Installer (Windows, no ffmpeg preinstalled)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./install.ps1 -Source . -AgentHost claude-code -Yes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Installer (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends ffmpeg
+          sh ./install.sh --source . --host claude-code --yes
+      - name: doctor sees models, ffmpeg and the skill
+        shell: bash
+        run: |
+          "$HOME/.local/bin/vidroute" doctor --refresh --json > doctor.json
+          PY=$(command -v python3 || command -v python)
+          "$PY" - <<'EOF'
+          import json
+          d = json.load(open("doctor.json", encoding="utf-8"))["data"]
+          print(json.dumps({k: d[k] for k in ("ffmpeg", "capabilities", "integrations")}, indent=1)[:4000])
+          assert d["ffmpeg"]["found"]
+          assert all(d["capabilities"][c]["ready"] for c in ("asr", "vad", "ocr", "scene"))
+          claude = next(h for h in d["integrations"]["hosts"] if h["id"] == "claude-code")
+          assert claude["skill"]["managed"] and claude["skill"]["current"]
+          EOF
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vidroute-user-path-logs-${{ matrix.os }}
+          path: ~/.vidroute/cache/logs
+          if-no-files-found: ignore

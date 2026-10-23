@@ -9,10 +9,30 @@
     "schema": {"const": "vidroute/manifest/1"},
     "allowed_domains": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[a-z0-9.-]+$"}},
     "env_groups": {"type": "object", "additionalProperties": {"$ref": "#/$defs/env_group"}},
-    "models": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/model"}}
+    "models": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/model"}},
+    "runtimes": {"type": "array", "items": {"$ref": "#/$defs/runtime"}}
   },
   "$defs": {
     "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "runtime": {
+      "type": "object",
+      "required": ["id", "tool", "version", "platforms", "install_dir", "size_mb", "license", "files", "sources"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$"},
+        "tool": {"enum": ["ffmpeg"]},
+        "version": {"type": "string"},
+        "platforms": {"type": "array", "minItems": 1,
+                      "items": {"type": "string", "pattern": "^(windows|linux|darwin)-(x86_64|arm64)$"}},
+        "install_dir": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+        "size_mb": {"type": "number", "minimum": 0},
+        "license": {"$ref": "#/$defs/license"},
+        "files": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/file"}},
+        "sources": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/source"}},
+        "verified_at": {"type": "string"},
+        "notes": {"type": "string"}
+      }
+    },
     "env_group": {
       "type": "object",
       "required": ["description", "python", "lock", "import_check"],
@@ -24,7 +44,8 @@
         "lock_cuda": {"type": "string"},
         "import_check": {"type": "string"},
         "approx_size_mb": {"type": "number"},
-        "approx_size_mb_cuda": {"type": "number"}
+        "approx_size_mb_cuda": {"type": "number"},
+        "windows_arm64_arch": {"enum": ["x86_64"]}
       }
     },
     "license": {

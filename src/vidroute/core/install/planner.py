@@ -19,10 +19,11 @@ import os
 import platform
 from typing import Any
 
-from vidroute.core import paths
+from vidroute.core import config, paths
 from vidroute.core.doctor.runtimes import UV_VERSION, find_uv
 from vidroute.core.errors import InsufficientHardware, UsageError
 from vidroute.core.install import envs as envmod
+from vidroute.core.install import network, portable
 from vidroute.core.install.manifest import Manifest, ModelEntry, load_manifest
 from vidroute.core.util import ffmpeg, proc
 
@@ -67,19 +68,57 @@ def default_for(cap: str, tier: str, manifest: Manifest) -> list[str]:
     raise UsageError(f"Unknown capability {cap!r}; use asr, vad, ocr or scene")
 
 
-def _python_runtime_present(version: str) -> bool:
+def _python_runtime_present(request: str) -> bool:
+    """Is the uv-managed Python for ``request`` ("3.12" or "cpython-3.12-windows-x86_64-none") already there?"""
     root = paths.runtimes_dir() / "python"
-    return root.is_dir() and any(p.name.startswith(f"cpython-{version}") for p in root.iterdir())
+    if not root.is_dir():
+        return False
+    if request.startswith("cpython-"):  # cpython-<version>-<os>-<arch>-<libc>
+        _, version, os_name, arch, libc = request.split("-")
+        suffix = f"-{os_name}-{arch}-{libc}"
+        return any(p.name.startswith(f"cpython-{version}") and p.name.endswith(suffix) for p in root.iterdir())
+    return any(p.name.startswith(f"cpython-{request}") for p in root.iterdir())
 
 
-def _ffmpeg_item() -> dict[str, Any] | None:
+def _python_item(request: str) -> dict[str, Any]:
+    note = "uv-managed, not added to PATH or registry"
+    version, arch = request, None
+    if request.startswith("cpython-"):  # cpython-<version>-<os>-<arch>-<libc>
+        _, version, _os, arch, _libc = request.split("-")
+        note += f"; {arch} build (runs emulated on Windows on Arm)"
+    return {"kind": "python", "id": f"python-{version}" + (f"-{arch}" if arch else ""), "version": version,
+            "request": request, "size_mb": PYTHON_RUNTIME_MB, "path": str(paths.runtimes_dir() / "python"),
+            "note": note}
+
+
+WINGET_FFMPEG = ["winget", "install", "--id", "Gyan.FFmpeg", "-e", "--silent",
+                 "--accept-package-agreements", "--accept-source-agreements"]
+
+
+def _portable_item(entry: Any, why: str) -> dict[str, Any]:
+    return {"kind": "ffmpeg", "action": "download", "id": entry.id, "version": entry.version,
+            "size_mb": entry.size_mb, "disk_mb": entry.disk_mb, "path": str(entry.path),
+            "license": {"spdx": entry.license.spdx, "name": entry.license.name, "url": entry.license.url,
+                        "notes": entry.license.notes},
+            "note": f"{why}; portable build into VIDROUTE_HOME, not added to PATH"}
+
+
+def _ffmpeg_item(manifest: Manifest) -> dict[str, Any] | None:
+    """ffmpeg is missing: winget on Windows (D-025), the pinned portable build when winget is unavailable or the
+    user prefers it (D-043), else the package-manager command for the user to run."""
     if ffmpeg.find_tool("ffmpeg") and ffmpeg.find_tool("ffprobe"):
         return None
-    if platform.system() == "Windows" and proc.which("winget"):
-        cmd = ["winget", "install", "--id", "Gyan.FFmpeg", "-e", "--silent",
-               "--accept-package-agreements", "--accept-source-agreements"]
-        return {"kind": "ffmpeg", "action": "run_with_yes", "command": cmd,
-                "note": "Runs only with --yes; installs FFmpeg system-wide via winget (Gyan.FFmpeg)."}
+    prefer = config.get("ffmpeg_source") or "auto"
+    entry = portable.for_platform(manifest)
+    winget = platform.system() == "Windows" and proc.which("winget") is not None
+    if entry is not None and (prefer == "portable" or (prefer == "auto" and not winget)):
+        return _portable_item(entry, "ffmpeg_source=portable" if prefer == "portable" else "winget is not available")
+    if winget and prefer != "portable":
+        item: dict[str, Any] = {"kind": "ffmpeg", "action": "run_with_yes", "command": WINGET_FFMPEG,
+                                "note": "Runs only with --yes; installs FFmpeg for this user via winget (Gyan.FFmpeg)."}
+        if entry is not None:
+            item["fallback"] = _portable_item(entry, "used only if winget fails")
+        return item
     return {"kind": "ffmpeg", "action": "manual", "command": ffmpeg.install_hint(),
             "note": "vidroute does not install system packages itself; run the command, then re-run install."}
 
@@ -149,7 +188,7 @@ def plan_install(
 
     accepted = set(accept_licenses or [])
     items: list[dict[str, Any]] = []
-    ff = _ffmpeg_item()
+    ff = _ffmpeg_item(manifest)
     if ff:
         items.append(ff)
 
@@ -167,17 +206,16 @@ def plan_install(
             continue
         size = group.approx_size_mb_cuda if variant == "cuda" and group.approx_size_mb_cuda else group.approx_size_mb
         env_items.append({"kind": "env", "id": name, "variant": variant, "python": group.python,
+                          "python_request": envmod.python_request(group),
                           "size_mb": size, "description": group.description, "path": str(group.path),
                           "lock": envmod.lock_path(group, variant).name})
     if env_items:
         if find_uv() is None:
             items.append({"kind": "uv", "id": "uv", "version": UV_VERSION, "size_mb": UV_MB,
                           "path": str(paths.runtimes_dir() / "uv"), "note": "pinned + hash-checked from PyPI"})
-        pythons = {i["python"] for i in env_items}
-        for ver in sorted(pythons):
-            if not _python_runtime_present(ver):
-                items.append({"kind": "python", "id": f"python-{ver}", "version": ver, "size_mb": PYTHON_RUNTIME_MB,
-                              "path": str(paths.runtimes_dir() / "python"), "note": "uv-managed, not added to PATH or registry"})
+        for req in sorted({i["python_request"] for i in env_items}):
+            if not _python_runtime_present(req):
+                items.append(_python_item(req))
         items.extend(env_items)
 
     reusable = {r["id"]: r for r in doctor_data.get("reusable_models") or []}
@@ -210,7 +248,15 @@ def plan_install(
             "path": str(entry.model_dir),
         })
 
-    download_mb = round(sum(float(i.get("size_mb") or 0) for i in items if i["kind"] in ("model", "env", "python", "uv")), 1)
+    download_mb = round(sum(float(i.get("size_mb") or 0) for i in items
+                            if i["kind"] in ("model", "env", "python", "uv")
+                            or (i["kind"] == "ffmpeg" and i["action"] == "download")), 1)
+    net = network.resolve(
+        mirror,
+        need_packages=any(i["kind"] in ("env", "uv") for i in items),
+        need_python=any(i["kind"] == "python" for i in items),
+        need_models=any(i["kind"] == "model" and i["action"] != "reuse" for i in items),
+    )
     disk_free = doctor_data.get("disk_free_gb")
     disk_needed_gb = round(download_mb * 2.2 / 1024, 2)  # archive + extracted + pip cache headroom
     actionable = [i for i in items if not (i["kind"] == "ffmpeg" and i["action"] == "manual")]
@@ -230,6 +276,7 @@ def plan_install(
         "force": force,
         "nothing_to_do": not actionable,
         "home": str(paths.home()),
+        "network": net,
         "confirm_command": f"vidroute install{args} --yes",
         "accept_command": (f"vidroute install{args}" + "".join(f" --accept-license {m}" for m in license_needed) + " --yes")
         if license_needed else None,
@@ -266,11 +313,20 @@ def describe(plan: dict[str, Any]) -> str:
             lines.append(f"  env    {i['id']:<34} {i['size_mb'] or 0:>7.1f} MB  ({i['variant']}, Python {i['python']}, {i['lock']})")
         elif i["kind"] in ("python", "uv"):
             lines.append(f"  {i['kind']:<6} {i['id']:<34} {i['size_mb']:>7.1f} MB  ({i.get('note', '')})")
+        elif i["kind"] == "ffmpeg" and i["action"] == "download":
+            lines.append(f"  ffmpeg {i['id'] + ' ' + i['version']:<34} {i['size_mb']:>7.1f} MB  {i['license']['spdx']}"
+                         f"  ({i['note']})")
         elif i["kind"] == "ffmpeg":
             cmd = i["command"] if isinstance(i["command"], str) else " ".join(i["command"])
             lines.append(f"  ffmpeg missing -> {cmd}  ({i['note']})")
+            if i.get("fallback"):
+                fb = i["fallback"]
+                lines.append(f"         fallback: {fb['id']} {fb['version']} ({fb['size_mb']:.1f} MB, {fb['license']['spdx']})")
     for s in plan["skipped"]:
         lines.append(f"  skip   {s['id']:<34} {s['reason']}")
     lines.append(f"  total download ~{plan['total_download_mb']} MB; needs ~{plan['disk_needed_gb']} GB free "
                  f"(free: {plan['disk_free_gb']} GB)")
+    net = network.describe(plan.get("network"))
+    if net:
+        lines.append(f"  {net}")
     return "\n".join(lines)

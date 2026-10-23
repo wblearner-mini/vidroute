@@ -118,6 +118,67 @@ def install(
 
 
 @command
+def setup(
+    hosts: list[str] | None = None,
+    skill: bool = True,
+    mcp: bool = False,
+    install: bool = True,
+    capabilities: list[str] | None = None,
+    profile: str = "auto",
+    models: list[str] | None = None,
+    mirror: str | None = None,
+    accept_licenses: list[str] | None = None,
+    selftest: bool = True,
+    yes: bool = False,
+    dry_run: bool = False,
+    force: bool = False,
+    *,
+    ctx: Ctx,
+) -> dict[str, Any]:
+    """Install plan + connecting agent hosts + self-test, behind one confirmation (exit 3 without ``yes``)."""
+    from vidroute.core import setup as _setup
+    from vidroute.core.errors import InsufficientHardware, NeedsConfirmation
+
+    mirror = mirror or _config.get("mirror") or "auto"
+    the_plan = _setup.plan(hosts, skill, mcp, install, capabilities, profile, models, mirror, accept_licenses,
+                           selftest, force)
+    inst = the_plan["install"]
+    if dry_run:
+        return {"plan": the_plan, "executed": False}
+    if inst and inst["license_acceptance_required"]:
+        raise NeedsConfirmation(
+            "Some models have restricted licenses that must be accepted explicitly: "
+            + ", ".join(inst["license_acceptance_required"]),
+            code="license_not_accepted", hint=inst["accept_command"], data={"plan": the_plan})
+    if inst and not inst["disk_ok"]:
+        raise InsufficientHardware(
+            f"Not enough disk space: ~{inst['disk_needed_gb']} GB needed, {inst['disk_free_gb']} GB free.",
+            hint="Free some space or set VIDROUTE_HOME to a larger drive", data={"plan": the_plan})
+    if not the_plan["nothing_to_do"] and not yes:
+        raise NeedsConfirmation(
+            "Review the setup plan and confirm (nothing has been downloaded or changed).",
+            code="needs_confirmation", hint=the_plan["confirm_command"], data={"plan": the_plan})
+    return _setup.execute(the_plan, ctx, mirror=mirror)
+
+
+@command
+def setup_remove(hosts: list[str] | None = None, yes: bool = False, dry_run: bool = False, *,
+                 ctx: Ctx) -> dict[str, Any]:
+    """Take out what ``setup`` added to agent hosts (skill folders, MCP entries); models stay installed."""
+    from vidroute.core import integrate
+    from vidroute.core.errors import NeedsConfirmation
+
+    the_plan = integrate.plan_remove(hosts)
+    if dry_run or not the_plan["changes"]:
+        return {"plan": the_plan, "executed": False}
+    if not yes:
+        hint = "vidroute setup --remove" + "".join(f" --host {h}" for h in hosts or []) + " --yes"
+        raise NeedsConfirmation("Review what would be removed from your agent hosts and confirm.",
+                                code="needs_confirmation", hint=hint, data={"plan": the_plan})
+    return {"plan": the_plan, "executed": True, **integrate.remove(the_plan, ctx)}
+
+
+@command
 def models_list(*, ctx: Ctx) -> dict[str, Any]:
     from vidroute.core.engines import supported
     from vidroute.core.install.manifest import load_manifest

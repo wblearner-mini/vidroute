@@ -103,3 +103,30 @@ jobs:
         shell: bash
         run: |
           cd dist && sha256sum * | tee SHA256SUMS.txt
+
+      # The path a new user takes, without model downloads: installer -> `vidroute setup` connecting a
+      # host -> the copied skill's launcher, run with no python on PATH.
+      - name: "User path: install.ps1 + setup (Windows)"
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./install.ps1 -Source . -NoSetup
+          $vr = Join-Path $HOME ".local\bin\vidroute.exe"
+          & $vr setup --host claude-code --no-install --no-selftest --yes --json | Out-File setup.json
+          if ($LASTEXITCODE -ne 0) { Get-Content setup.json; exit 1 }
+          $env:Path = "$env:SystemRoot\System32"
+          $out = & "$HOME\.claude\skills\vidroute\scripts\vidroute.cmd" version --json | ConvertFrom-Json
+          if (-not $out.ok) { exit 1 }
+          & $vr setup --remove --yes --json | Out-Null
+          if (Test-Path "$HOME\.claude\skills\vidroute") { exit 1 }
+      - name: "User path: install.sh + setup (Linux)"
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sh ./install.sh --source . --no-setup
+          vr="$HOME/.local/bin/vidroute"
+          "$vr" setup --host claude-code --no-install --no-selftest --yes --json > setup.json || { cat setup.json; exit 1; }
+          env -i PATH=/nonexistent HOME="$HOME" /bin/sh "$HOME/.claude/skills/vidroute/scripts/vidroute" version --json \
+            | python -c "import json,sys; assert json.load(sys.stdin)['ok']"
+          "$vr" setup --remove --yes --json > /dev/null
+          test ! -e "$HOME/.claude/skills/vidroute"

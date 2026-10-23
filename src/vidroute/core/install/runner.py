@@ -9,6 +9,7 @@ from vidroute.core import paths
 from vidroute.core.context import Ctx
 from vidroute.core.errors import RunFailed, VidrouteError
 from vidroute.core.install import envs as envmod
+from vidroute.core.install import portable
 from vidroute.core.install.download import Downloader
 from vidroute.core.install.manifest import Manifest, load_manifest
 from vidroute.core.install.models import install_model
@@ -29,22 +30,43 @@ def run_smoke(model_id: str, ctx: Ctx, manifest: Manifest | None = None) -> dict
         return {"status": "failed", "detail": f"{type(exc).__name__}: {exc}"}
 
 
+def _install_portable_ffmpeg(item: dict[str, Any], manifest: Manifest, ctx: Ctx,
+                             downloader: Downloader) -> dict[str, Any]:
+    try:
+        res = portable.install(manifest.runtimes[item["id"]], manifest, ctx, downloader)
+    except VidrouteError as exc:
+        if exc.code == "cancelled":
+            raise
+        ctx.warn("ffmpeg_install_failed", f"The portable FFmpeg build could not be installed: {exc.message}",
+                 ffmpeg.install_hint())
+        return {"kind": "ffmpeg", "id": item["id"], "status": "failed", "detail": exc.message}
+    ffmpeg.reset_cache()
+    return {"kind": "ffmpeg", **res}
+
+
 def execute(plan: dict[str, Any], ctx: Ctx, mirror: str = "auto", smoke: bool = True) -> dict[str, Any]:
     manifest = load_manifest()
     paths.ensure_dir(paths.home())
     results: list[dict[str, Any]] = []
     failed = False
+    net = plan.get("network")
+    downloader = Downloader(manifest.allowed_domains, ctx=ctx)
 
     for item in plan["items"]:
         if item["kind"] != "ffmpeg":
             continue
-        if item["action"] == "run_with_yes":
+        if item["action"] == "download":
+            results.append(_install_portable_ffmpeg(item, manifest, ctx, downloader))
+        elif item["action"] == "run_with_yes":
             ctx.progress("ffmpeg", None, None, "installing with winget")
             res = proc.run(item["command"], timeout=1800)
             ok = res.ok and ffmpeg.find_tool("ffmpeg") is not None
             results.append({"kind": "ffmpeg", "status": "installed" if ok else "failed",
                             "detail": (res.stderr or res.stdout).strip()[-400:]})
-            if not ok:
+            if not ok and item.get("fallback"):
+                ctx.warn("winget_failed", "winget could not install FFmpeg; using the portable build instead.")
+                results.append(_install_portable_ffmpeg(item["fallback"], manifest, ctx, downloader))
+            elif not ok:
                 ctx.warn("ffmpeg_install_failed", "winget could not install FFmpeg; install it manually.",
                          ffmpeg.install_hint())
         else:
@@ -53,7 +75,7 @@ def execute(plan: dict[str, Any], ctx: Ctx, mirror: str = "auto", smoke: bool = 
 
     if any(i["kind"] == "uv" for i in plan["items"]):
         try:
-            uv = envmod.bootstrap_uv(ctx)
+            uv = envmod.bootstrap_uv(ctx, net)
             results.append({"kind": "uv", "status": "installed", "path": str(uv)})
         except VidrouteError as exc:
             results.append({"kind": "uv", "status": "failed", "detail": exc.message})
@@ -65,7 +87,7 @@ def execute(plan: dict[str, Any], ctx: Ctx, mirror: str = "auto", smoke: bool = 
         ctx.check_cancelled()
         try:
             res = envmod.create_env(manifest.env_groups[item["id"]], ctx, variant=item["variant"],
-                                    force=bool(plan.get("force")))
+                                    force=bool(plan.get("force")), net=net)
             results.append({"kind": "env", "id": item["id"], "status": res["status"], "variant": item["variant"]})
         except VidrouteError as exc:
             failed = True
@@ -73,14 +95,14 @@ def execute(plan: dict[str, Any], ctx: Ctx, mirror: str = "auto", smoke: bool = 
             if item["variant"] == "cuda":
                 ctx.warn("gpu_env_failed", f"CUDA runtime for {item['id']} failed to install; trying the CPU variant.")
                 try:
-                    res = envmod.create_env(manifest.env_groups[item["id"]], ctx, variant="cpu")
+                    res = envmod.create_env(manifest.env_groups[item["id"]], ctx, variant="cpu", net=net)
                     results.append({"kind": "env", "id": item["id"], "status": res["status"], "variant": "cpu",
                                     "note": "fallback after CUDA failure"})
                     failed = False
                 except VidrouteError as exc2:
                     results.append({"kind": "env", "id": item["id"], "status": "failed", "detail": exc2.message})
 
-    downloader = Downloader(manifest.allowed_domains, ctx=ctx)
+    model_mirror = (net or {}).get("model_mirror") or mirror
     installed_ids = []
     for item in plan["items"]:
         if item["kind"] != "model":
@@ -88,7 +110,7 @@ def execute(plan: dict[str, Any], ctx: Ctx, mirror: str = "auto", smoke: bool = 
         ctx.check_cancelled()
         entry = manifest.model(item["id"])
         try:
-            res = install_model(entry, manifest, ctx, mirror=mirror, reuse_path=item.get("reuse_path"),
+            res = install_model(entry, manifest, ctx, mirror=model_mirror, reuse_path=item.get("reuse_path"),
                                 downloader=downloader, force=bool(plan.get("force")))
             results.append({"kind": "model", **res})
             installed_ids.append(entry.id)

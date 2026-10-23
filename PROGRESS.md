@@ -13,6 +13,7 @@ commit and an update here.
 | 5 | native routes, `handoff.json`, `drill`, raw-video consent | ✅ done |
 | 6 | CLI/MCP/Skill shells, packaging, README | ✅ done |
 | 6.5 | open-source release checklist, v0.1.0 | ⏳ next |
+| 6.6 | zero-touch setup: `vidroute setup`, host integration, installers, mirrors | ✅ done |
 | 8 | desktop app (optional, v0.2+) | — |
 | 7 | extensions (D5 delegate, two-pass ASR, VLM, diarization) | — |
 
@@ -246,3 +247,49 @@ commit and an update here.
   debug vidroute internals (one run spent ~20 turns doing so); `prepare` with a
   `plan` path and no `out` writes next to that plan (an agent's outputs had
   landed in the default folder); the opencode host profile is now `verified`.
+
+## Phase 6.6 — zero-touch setup (2026-10-23)
+
+Owner request: fewer manual steps for other users, especially connecting agent
+hosts; the repository stays private for now (D-039 … D-046).
+
+* **`vidroute setup`**: one plan, one confirmation — ffmpeg, runtimes and models
+  (default asr + vad + ocr + scene), the Agent Skill for every agent host found,
+  optional MCP registration (`--mcp`), then an end-to-end self-test.
+  `setup --remove` undoes the host part; `doctor` lists which hosts see the
+  skill and warns about outdated copies.
+* **Host integration** for Claude Code, Codex CLI, Gemini CLI, Qwen Code,
+  opencode, Cursor, Cline, Roo Code, Kilo Code and OpenClaw, from each host's
+  documentation: the fewest skill folders that reach every host
+  (`~/.agents/skills` serves seven of them), ownership markers, the recorded
+  interpreter, MCP through `claude`/`codex` commands or key-by-key JSON edits
+  with backups. Nothing vidroute did not create is replaced or removed.
+* **Launchers without Python on PATH**: `scripts/vidroute` (sh) and
+  `scripts/vidroute.cmd` fall back to uv (also where installers put it before
+  PATH is refreshed) and use the interpreter `setup` recorded.
+* **Installers** `install.ps1` / `install.sh`: pinned uv (GitHub → PyPI →
+  Aliyun mirror, SHA-256 checked) → `uv tool install` → `vidroute setup`.
+* **Mainland China**: when huggingface.co is blocked, PyPI (Aliyun), Python
+  builds (npmmirror) and models (ModelScope, hf-mirror) switch to mirrors;
+  `--mirror cn` forces it; every download stays hash-checked.
+* **Windows**: pinned portable FFmpeg 9.0.2 when winget is missing or fails;
+  Windows on Arm gets x64 worker Pythons where wheels lack `win_arm64`.
+* **Docs**: `docs/AGENT_SETUP.md` (instructions an agent follows), README
+  install sections (en/zh), Windows troubleshooting, known issues.
+* **CI**: every push runs the installer + `setup` + the copied skill's launcher
+  without Python on PATH on Windows and Ubuntu; the manual Real install workflow
+  gains an installer-driven job with models and the self-test.
+* Tests: 278 passing (+51: detection, folder choice, markers, MCP JSON/CLI,
+  removal, setup round trip, mirrors, portable FFmpeg, Windows on Arm,
+  launchers, installer pins).
+* **Acceptance (this Linux machine, sandboxed HOME, fresh VIDROUTE_HOME, real
+  network in mainland China):** `sh install.sh --source . --no-setup` detected
+  the blocked huggingface.co, fetched uv from the Aliyun PyPI mirror (SHA-256
+  checked) and installed vidroute with `uv tool install`; then
+  `vidroute setup --host claude-code --yes` installed Python 3.12 (npmmirror),
+  the `sherpa` and `ocr` envs (Aliyun), SenseVoice, Silero VAD and PP-OCRv6
+  (597 MB) in 6 min 24 s, created the Claude Code skill, and the self-test
+  passed in 5.4 s. The copied skill's sh launcher ran `doctor` with an empty
+  PATH through the recorded interpreter. With the existing models in
+  `~/.vidroute` the self-test passes in 6.0 s.
+

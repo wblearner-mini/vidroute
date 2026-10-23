@@ -472,3 +472,162 @@ all pinned versions. Both are standard-library scripts run by the
 `supply-chain` workflow (on lock changes and weekly). Releases are built by
 `release.yml` on version tags with `SHA256SUMS.txt`; PyPI uploads use trusted
 publishing and only run on a manual dispatch.
+
+## D-039 `vidroute setup`: one plan, one confirmation (2026-10-23)
+
+Owner request: fewer manual steps, especially connecting agent hosts. `vidroute
+setup` combines the install plan (D-025, unchanged), connecting the agent hosts
+on this machine (D-040) and an end-to-end self-test (D-046) into one plan with
+one confirmation: exit 3 with `data.plan` and a `--yes` hint, the interactive
+y/N prompt in a terminal, nothing written before. Host integration writes
+outside `VIDROUTE_HOME`, which brief §13.3 allows only with the user's
+confirmation — so it is always part of that plan, never implicit. Defaults:
+capabilities asr + vad + ocr + scene (the README's CPU baseline), hosts `auto`
+(every host detected), skill on, MCP off. A machine that is already set up gets
+the self-test only. Exit codes: 2 when ffmpeg is still missing (Linux/macOS,
+where it is the user's package manager's job), 5 when an install step,
+integration or the self-test failed; re-running resumes. `setup --remove` takes
+out exactly what state.json and the folder markers say vidroute added; models
+stay.
+
+## D-040 Agent-host integration: skill folders, markers, MCP opt-in (2026-10-23)
+
+User-level skill folders, from each host's documentation on 2026-10-23:
+
+| host | reads | source |
+|---|---|---|
+| Claude Code | `~/.claude/skills` (`$CLAUDE_CONFIG_DIR/skills`) | code.claude.com/docs/en/skills |
+| Codex CLI | `~/.agents/skills` | learn.chatgpt.com/docs/build-skills |
+| Gemini CLI | `~/.gemini/skills`, `~/.agents/skills` | geminicli.com/docs/cli/skills |
+| Qwen Code | `~/.qwen/skills` | qwenlm.github.io/qwen-code-docs/en/users/features/skills |
+| opencode | `~/.config/opencode/skills`, `~/.claude/skills`, `~/.agents/skills` | opencode.ai/docs/skills |
+| Cursor | `~/.agents/skills`, `~/.cursor/skills`, `~/.claude/skills`, `~/.codex/skills` | cursor.com/docs/skills |
+| Cline | `~/.cline/skills` | docs.cline.bot/customization/skills |
+| Roo Code | `~/.roo/skills`, `~/.agents/skills` | roocodeinc.github.io/Roo-Code/features/skills |
+| Kilo Code | `~/.kilo/skills`, `~/.agents/skills` | kilo.ai/docs/customize/skills |
+| OpenClaw | `~/.agents/skills` (and its state dir) | docs.openclaw.ai/tools/skills |
+
+* **Fewest copies.** Hosts with one folder fix it; the others join a folder
+  already chosen, else `~/.agents/skills`. Claude Code + opencode → one copy;
+  Claude Code + Codex → two (opencode/Cursor may then list the skill twice;
+  KNOWN_ISSUES.md).
+* **Detection** only looks: command on PATH, configuration folder, or (Cline,
+  Roo, Kilo) a VS Code-family extension folder.
+* **Ownership.** A copy carries `.vidroute-skill.cfg` (`installed_by=vidroute`,
+  version, content digest, interpreter). Only such folders are updated or
+  removed; a hand-made `vidroute` folder is skipped, or with `--force` renamed to
+  `vidroute.bak-<time>` — never deleted. `doctor` reports each host's copy and
+  warns when it is outdated or its interpreter is gone.
+* **Recorded interpreter.** The marker holds the Python that runs vidroute (and
+  the source tree when it is not installed), so the copy works in a host that
+  was started before PATH changed.
+* **Claude Code plugin.** When `installed_plugins.json` lists `vidroute@…`, the
+  plugin already brings the skill and `~/.claude/skills` is skipped. The plugin
+  still has no `bin/` folder: claude.ai and Cowork refuse plugins that ship one
+  (code.claude.com/docs/en/plugins-reference), and the launchers are reachable
+  through the skill folder anyway.
+* **MCP is opt-in** (`--mcp`): the skill covers every host above, and MCP tool
+  definitions cost context on every turn. Claude Code and Codex are changed
+  through their own commands (`claude mcp add --scope user`, `codex mcp add`;
+  `~/.claude.json` is a large state file the host rewrites, Codex uses TOML).
+  Gemini CLI, Qwen Code, Cursor and opencode keep servers in JSON
+  (`mcpServers` / opencode `mcp` with `type: local`); vidroute changes only its
+  own key, keeps the file's indentation and a one-time `.vidroute-backup`, and
+  leaves files that are not strict JSON (comments) alone, printing the snippet
+  instead. An entry is vidroute's own only when state.json recorded writing it.
+  The server command is absolute (`<python> -m vidroute.mcp_server`). Cline,
+  Roo, Kilo and OpenClaw keep MCP settings in editor storage: skill only.
+
+## D-041 Launchers that need no `python` on PATH (2026-10-23)
+
+`skills/vidroute/scripts/` has three entry points: `vidroute` (POSIX sh, shell
+builtins only, also for Git Bash), `vidroute.cmd` (cmd/PowerShell, CRLF) and
+`vidroute.py`. The shell launchers try the interpreter recorded by `setup`, then
+`python3`/`python`/`py -3` — each test-run, so the Microsoft Store placeholder
+`python.exe` is skipped — then uv, also where installers put it before PATH is
+refreshed (`~/.local/bin`, `WinGet\Links`, `~/.cargo/bin`, `VIDROUTE_HOME`), and
+run `uv run --no-project --python 3.12 vidroute.py` with
+`UV_PYTHON_INSTALL_DIR=$VIDROUTE_HOME/runtimes/python`, so that download is the
+same Python the model workers use. Without any of them they print a
+`needs_install` envelope whose hint installs uv (winget / PowerShell installer /
+`curl … | sh`). `vidroute.py` prefers the source tree it lives in, then the
+recorded installation, then an importable package, then PATH. Its install hint
+is `uv tool install git+https://github.com/wblearner-mini/vidroute` until the
+first PyPI release (docs/RELEASING.md lists the switch).
+
+## D-042 Mirrors for packages and the Python runtime (2026-10-23)
+
+Worker environments are installed with `--require-hashes`, and uv verifies every
+managed-Python download against the SHA-256 in its metadata (`Error::HashMismatch`,
+`crates/uv-python-managed/src/downloads.rs` at uv 0.13.4; uv 0.13.4 downloads
+from `releases.astral.sh` and `UV_PYTHON_INSTALL_MIRROR` replaces that prefix —
+checked with `uv python list --show-urls`). A mirror therefore cannot change
+what is installed. Rule for `--mirror auto`: keep official sources; use mirrors
+when the official one does not answer, or when huggingface.co is unreachable
+while hf-mirror.com or ModelScope answer (the signature of a mainland-China
+network, where GitHub and PyPI downloads also crawl). Mirrors: PyPI —
+`mirrors.aliyun.com/pypi/simple/` then `pypi.tuna.tsinghua.edu.cn/simple/`;
+Python builds — `registry.npmmirror.com/-/binary/python-build-standalone/`
+(lists releases up to 20261021, checked 2026-10-23); models — bundled, then
+ModelScope, then hf-mirror.com, then the rest. `--mirror cn` forces this. The
+user's `UV_DEFAULT_INDEX` / `UV_INDEX_URL` / `PIP_INDEX_URL` /
+`UV_PYTHON_INSTALL_MIRROR` and the config keys `pypi_index` / `python_mirror`
+(`official` turns mirrors off) always win. The plan shows the choice and why.
+
+## D-043 Portable FFmpeg for Windows (refines D-025, 2026-10-23)
+
+winget stays first when it is available (brief §6). Without winget (LTSC,
+Server, locked-down PCs), when winget fails, or with
+`vidroute config set ffmpeg_source portable`, the plan offers a pinned build
+placed in `$VIDROUTE_HOME/runtimes/ffmpeg` — not added to PATH;
+`util.ffmpeg` already searches that folder. Build: gyan.dev "essentials"
+FFmpeg 9.0.2 from `github.com/GyanD/codexffmpeg` (versioned tags are kept, unlike
+BtbN's pruned autobuilds), 114,768,076 bytes, SHA-256
+`60f46726…a2047ba` = GitHub release asset digest = local download; `ffmpeg.exe`,
+`ffprobe.exe` and `LICENSE` are each pinned too (210 MB extracted, `ffplay`
+skipped). Static GPLv3 build with libx264, libmp3lame and freetype (README.txt
+in the archive) — the same family CI installs with `choco install ffmpeg
+--version 9.0.2`. GPL obligations apply to redistribution; vidroute only
+downloads the file for the user (after the plan) and runs it as a separate
+program, so the manifest marks it unrestricted with that note. The x64 build
+also serves Windows on Arm (emulation). The hint for a missing ffmpeg on
+Windows is now `vidroute install --capability scene`, which plans exactly this.
+
+## D-044 Windows on Arm: x64 Python where wheels are missing (2026-10-23)
+
+PyPI on 2026-10-23: `opencv-python-headless` 5.0.0.93 and `pyclipper` 1.4.0
+(OCR env) and `ctranslate2` 4.8.3 (faster-whisper env) have no `win_arm64`
+wheels; everything in the sherpa env has. Worker envs are built `--no-build`,
+so the manifest marks `ocr` and `whisper` with `windows_arm64_arch: x86_64`:
+on Windows on Arm vidroute asks uv for `cpython-3.12-windows-x86_64-none`
+(uv's request syntax, checked with `uv python list --all-platforms` on uv
+0.13.4) and Windows runs it under emulation; sherpa stays native. The OS
+architecture comes from `IsWow64Process2`, because an emulated x64 Python
+reports `AMD64`. Not validated on real Arm hardware (no Arm runner for private
+repositories).
+
+## D-045 One-line installers (2026-10-23)
+
+`install.ps1` (Windows PowerShell 5.1+) and `install.sh` (POSIX sh) need no
+Python: they find uv or place uv 0.13.4 (= `UV_VERSION`) in
+`$VIDROUTE_HOME/runtimes/uv` — from the GitHub release (asset digests pinned),
+else the PyPI wheel, else the same wheel from the Aliyun PyPI mirror (same
+`packages/…` path, checked 2026-10-23; wheel hashes = `envs/uv.lock.txt`,
+asserted by tests). Then `uv tool install --force --reinstall <source>`
+(re-running upgrades; uv supplies a Python if there is none), `uv tool
+update-shell`, and `vidroute setup` by absolute path (the current shell has
+the old PATH). Mainland-China detection (D-042) also switches the uv download
+order and passes `--mirror cn`. Under `irm | iex` the script never calls
+`exit` (it would close the user's window); `curl | sh` reads the setup answer
+from `/dev/tty`. Until the repository is public they are run from a checkout
+(`-Source .` / `--source .`).
+
+## D-046 Self-test (2026-10-23)
+
+`setup` ends with a 6-second clip generated by ffmpeg: a white slide reading
+"VIDROUTE SELF TEST" (when `drawtext` exists) over the Chinese sample recording
+shipped with SenseVoice (a tone without it), run through `prepare --route
+frames` into `$VIDROUTE_HOME/cache/selftest`. Checks: outputs written, a
+contact sheet, speech transcribed (when ASR is installed), the slide text read
+back (when OCR is installed). On this machine with the real models: passed in
+6.0 s ("开放时间早上9点至下午5点。", "VIDROUTE SELF TEST").

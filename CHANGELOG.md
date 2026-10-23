@@ -24,6 +24,18 @@ All notable changes are documented here. The format follows
 - MCP server `vidroute-mcp`; Agent Skill `skills/vidroute`; Claude Code plugin and marketplace
   manifests; `vidroute skill path`.
 - Documentation in English and Chinese; Windows troubleshooting; routing reference.
+- `vidroute setup`: one plan and one confirmation for ffmpeg, runtimes and models, the Agent Skill in
+  every agent host found (Claude Code, Codex CLI, Gemini CLI, Qwen Code, opencode, Cursor, Cline,
+  Roo Code, Kilo Code, OpenClaw; `--mcp` also registers the MCP server) and an end-to-end self-test;
+  `setup --remove` undoes the host part. `doctor` reports which hosts see the skill.
+- One-line installers `install.ps1` (Windows) and `install.sh` (Linux, macOS) that need no Python.
+- `docs/AGENT_SETUP.md`: step-by-step setup instructions for an AI agent.
+- Skill launchers `scripts/vidroute` (sh) and `scripts/vidroute.cmd` that need no `python` on PATH
+  (they fall back to uv) and use the interpreter `vidroute setup` recorded.
+- `--mirror cn` and automatic mirrors in mainland China for PyPI, uv-managed Python and models;
+  config keys `pypi_index`, `python_mirror`, `ffmpeg_source`.
+- Windows: a pinned portable FFmpeg 9.0.2 build when winget is unavailable or fails.
+- Windows on Arm: x64 worker Python for the OCR and faster-whisper environments.
 
 ### Fixed
 

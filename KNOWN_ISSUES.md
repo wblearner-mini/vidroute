@@ -29,7 +29,26 @@ users and what would close it.
   (`asr-faster-whisper-large-v3-turbo`) is implemented with automatic CPU
   fallback but not validated on real hardware.
 
+## Setup and agent hosts
+
+* **Skill discovery was live-tested in Claude Code and opencode only.** The
+  folders for Codex CLI, Gemini CLI, Qwen Code, Cursor, Cline, Roo Code, Kilo
+  Code and OpenClaw come from their documentation (2026-10-23, D-040).
+* **opencode and Cursor may list the skill twice** when Claude Code and another
+  `~/.agents/skills` host are both connected (they read both folders). Both
+  copies are identical.
+* **MCP registration** is automated for Claude Code, Codex CLI, Gemini CLI,
+  Qwen Code, Cursor and opencode; Cline, Roo Code, Kilo Code and OpenClaw get
+  the skill only (their MCP settings live in editor storage).
+* **The one-line installers** (`irm … | iex`, `curl … | sh`) need the
+  repository to be public; until then they run from a checkout.
+* **Windows on Arm**: the x64-emulated OCR / faster-whisper environments are
+  not validated on real Arm hardware (no Arm runner for private repositories).
+
 ## Downloads
+
+* The portable FFmpeg for Windows comes from GitHub only (no mirror in mainland
+  China); winget, when available, is tried first.
 
 * OCR models have a single mirror (ModelScope `RapidAI/RapidOCR@v3.10.0`); the
   PaddlePaddle ONNX files on Hugging Face are different files and are not used.

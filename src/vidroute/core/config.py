@@ -21,7 +21,10 @@ KNOWN_KEYS: dict[str, tuple[Any, tuple[type, ...], str]] = {
     "budget_tokens": (None, (int,), "Absolute input-token budget; overrides budget_fraction."),
     "default_llm": (None, (str,), "Model id used when --llm is omitted."),
     "default_host": (None, (str,), "Host id used when --host is omitted."),
-    "mirror": ("auto", (str,), "Download mirror preference: auto|github|hf|modelscope."),
+    "mirror": ("auto", (str,), "Download mirror preference: auto|cn|github|hf|modelscope."),
+    "pypi_index": (None, (str,), "Package index for worker environments (a PyPI mirror URL, or 'official')."),
+    "python_mirror": (None, (str,), "Mirror for uv-managed Python downloads (URL, or 'official')."),
+    "ffmpeg_source": ("auto", (str,), "How a missing ffmpeg is installed on Windows: auto|winget|portable."),
     "ffmpeg_path": (None, (str,), "Explicit path to the ffmpeg executable."),
     "ffprobe_path": (None, (str,), "Explicit path to the ffprobe executable."),
     "out_root": (None, (str,), "Default output root when --out is omitted."),
@@ -31,7 +34,8 @@ KNOWN_KEYS: dict[str, tuple[Any, tuple[type, ...], str]] = {
     "host_profiles": ([], (list,), "User host profile overrides (managed by `vidroute host set`)."),
 }
 
-MIRRORS = ("auto", "github", "hf", "modelscope")
+MIRRORS = ("auto", "cn", "github", "hf", "modelscope")
+FFMPEG_SOURCES = ("auto", "winget", "portable")
 
 
 def load() -> dict[str, Any]:
@@ -76,6 +80,10 @@ def set_value(key: str, value: Any) -> dict[str, Any]:
         raise UsageError(f"Config key {key!r} does not accept booleans")
     if key == "mirror" and value not in MIRRORS:
         raise UsageError(f"mirror must be one of {', '.join(MIRRORS)}")
+    if key == "ffmpeg_source" and value not in FFMPEG_SOURCES:
+        raise UsageError(f"ffmpeg_source must be one of {', '.join(FFMPEG_SOURCES)}")
+    if key in ("pypi_index", "python_mirror") and value not in (None, "official") and not str(value).startswith("https://"):
+        raise UsageError(f"{key} must be an https:// URL or 'official'")
     if key == "budget_fraction" and value is not None and not (0 < float(value) <= 1):
         raise UsageError("budget_fraction must be in (0, 1]")
     data = load()

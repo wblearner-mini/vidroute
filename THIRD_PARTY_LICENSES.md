@@ -35,6 +35,8 @@ model names in install plans, `vidroute models list` and every output `manifest.
 | tool | license | how it gets there |
 |---|---|---|
 | FFmpeg / ffprobe | LGPL-2.1-or-later or GPL-2.0-or-later, depending on the build | installed by the user (`winget install --id Gyan.FFmpeg`, Homebrew, apt, ...); vidroute only runs it |
+| FFmpeg 9.0.2 essentials build by gyan.dev (Windows, optional) | GPL-3.0-or-later (static build incl. libx264, libmp3lame, freetype) | downloaded only after the user confirms a plan, from `github.com/GyanD/codexffmpeg` (SHA-256 pinned), into `$VIDROUTE_HOME/runtimes/ffmpeg` with its `LICENSE`; never redistributed by vidroute; source: FFmpeg commit 946fcce07b |
+| uv 0.13.4 (installers, worker environments) | MIT OR Apache-2.0 | downloaded by `install.ps1` / `install.sh` or vidroute's bootstrap (SHA-256 pinned) |
 | CPython 3.12 for worker environments | PSF-2.0 | python-build-standalone, installed by `uv` into `VIDROUTE_HOME` |
 | uv | MIT OR Apache-2.0 | PyPI (hash-pinned in `envs/uv.lock.txt`) when not already on PATH |
 

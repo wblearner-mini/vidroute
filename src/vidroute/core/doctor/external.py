@@ -17,6 +17,7 @@ from vidroute import __version__
 USER_AGENT = f"vidroute/{__version__}"
 MIRRORS = {
     "github": "https://github.com/",
+    "pypi": "https://pypi.org/simple/",
     "huggingface": "https://huggingface.co/",
     "hf-mirror": "https://hf-mirror.com/",
     "modelscope": "https://www.modelscope.cn/",

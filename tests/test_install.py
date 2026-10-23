@@ -230,7 +230,7 @@ def test_force_rebuilds_worker_environments(monkeypatch):
 
     seen = []
 
-    def fake_create_env(group, ctx, variant="cpu", force=False):
+    def fake_create_env(group, ctx, variant="cpu", force=False, net=None):
         seen.append((group.name, variant, force))
         return {"group": group.name, "status": "created", "path": "x"}
 

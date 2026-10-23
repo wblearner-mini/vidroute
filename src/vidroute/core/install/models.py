@@ -27,9 +27,21 @@ from vidroute.core.util.jsonio import read_json, write_json_atomic
 MIRROR_TYPES = {"github": "github", "hf": "hf", "modelscope": "modelscope"}
 
 
+def _cn_rank(s: Source) -> int:
+    """Mainland China: files bundled in a wheel, ModelScope, hf-mirror.com, then the rest (huggingface.co is
+    blocked there and GitHub downloads are slow)."""
+    if s.type == "bundled":
+        return 0
+    if s.type == "modelscope":
+        return 1
+    return 2 if "hf-mirror.com" in (s.base_url or s.url or "") else 3
+
+
 def order_sources(entry: ModelEntry, mirror: str = "auto") -> list[Source]:
     sources = list(entry.sources)
-    if mirror in MIRROR_TYPES:
+    if mirror == "cn":
+        sources.sort(key=_cn_rank)
+    elif mirror in MIRROR_TYPES:
         sources.sort(key=lambda s: 0 if s.type == MIRROR_TYPES[mirror] else 1)
     return sources
 

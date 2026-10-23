@@ -90,6 +90,18 @@ def render_doctor(env: Envelope, args: argparse.Namespace) -> str:
     if net.get("checked"):
         mir = ", ".join(f"{k} {'ok' if v.get('ok') else 'unreachable'}" for k, v in (net.get("mirrors") or {}).items())
         lines.append(f"  network  {mir}")
+    for h in (d.get("integrations") or {}).get("hosts") or []:
+        skill = h.get("skill")
+        if skill is None:
+            seen = "no vidroute skill -> vidroute setup"
+        elif skill.get("plugin"):
+            seen = "skill from the vidroute plugin"
+        else:
+            state_txt = ("current" if skill.get("current") else "outdated -> vidroute setup") if skill.get("managed") \
+                else "copied by hand"
+            seen = f"skill {skill['path']} ({state_txt})"
+        mcp = f"; MCP via {h['mcp']['method']}" if h.get("mcp") else ""
+        lines.append(f"  agent    {h['name']}: {seen}{mcp}" + ("" if h.get("detected") else " (host not found)"))
     return "\n".join(lines)
 
 
@@ -109,6 +121,67 @@ def render_install(env: Envelope, args: argparse.Namespace) -> str:
             lines.append(f"  smoke  {mid:<34} {sm.get('status')}  {sm.get('detail', '')}")
     elif d.get("plan") and not d.get("message"):
         lines.append(f"Dry run only. To install: {d['plan']['confirm_command']}")
+    return "\n".join(lines)
+
+
+def _describe_integration(integ: dict[str, Any]) -> list[str]:
+    lines = []
+    names = ", ".join(h["name"] for h in integ.get("hosts") or []) or "none"
+    lines.append(f"Agent hosts ({integ.get('mode')}): {names}")
+    for i in integ.get("items") or []:
+        if i["kind"] == "skill":
+            lines.append(f"  skill  {i['action']:<8} {i['path']}  [{', '.join(i['hosts'])}]  {i['reason']}")
+        else:
+            lines.append(f"  mcp    {i['action']:<8} {i['host']}: {i.get('target') or i['method']}  {i['reason']}")
+            if i.get("manual"):
+                lines.append(f"         by hand: {i['manual']}")
+    for n in integ.get("notes") or []:
+        lines.append(f"  note: {n}")
+    return lines
+
+
+def describe_setup(plan: dict[str, Any]) -> str:
+    from vidroute.core.install.planner import describe
+
+    lines = []
+    if plan.get("install"):
+        lines.append(describe(plan["install"]))
+    elif plan.get("install") is None:
+        lines.append("Install: skipped (--no-install)")
+    lines += _describe_integration(plan["integration"])
+    if plan.get("selftest"):
+        lines.append("Then: an end-to-end self-test on a generated 6-second clip.")
+    return "\n".join(lines)
+
+
+def render_setup(env: Envelope, args: argparse.Namespace) -> str:
+    d = env.data
+    if "integration" not in (d.get("plan") or {}):  # setup --remove
+        rows = d.get("results") or (d.get("plan") or {}).get("items") or []
+        return "\n".join(f"  {r['kind']:<6} {r.get('status') or r['action']:<8} {r.get('path') or r.get('host')}"
+                         f"  {r.get('reason', '')}" for r in rows) or "vidroute has not added anything to an agent host."
+    lines = [describe_setup(d["plan"])] if d.get("plan") else []
+    if not d.get("executed") and d.get("plan") and not d["plan"].get("nothing_to_do") and "selftest" not in d:
+        lines.append(f"Dry run only. To set up: {d['plan']['confirm_command']}")
+    inst = d.get("install")
+    if isinstance(inst, dict):
+        lines.append("Install results:")
+        for r in inst.get("results", []):
+            lines.append(f"  {r.get('kind'):<6} {r.get('id', ''):<34} {r.get('status')}")
+    integ = d.get("integration")
+    if isinstance(integ, dict) and integ.get("results"):
+        lines.append("Agent hosts:")
+        for r in integ["results"]:
+            where = r.get("path") if r["kind"] == "skill" else f"{r['host']} ({r.get('target') or r['method']})"
+            lines.append(f"  {r['kind']:<6} {r.get('status'):<10} {where}")
+    st = d.get("selftest")
+    if isinstance(st, dict):
+        lines.append(f"Self-test: {st['status']}" + (f" in {st.get('seconds')} s" if st.get("seconds") is not None else "")
+                     + (f" ({st['reason']})" if st.get("reason") else ""))
+        for c in st.get("checks") or []:
+            lines.append(f"  {'ok  ' if c['ok'] else 'FAIL'} {c['check']:<10} {c['detail']}")
+    for step in d.get("next_steps") or []:
+        lines.append(f"Next: {step}")
     return "\n".join(lines)
 
 
@@ -238,6 +311,29 @@ def h_install(args: argparse.Namespace, ctx: Ctx) -> Envelope:
         if _confirm("Proceed with this install?"):
             ctx.warnings.clear()
             env = api.install(yes=True, ctx=ctx, **kwargs)
+    return env
+
+
+def h_setup(args: argparse.Namespace, ctx: Ctx) -> Envelope:
+    if args.remove:
+        env = api.setup_remove(args.host, yes=args.yes, dry_run=args.dry_run, ctx=ctx)
+        if (not env.ok and env.error and env.error.get("code") == "needs_confirmation" and ctx.interactive):
+            sys.stderr.write(render_setup(Envelope(True, env.data), args) + "\n")
+            if _confirm("Remove these from your agent hosts?"):
+                ctx.warnings.clear()
+                env = api.setup_remove(args.host, yes=True, ctx=ctx)
+        return env
+    kwargs = dict(hosts=args.host, skill=not args.no_skill, mcp=args.mcp, install=not args.no_install,
+                  capabilities=args.capability, profile=args.profile, models=args.model, mirror=args.mirror,
+                  accept_licenses=args.accept_license, selftest=not args.no_selftest, dry_run=args.dry_run,
+                  force=args.force)
+    env = api.setup(yes=args.yes, ctx=ctx, **kwargs)
+    if (not env.ok and env.error and env.error.get("code") == "needs_confirmation" and ctx.interactive
+            and env.data.get("plan")):
+        sys.stderr.write(describe_setup(env.data["plan"]) + "\n")
+        if _confirm("Proceed with this setup?"):
+            ctx.warnings.clear()
+            env = api.setup(yes=True, ctx=ctx, **kwargs)
     return env
 
 
@@ -376,12 +472,36 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--capability", action="append", choices=["asr", "vad", "ocr", "scene"], help="capability to install (repeatable)")
     p.add_argument("--profile", choices=["auto", "lite", "full"], default="auto", help="package set when no --capability/--model is given")
     p.add_argument("--model", action="append", help="exact model id from `vidroute models list` (repeatable)")
-    p.add_argument("--mirror", choices=["auto", "github", "hf", "modelscope"], help="preferred download source")
+    p.add_argument("--mirror", choices=["auto", "cn", "github", "hf", "modelscope"],
+                   help="preferred download source (cn: mirrors in mainland China for packages, Python and models)")
     p.add_argument("--accept-license", action="append", metavar="ID", help="accept a restricted model license (repeatable)")
     p.add_argument("--yes", "-y", action="store_true", help="confirm the plan non-interactively")
     p.add_argument("--dry-run", "--plan", dest="dry_run", action="store_true", help="only show the plan")
     p.add_argument("--force", action="store_true", help="reinstall even if already installed")
     p.add_argument("--no-smoke", action="store_true", help="skip smoke tests after installing")
+
+    p = add("setup", "One step to a working vidroute: ffmpeg, local models and runtimes, the skill in your agent "
+                     "hosts (MCP with --mcp), then a self-test — after one confirmation", h_setup, render_setup)
+    p.add_argument("--host", action="append", metavar="ID",
+                   help="agent host to connect (repeatable): auto (default: every host found), none, claude-code, "
+                        "codex-cli, gemini-cli, qwen-code, opencode, cursor, cline, roo, kilo, openclaw")
+    p.add_argument("--mcp", action="store_true", help="also register the vidroute MCP server with those hosts")
+    p.add_argument("--no-skill", action="store_true", help="do not copy the Agent Skill into the hosts")
+    p.add_argument("--no-install", action="store_true", help="skip ffmpeg, runtimes and models")
+    p.add_argument("--capability", action="append", choices=["asr", "vad", "ocr", "scene"],
+                   help="capabilities to install (default: asr, vad, ocr, scene)")
+    p.add_argument("--profile", choices=["auto", "lite", "full"], default="auto", help="package set instead of --capability")
+    p.add_argument("--model", action="append", help="exact model id from `vidroute models list` (repeatable)")
+    p.add_argument("--mirror", choices=["auto", "cn", "github", "hf", "modelscope"],
+                   help="preferred download source (cn: mirrors in mainland China)")
+    p.add_argument("--accept-license", action="append", metavar="ID", help="accept a restricted model license")
+    p.add_argument("--no-selftest", action="store_true", help="skip the end-to-end self-test")
+    p.add_argument("--remove", action="store_true",
+                   help="take vidroute out of the agent hosts again (models and runtimes stay)")
+    p.add_argument("--yes", "-y", action="store_true", help="confirm the plan non-interactively")
+    p.add_argument("--dry-run", "--plan", dest="dry_run", action="store_true", help="only show the plan")
+    p.add_argument("--force", action="store_true",
+                   help="reinstall, and put aside skill folders or MCP entries vidroute did not create")
 
     p = add("models", "List, verify (sha256) or remove installed models", h_models, render_models)
     msub = p.add_subparsers(dest="action", metavar="ACTION", parser_class=_Parser)

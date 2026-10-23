@@ -8,8 +8,9 @@ description: >-
   a local transcript, or text only), prepares it locally, and tells you how to read and proofread it.
 license: MIT
 compatibility: >-
-  Needs Python 3.10+ and ffmpeg on PATH. Local speech/OCR models are downloaded once, only after the
-  user approves an install plan; afterwards everything runs offline. vidroute never calls cloud models.
+  Needs Python 3.10+ or uv (the launchers find either), and ffmpeg (the install plan offers it on
+  Windows). Local speech/OCR models are downloaded once, only after the user approves an install plan;
+  afterwards everything runs offline. vidroute never calls cloud models.
 metadata:
   version: "0.1.0"
   repository: "https://github.com/wblearner-mini/vidroute"
@@ -29,17 +30,20 @@ this machine, and writes a reading guide. You stay the one who analyses; vidrout
 
 ## Running vidroute
 
-Run the launcher in this skill (it finds a source tree, an installed `vidroute`, or says how to install).
-Use the skill folder's absolute path; the interpreter is `python3` on Linux/macOS, `python` or `py -3`
-on Windows:
+Run the launcher in this skill folder, by its absolute path. It finds vidroute (the copy this skill
+belongs to, the installation `vidroute setup` recorded, or one on PATH) and needs no `python` on PATH:
 
 ```
-python3 <skill folder>/scripts/vidroute.py <command> [options] --json
+sh "<skill folder>/scripts/vidroute" <command> [options] --json        # Linux, macOS, Git Bash
+& "<skill folder>\scripts\vidroute.cmd" <command> [options] --json     # Windows PowerShell (cmd: no &)
 ```
 
-`vidroute <command> ...` works the same when vidroute is installed. Always pass `--json` and parse
-**stdout**: `{"ok", "schema": "vidroute/1", "data", "warnings", "error"}`. Progress and logs are on stderr.
-Use absolute paths for videos and output folders.
+`vidroute <command> ...` (when on PATH) and `python3 <skill folder>/scripts/vidroute.py ...` work the same.
+If the launcher answers `needs_install` (exit 2), this machine has neither Python 3.10+ nor uv: ask the
+user, run `error.hint` (it installs uv), then run the same command again — no restart needed.
+
+Always pass `--json` and parse **stdout**: `{"ok", "schema": "vidroute/1", "data", "warnings", "error"}`.
+Progress and logs are on stderr. Use absolute paths for videos and output folders.
 
 ## Workflow
 
@@ -48,10 +52,10 @@ Use absolute paths for videos and output folders.
    (`vidroute host list`). If you know your modalities better than the profile, add
    `--modalities text,image,video,audio` (and `--audio-in-video yes|no`).
 2. **First use only:** `vidroute doctor --json`. If `capabilities` miss what the video needs (speech →
-   `asr` + `vad`, on-screen text → `ocr`), run
+   `asr` + `vad`, on-screen text → `ocr`) or `ffmpeg.found` is false, run
    `vidroute install --capability asr --capability vad --capability ocr --capability scene --json`.
-   It exits 3 with the plan (sizes, sources, licenses) and downloads nothing. **Show the plan to the user
-   and ask.** Only after a yes, run the same command with `--yes`.
+   It exits 3 with the plan (ffmpeg if missing, sizes, sources, licenses) and downloads nothing. **Show
+   the plan to the user and ask.** Only after a yes, run the same command with `--yes`.
 3. **Plan.** `vidroute plan "<video>" --llm <id> --host <host> --task <minutes|summary|qa|transcript>
    [--prefer quality|privacy|cost] [--language zh|en|auto] --out "<dir>" --json`
    Tell the user in one or two sentences which route was chosen and why (`data.delivery.reasons`,
@@ -103,6 +107,12 @@ short mention to the user when they change the result (e.g. `unverified_profile`
   in "items to verify" and tell the user, citing `SUMMARY.md` and the warnings; do not inspect vidroute's
   code, models or environments.
 - Outputs stay in `<dir>/<slug>/`; vidroute never writes elsewhere except its own home (`~/.vidroute`).
+
+## Setting vidroute up for other hosts
+
+When the user asks to set vidroute up or connect it to their agent tools, run `vidroute setup --json`:
+it exits 3 with one plan (ffmpeg, models, the skill for every agent host found, a self-test). Show it,
+ask, and only after a yes run the same command with `--yes`. `vidroute setup --remove` takes it out again.
 
 ## MCP alternative
 

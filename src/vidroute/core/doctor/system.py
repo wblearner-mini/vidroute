@@ -14,6 +14,38 @@ from vidroute.core.util import proc
 GIB = 1024**3
 
 
+_ARCH = {"amd64": "x86_64", "x64": "x86_64", "x86_64": "x86_64", "aarch64": "arm64", "arm64": "arm64",
+         "i386": "x86", "i686": "x86", "x86": "x86"}
+# IMAGE_FILE_MACHINE_* values returned by IsWow64Process2
+_WIN_MACHINES = {0x8664: "x86_64", 0xAA64: "arm64", 0x014C: "x86"}
+
+
+def native_machine() -> str:
+    """The CPU architecture of the OS, also when this Python runs under emulation (x64 Python on Windows on Arm)."""
+    machine = platform.machine().lower()
+    if os.name == "nt":
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+            fn = kernel32.IsWow64Process2
+            fn.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.USHORT), ctypes.POINTER(wintypes.USHORT)]
+            fn.restype = wintypes.BOOL
+            kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+            process, native = wintypes.USHORT(), wintypes.USHORT()
+            if fn(kernel32.GetCurrentProcess(), ctypes.byref(process), ctypes.byref(native)):
+                return _WIN_MACHINES.get(native.value, _ARCH.get(machine, machine))
+        except (AttributeError, OSError):  # Windows before 10 1709
+            pass
+    return _ARCH.get(machine, machine)
+
+
+def platform_key() -> str:
+    """``<system>-<arch>`` as used by the manifest, e.g. ``windows-x86_64`` or ``windows-arm64``."""
+    return f"{platform.system().lower()}-{native_machine()}"
+
+
 def os_info() -> dict[str, Any]:
     system = platform.system()
     info: dict[str, Any] = {
@@ -21,6 +53,7 @@ def os_info() -> dict[str, Any]:
         "release": platform.release(),
         "version": platform.version(),
         "machine": platform.machine(),
+        "native_machine": native_machine(),
         "python": platform.python_version(),
         "python_executable": sys.executable,
     }

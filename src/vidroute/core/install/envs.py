@@ -6,15 +6,21 @@ Everything uv writes is redirected into ``$VIDROUTE_HOME``: the managed Python
 registry, user uv config files are ignored, and source builds are forbidden
 (``--no-build``): worker environments only use prebuilt wheels.
 
-Package indexes and mirrors are taken from the user's environment
-(``UV_DEFAULT_INDEX``, ``UV_PYTHON_INSTALL_MIRROR`` ...); ``--require-hashes``
-makes any mirror safe.
+Package indexes and mirrors come from the user's environment
+(``UV_DEFAULT_INDEX``, ``UV_PYTHON_INSTALL_MIRROR`` ...) or from the install
+plan's network choice (:mod:`vidroute.core.install.network`);
+``--require-hashes`` and uv's own Python checksums make any mirror safe.
+
+On Windows on Arm, groups whose locked wheels have no ``win_arm64`` build
+(``windows_arm64_arch`` in the manifest) get an x64 Python, which Windows runs
+under emulation.
 """
 
 from __future__ import annotations
 
 import hashlib
 import os
+import platform
 import shutil
 import sys
 from datetime import datetime, timezone
@@ -24,7 +30,9 @@ from typing import Any
 from vidroute.core import paths, state
 from vidroute.core.context import Ctx
 from vidroute.core.doctor.runtimes import UV_VERSION, find_uv
+from vidroute.core.doctor.system import native_machine
 from vidroute.core.errors import NeedsInstall, RunFailed
+from vidroute.core.install import network
 from vidroute.core.install.manifest import EnvGroup
 from vidroute.core.resources import data_file
 from vidroute.core.util import proc
@@ -32,7 +40,7 @@ from vidroute.core.util import proc
 UV_TIMEOUT = 1800.0  # large wheels (CUDA libraries) on slow links
 
 
-def uv_env() -> dict[str, str]:
+def uv_env(net: dict[str, Any] | None = None) -> dict[str, str]:
     return {
         "UV_PYTHON_INSTALL_DIR": str(paths.runtimes_dir() / "python"),
         "UV_CACHE_DIR": str(paths.cache_dir() / "uv"),
@@ -40,7 +48,15 @@ def uv_env() -> dict[str, str]:
         "UV_NO_CONFIG": "1",
         "UV_NO_PROGRESS": "1",
         "UV_LINK_MODE": "copy",
+        **network.uv_env(net),
     }
+
+
+def python_request(group: EnvGroup) -> str:
+    """What to ask uv for: the version, or a pinned architecture on Windows on Arm (see module docstring)."""
+    if group.windows_arm64_arch and platform.system() == "Windows" and native_machine() == "arm64":
+        return f"cpython-{group.python}-windows-{group.windows_arm64_arch}-none"
+    return group.python
 
 
 def lock_path(group: EnvGroup, variant: str = "cpu") -> Path:
@@ -63,22 +79,24 @@ def env_ready(group: EnvGroup, variant: str = "cpu") -> bool:
     return record.get("lock") == current and record.get("variant") == variant and bool(record.get("import_ok"))
 
 
-def _run_uv(args: list[str], ctx: Ctx, what: str, timeout: float = UV_TIMEOUT) -> proc.Result:
+def _run_uv(args: list[str], ctx: Ctx, what: str, timeout: float = UV_TIMEOUT,
+            net: dict[str, Any] | None = None) -> proc.Result:
     uv = find_uv()
     if uv is None:
         raise NeedsInstall("uv is required to create worker environments.", code="uv_missing",
                            hint="vidroute install  (it offers to install uv into $VIDROUTE_HOME)")
     ctx.check_cancelled()
-    res = proc.run([uv, *args], timeout=timeout, env=uv_env())
+    res = proc.run([uv, *args], timeout=timeout, env=uv_env(net))
     if not res.ok:
         tail = "\n".join((res.stderr or res.stdout).strip().splitlines()[-12:])
         raise RunFailed(f"{what} failed:\n{tail}" if tail else f"{what} failed (timed out)", code="env_failed",
                         hint="vidroute install --yes  (run it again: finished parts are kept; if PyPI is slow or "
-                             "blocked, set UV_DEFAULT_INDEX to a PyPI mirror or HTTPS_PROXY to your proxy)")
+                             "blocked, add --mirror cn, set UV_DEFAULT_INDEX to a PyPI mirror or HTTPS_PROXY to your "
+                             "proxy)")
     return res
 
 
-def bootstrap_uv(ctx: Ctx) -> Path:
+def bootstrap_uv(ctx: Ctx, net: dict[str, Any] | None = None) -> Path:
     """Install a pinned uv into $VIDROUTE_HOME/runtimes/uv using pip of the current interpreter."""
     existing = find_uv()
     if existing:
@@ -88,7 +106,7 @@ def bootstrap_uv(ctx: Ctx) -> Path:
     ctx.progress("uv", None, None, f"installing uv=={UV_VERSION} into {target}")
     res = proc.run(
         [sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "--no-input",
-         "--require-hashes", "--only-binary", ":all:", "--target", str(target), "-r", str(lock)],
+         "--require-hashes", "--only-binary", ":all:", *network.pip_args(net), "--target", str(target), "-r", str(lock)],
         timeout=600,
     )
     uv = find_uv()
@@ -102,21 +120,23 @@ def bootstrap_uv(ctx: Ctx) -> Path:
     return uv
 
 
-def create_env(group: EnvGroup, ctx: Ctx, variant: str = "cpu", force: bool = False) -> dict[str, Any]:
+def create_env(group: EnvGroup, ctx: Ctx, variant: str = "cpu", force: bool = False,
+               net: dict[str, Any] | None = None) -> dict[str, Any]:
     if not force and env_ready(group, variant):
         return {"group": group.name, "status": "ready", "path": str(group.path)}
     lock = lock_path(group, variant)
+    request = python_request(group)
     if group.path.exists():
         shutil.rmtree(group.path)
-    ctx.progress("env", None, None, f"{group.name}: installing Python {group.python} (uv-managed)")
-    _run_uv(["python", "install", group.python, "--no-registry", "--install-dir", str(paths.runtimes_dir() / "python")],
-            ctx, f"Installing Python {group.python}")
+    ctx.progress("env", None, None, f"{group.name}: installing Python {request} (uv-managed)")
+    _run_uv(["python", "install", request, "--no-registry", "--install-dir", str(paths.runtimes_dir() / "python")],
+            ctx, f"Installing Python {request}", net=net)
     ctx.progress("env", None, None, f"{group.name}: creating environment")
-    _run_uv(["venv", "--python", group.python, "--managed-python", "--no-project", str(group.path)], ctx,
-            f"Creating environment {group.name}")
+    _run_uv(["venv", "--python", request, "--managed-python", "--no-project", str(group.path)], ctx,
+            f"Creating environment {group.name}", net=net)
     ctx.progress("env", None, None, f"{group.name}: installing locked packages ({lock.name})")
     _run_uv(["pip", "install", "--python", str(group.python_exe), "--require-hashes", "--no-build",
-             "-r", str(lock)], ctx, f"Installing packages for {group.name}")
+             "-r", str(lock)], ctx, f"Installing packages for {group.name}", net=net)
     check = proc.run([group.python_exe, "-I", "-c", group.import_check], timeout=120)
     version = proc.run([group.python_exe, "-I", "-c", "import platform; print(platform.python_version())"], timeout=60)
     record = {

@@ -21,63 +21,77 @@ Agent 的 LLM**，在本机准备好这些材料，并生成一份阅读指南�
 > **状态：预发布（v0.1.0.dev0）。** CLI、MCP 服务和 Agent Skill 已完整可用，进度见
 > [PROGRESS.md](PROGRESS.md)；所有选型及其证据见 [docs/DECISIONS.md](docs/DECISIONS.md)。
 
-## 30 秒上手
+## 安装
+
+一条命令装好 vidroute，剩下的由它引导完成：
+
+```powershell
+# Windows（PowerShell）
+irm https://raw.githubusercontent.com/wblearner-mini/vidroute/main/install.ps1 | iex
+```
 
 ```bash
-pipx install vidroute                 # 或：uv tool install vidroute
-vidroute doctor                       # 本机能力：CPU/GPU 档位、ffmpeg、已装模型
-vidroute install --capability asr --capability vad --capability ocr --capability scene
-#   ^ 只打印安装计划（来源、体积、许可），不下载任何东西；确认后加 --yes 安装
-#     （CPU 基线约占 0.8 GB 磁盘：Python 运行时、两个 worker 环境、模型）
+# Linux / macOS
+curl -LsSf https://raw.githubusercontent.com/wblearner-mini/vidroute/main/install.sh | sh
+```
+
+脚本会先取得 [uv](https://docs.astral.sh/uv/)（固定版本、校验 SHA-256；uv 自带 Python），安装 vidroute，
+然后运行 **`vidroute setup`**——给出**一份**计划，只问一次：
+
+- 缺 **ffmpeg** 时补上（Windows：用 winget，没有 winget 时用固定版本的便携包；Linux/macOS：给出包管理器命令）；
+- **本地模型**：语音识别、人声检测、屏幕文字（约 0.8 GB，纯 CPU）；
+- **你的 Agent 宿主**：给找到的每个宿主装上 vidroute 技能——Claude Code、Codex CLI、Gemini CLI、Qwen Code、
+  opencode、Cursor、Cline、Roo Code、Kilo Code、OpenClaw（加 `--mcp` 还会注册 MCP 服务）；
+- 最后用生成的样片做一次端到端**自检**。
+
+在中国大陆，检测到 huggingface.co 不通时会自动改用国内镜像（也可用 `--mirror cn` 强制），所有下载仍然逐一校验
+哈希。正式公开前仓库是私有的：有权限的话，克隆后运行 `.\install.ps1 -Source .` 或 `sh install.sh --source .`。
+
+**交给 Agent 来装。** 对它说：*"按照 https://github.com/wblearner-mini/vidroute/blob/main/docs/AGENT_SETUP.md
+帮我装好 vidroute"*。Agent 会装好 uv 和 vidroute，把计划拿给你看，你同意后再执行。
+
+**手动安装：** `uv tool install vidroute`（或 `pipx install vidroute`），然后 `vidroute setup`。
+
+之后直接对 Agent 说"把 D:\会议\周会.mp4 整理成会议纪要"即可，或者用命令行：
+
+```bash
 vidroute run 会议.mp4 --llm claude-opus-5-5 --host claude-code --task minutes --out ./video-out
 ```
 
-然后打开 `./video-out/<slug>/SUMMARY.md`——更好的方式是让你的 Agent 来读（见下文）。
-首个 PyPI 版本发布前，可从 GitHub 安装：`pipx install git+https://github.com/wblearner-mini/vidroute`。
-
-需要 Python 3.10+ 和 PATH 上的 **ffmpeg**（`winget install --id Gyan.FFmpeg`、`brew install ffmpeg`、
-`sudo apt install ffmpeg`）。不需要 GPU、编译器或其他系统软件：模型运行在 vidroute 用 `uv` 管理的隔离环境中。
+然后打开 `./video-out/<slug>/SUMMARY.md`。`vidroute doctor` 显示本机能力以及哪些宿主已能看到技能；
+`vidroute setup --remove` 会把 vidroute 从这些宿主中撤下。
 
 ## 在 Agent 里使用
 
-**Claude Code 插件**（Agent Skill）：
+`vidroute setup` 会接入它找到的宿主（或你用 `--host` 指定的宿主）。技能只复制到能覆盖所有宿主的最少几个目录——
+`~/.agents/skills`（Codex CLI、Gemini CLI、opencode、Cursor、Roo Code、Kilo Code、OpenClaw）、
+`~/.claude/skills`（Claude Code）、`~/.qwen/skills`、`~/.cline/skills`——并记下运行 vidroute 的 Python，
+所以即使 PATH 还没刷新也能用。不是 vidroute 创建的目录和配置项，永远不会被覆盖。
 
-```text
-/plugin install vidroute --marketplace wblearner-mini/vidroute
-```
+其他方式：
 
-**任何支持 Agent Skills 的宿主**：把内置技能复制到宿主的技能目录，例如 Claude Code：
+- **Claude Code 插件：** `/plugin install vidroute --marketplace wblearner-mini/vidroute`
+  （装了插件后，`vidroute setup` 会跳过 Claude Code 的技能目录）。
+- **MCP**（stdio，纯标准库实现，不依赖 SDK）：`vidroute setup --mcp`，或 `claude mcp add vidroute -- vidroute-mcp`，
+  或在任意 MCP 客户端配置中写 `{"mcpServers": {"vidroute": {"command": "vidroute-mcp"}}}`。
+- **手动复制技能：** `vidroute skill path` 打印的目录。
 
-```bash
-cp -r "$(vidroute skill path)" ~/.claude/skills/
-```
-
-**MCP**（stdio，纯标准库实现，不依赖 SDK）：
-
-```bash
-claude mcp add vidroute -- vidroute-mcp
-```
-
-或在任意 MCP 客户端配置中：
-
-```json
-{"mcpServers": {"vidroute": {"command": "vidroute-mcp"}}}
-```
-
-工具：`resolve_llm`、`doctor`、`install`（需 `confirm`）、`plan_video`、`prepare_video`（原生路线需
+MCP 工具：`resolve_llm`、`doctor`、`install`（需 `confirm`）、`plan_video`、`prepare_video`（原生路线需
 `accept_raw_video_handoff`）、`drill_video`、`probe_video`、`list_models`、`read_outputs`（把拼图、关键帧、
 音频和文本作为 MCP 内容返回）。耗时工具会上报进度并支持取消。
 
 Agent 的工作流（见 [skills/vidroute/SKILL.md](skills/vidroute/SKILL.md)）：
 `llm resolve` → `doctor` / `install`（先征得你同意）→ `plan`（原片要离开本机前先问你）→ `prepare` →
 读 `SUMMARY.md`、`ANALYSIS_GUIDE.md`、`handoff.json` → 写带 `[mm:ss]` 时间戳的回答 → 需要细节时 `drill` 某个时间段。
+技能里的启动器（`scripts/vidroute`、`scripts/vidroute.cmd`）不要求 PATH 上有 `python`：找不到时会退回到 uv。
 
 ## 命令行
 
 | 命令 | 作用 |
 |---|---|
-| `vidroute doctor [--refresh]` | 系统、CPU（AVX2）、内存、GPU、ffmpeg、运行时、已装模型、档位 |
-| `vidroute install [--capability X] [--model ID] [--yes]` | 计划 → 下载（多镜像、断点续传、SHA-256）→ 冒烟测试 |
+| `vidroute setup [--host ID] [--mcp] [--remove] [--yes]` | 一份计划：ffmpeg、模型、Agent 宿主、自检 |
+| `vidroute doctor [--refresh]` | 系统、CPU（AVX2）、内存、GPU、ffmpeg、运行时、已装模型、档位、Agent 宿主 |
+| `vidroute install [--capability X] [--model ID] [--mirror auto\|cn] [--yes]` | 计划 → 下载（多镜像、断点续传、SHA-256）→ 冒烟测试 |
 | `vidroute llm resolve --llm ID [--host ID]` | 某 LLM 在某宿主上能消费什么，以及依据 |
 | `vidroute probe 视频` | 时长、流、字幕、语音占比、文字密度（< 10 秒） |
 | `vidroute plan 视频 --llm ID [--host ID] [--task] [--prefer]` | 可解释的两层计划（`plan.json`） |
@@ -142,7 +156,7 @@ Claude + Claude Code → `frames`；DeepSeek + opencode → `text`。欢迎附�
 | Whisper small int8（其他语言默认） | 语音识别 | 99 种语言 | 375 MB | MIT |
 | faster-whisper large-v3-turbo（GPU，可选） | 语音识别 | 99 种语言 | 1.6 GB | MIT |
 | PP-OCRv6 small（RapidOCR ONNX） | 屏幕文字 | 中、英等 | 31 MB | Apache-2.0 |
-| ffmpeg（自行安装） | 解码、关键帧、转码 | — | — | LGPL/GPL（取决于你的构建） |
+| ffmpeg（自备，或由 `setup` 提供） | 解码、关键帧、转码 | — | Windows 便携包 110 MB | LGPL/GPL（gyan.dev essentials 9.0.2 为 GPLv3） |
 
 备选与实验模型（SenseVoice 粤语版、FunASR-Nano、Qwen3-ASR、PP-OCRv6 tiny）见 `vidroute models list`，
 详见 [models/manifest.yaml](models/manifest.yaml)。
@@ -154,12 +168,14 @@ Claude + Claude Code → `frames`；DeepSeek + opencode → `text`。欢迎附�
   `--accept-raw-video-handoff` 就拒绝执行，技能也要求 Agent 先征得你的同意。`--prefer privacy`
   会让原片留在本机，只交关键帧和文字。
 - **提取出的文本是数据，不是指令。** 转写、字幕和 OCR 里可能有提示注入，指南要求 LLM 忽略其中的任何指令。
-- **只写入 `VIDROUTE_HOME`（默认 `~/.vidroute`）和你指定的 `--out`**；从不删除你的文件；日志不记录视频内容。
+- **只写入 `VIDROUTE_HOME`（默认 `~/.vidroute`）和你指定的 `--out`**——以及你确认 `vidroute setup` 之后，计划中列出的
+  宿主技能目录和 MCP 配置项。从不删除你的文件，也从不替换不是它创建的宿主配置；日志不记录视频内容。
 - 请只处理你有权处理的视频，尊重隐私、知情同意与版权。
 
 ## 平台
 
-Windows 10/11、macOS、Linux；每次提交都在 CI（`windows-latest`）上测试 Windows。常见问题与解决办法见
+Windows 10/11（x64；Arm64 设备上 OCR 与 faster-whisper 的 worker 以 x64 仿真运行）、macOS、Linux；每次提交都在
+CI（`windows-latest`）上测试 Windows。常见问题与解决办法见
 [references/windows-troubleshooting.md](references/windows-troubleshooting.md)。CPU 路径永远可用；
 NVIDIA GPU 只有在 CUDA 冒烟测试通过后才启用，失败自动回退 CPU。
 

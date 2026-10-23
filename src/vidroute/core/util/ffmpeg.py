@@ -1,8 +1,9 @@
 """Locating and interrogating ffmpeg/ffprobe.
 
-vidroute never downloads ffmpeg on its own: if it is missing we print the
-platform's install command (``winget install Gyan.FFmpeg`` on Windows) and only
-run it when the user passes ``install --yes``.
+vidroute never downloads ffmpeg on its own: if it is missing, the install plan
+offers winget (or, without winget, a pinned portable build placed in
+``$VIDROUTE_HOME/runtimes/ffmpeg``) on Windows and the package-manager command
+elsewhere; nothing runs until the user confirms with ``install --yes``.
 """
 
 from __future__ import annotations
@@ -32,7 +33,7 @@ INTERESTING_FILTERS = ("select", "scdet", "silencedetect", "drawtext", "tile", "
 def install_hint() -> str:
     system = platform.system()
     if system == "Windows":
-        return "winget install Gyan.FFmpeg"
+        return "vidroute install --capability scene   (plans FFmpeg: winget, or a portable build)"
     if system == "Darwin":
         return "brew install ffmpeg"
     return "sudo apt install ffmpeg  (or your distribution's package manager)"
@@ -132,6 +133,11 @@ def detect(timeout: float = PROBE_TIMEOUT) -> FFmpegInfo:
 @lru_cache(maxsize=1)
 def _cached_detect() -> FFmpegInfo:
     return detect()
+
+
+def reset_cache() -> None:
+    """Forget a cached "not found" after ffmpeg was installed in this process."""
+    _cached_detect.cache_clear()
 
 
 def require() -> FFmpegInfo:

@@ -136,6 +136,7 @@ class EnvGroup:
     lock_cuda: str | None = None
     approx_size_mb: float | None = None
     approx_size_mb_cuda: float | None = None
+    windows_arm64_arch: str | None = None  # x86_64 when locked wheels lack win_arm64 builds
 
     @property
     def path(self) -> Path:
@@ -149,10 +150,46 @@ class EnvGroup:
 
 
 @dataclass(frozen=True)
+class RuntimeEntry:
+    """A portable tool (ffmpeg) vidroute can place in ``$VIDROUTE_HOME/runtimes/<install_dir>``."""
+
+    id: str
+    tool: str
+    version: str
+    platforms: tuple[str, ...]
+    install_dir: str
+    size_mb: float
+    license: License
+    files: tuple[ModelFile, ...]
+    sources: tuple[Source, ...]
+    verified_at: str | None = None
+    notes: str = ""
+
+    @property
+    def path(self) -> Path:
+        return paths.runtimes_dir() / self.install_dir
+
+    @property
+    def disk_mb(self) -> float:
+        return round(sum(f.size for f in self.files) / 1e6, 1)
+
+    def installed_status(self) -> dict[str, Any]:
+        marker = read_json(self.path / MARKER)
+        ok = isinstance(marker, dict) and marker.get("id") == self.id
+        for f in self.files:
+            try:
+                ok = ok and (self.path / f.path).stat().st_size == f.size
+            except OSError:
+                ok = False
+        return {"installed": ok, "path": str(self.path), "version": marker.get("version") if isinstance(marker, dict) else None}
+
+
+@dataclass(frozen=True)
 class Manifest:
     allowed_domains: tuple[str, ...]
     env_groups: dict[str, EnvGroup]
     models: dict[str, ModelEntry]
+    runtimes: dict[str, RuntimeEntry] = field(default_factory=dict)
 
     def model(self, model_id: str) -> ModelEntry:
         try:
@@ -176,6 +213,41 @@ def _req(obj: dict[str, Any], key: str, where: str) -> Any:
     return obj[key]
 
 
+def _license(lic: dict[str, Any]) -> License:
+    return License(
+        spdx=str(lic["spdx"]),
+        restricted=bool(lic["restricted"]),
+        gated=bool(lic["gated"]),
+        name=str(lic.get("name", lic["spdx"])),
+        url=str(lic.get("url", "")),
+        notes=str(lic.get("notes") or ""),
+    )
+
+
+def _files(raw: list[dict[str, Any]] | None) -> tuple[ModelFile, ...]:
+    return tuple(ModelFile(str(f["path"]), int(f["size"]), str(f["sha256"]).lower(), bool(f.get("optional", False)))
+                 for f in raw or [])
+
+
+def _sources(raw: list[dict[str, Any]] | None) -> tuple[Source, ...]:
+    return tuple(
+        Source(
+            type=str(s["type"]),
+            kind=str(s["kind"]),
+            base_url=s.get("base_url"),
+            url=s.get("url"),
+            size=s.get("size"),
+            sha256=(s.get("sha256") or None) and str(s["sha256"]).lower(),
+            strip_prefix=str(s.get("strip_prefix") or ""),
+            layout=dict(s.get("layout") or {}),
+            env_group=s.get("env_group"),
+            package=s.get("package"),
+            subdir=str(s.get("subdir") or ""),
+        )
+        for s in raw or []
+    )
+
+
 def parse_manifest(raw: Any, source: str = "manifest.yaml") -> Manifest:
     if not isinstance(raw, dict) or raw.get("schema") != "vidroute/manifest/1":
         raise DataFileError(f"{source}: expected schema 'vidroute/manifest/1'")
@@ -191,6 +263,7 @@ def parse_manifest(raw: Any, source: str = "manifest.yaml") -> Manifest:
             lock_cuda=g.get("lock_cuda"),
             approx_size_mb=g.get("approx_size_mb"),
             approx_size_mb_cuda=g.get("approx_size_mb_cuda"),
+            windows_arm64_arch=g.get("windows_arm64_arch"),
         )
     models: dict[str, ModelEntry] = {}
     for m in _req(raw, "models", source):
@@ -215,34 +288,9 @@ def parse_manifest(raw: Any, source: str = "manifest.yaml") -> Manifest:
             languages=tuple(_req(m, "languages", where)),
             size_mb=float(_req(m, "size_mb", where)),
             tiers=tuple(_req(m, "tiers", where)),
-            license=License(
-                spdx=str(lic["spdx"]),
-                restricted=bool(lic["restricted"]),
-                gated=bool(lic["gated"]),
-                name=str(lic.get("name", lic["spdx"])),
-                url=str(lic.get("url", "")),
-                notes=str(lic.get("notes") or ""),
-            ),
-            files=tuple(
-                ModelFile(str(f["path"]), int(f["size"]), str(f["sha256"]).lower(), bool(f.get("optional", False)))
-                for f in m.get("files") or []
-            ),
-            sources=tuple(
-                Source(
-                    type=str(s["type"]),
-                    kind=str(s["kind"]),
-                    base_url=s.get("base_url"),
-                    url=s.get("url"),
-                    size=s.get("size"),
-                    sha256=(s.get("sha256") or None) and str(s["sha256"]).lower(),
-                    strip_prefix=str(s.get("strip_prefix") or ""),
-                    layout=dict(s.get("layout") or {}),
-                    env_group=s.get("env_group"),
-                    package=s.get("package"),
-                    subdir=str(s.get("subdir") or ""),
-                )
-                for s in m.get("sources") or []
-            ),
+            license=_license(lic),
+            files=_files(m.get("files")),
+            sources=_sources(m.get("sources")),
             min_ram_gb=m.get("min_ram_gb"),
             min_vram_gb=m.get("min_vram_gb"),
             requires_gpu=m.get("requires_gpu"),
@@ -252,8 +300,25 @@ def parse_manifest(raw: Any, source: str = "manifest.yaml") -> Manifest:
             verified_at=m.get("verified_at"),
             notes=str(m.get("notes") or ""),
         )
+    runtimes: dict[str, RuntimeEntry] = {}
+    for r in raw.get("runtimes") or []:
+        rid = _req(r, "id", f"{source}: runtimes[]")
+        where = f"{source}: runtime {rid}"
+        runtimes[rid] = RuntimeEntry(
+            id=rid,
+            tool=str(_req(r, "tool", where)),
+            version=str(_req(r, "version", where)),
+            platforms=tuple(_req(r, "platforms", where)),
+            install_dir=str(_req(r, "install_dir", where)),
+            size_mb=float(_req(r, "size_mb", where)),
+            license=_license(_req(r, "license", where)),
+            files=_files(_req(r, "files", where)),
+            sources=_sources(_req(r, "sources", where)),
+            verified_at=r.get("verified_at"),
+            notes=str(r.get("notes") or ""),
+        )
     domains = tuple(str(d).lower() for d in _req(raw, "allowed_domains", source))
-    return Manifest(allowed_domains=domains, env_groups=groups, models=models)
+    return Manifest(allowed_domains=domains, env_groups=groups, models=models, runtimes=runtimes)
 
 
 @lru_cache(maxsize=1)

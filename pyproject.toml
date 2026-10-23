@@ -82,6 +82,8 @@ include = [
     "docs/",
     "README.md",
     "README.zh-CN.md",
+    "install.ps1",
+    "install.sh",
     "LICENSE",
     "THIRD_PARTY_LICENSES.md",
     "CHANGELOG.md",

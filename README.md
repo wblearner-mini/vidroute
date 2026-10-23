@@ -23,51 +23,67 @@ degradation (`native → frames → text`) is recorded with its reason.
 > **Status: pre-release (v0.1.0.dev0).** Feature-complete for the CLI, MCP server and Agent Skill;
 > see [PROGRESS.md](PROGRESS.md). Decisions and their evidence: [docs/DECISIONS.md](docs/DECISIONS.md).
 
-## 30-second start
+## Install
+
+One command installs vidroute and walks you through the rest:
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/wblearner-mini/vidroute/main/install.ps1 | iex
+```
 
 ```bash
-pipx install vidroute                 # or: uv tool install vidroute
-vidroute doctor                       # what this machine can do (CPU/GPU tier, ffmpeg, models)
-vidroute install --capability asr --capability vad --capability ocr --capability scene
-#   ^ prints the plan (sources, sizes, licenses) and downloads nothing; add --yes to install
-#     (the CPU baseline takes about 0.8 GB on disk: Python runtime, two worker envs, models)
+# Linux / macOS
+curl -LsSf https://raw.githubusercontent.com/wblearner-mini/vidroute/main/install.sh | sh
+```
+
+The script fetches [uv](https://docs.astral.sh/uv/) (pinned and SHA-256-checked; uv brings its own
+Python), installs vidroute, then runs **`vidroute setup`**, which shows one plan and asks once:
+
+- **ffmpeg** if it is missing (Windows: winget, or a pinned portable build when winget is unavailable;
+  Linux/macOS: the package-manager command to run);
+- **local models**: speech recognition, voice activity, on-screen text (~0.8 GB, CPU only);
+- **your agent hosts**: the vidroute skill for every host it finds — Claude Code, Codex CLI, Gemini CLI,
+  Qwen Code, opencode, Cursor, Cline, Roo Code, Kilo Code, OpenClaw (`--mcp` also registers the MCP server);
+- an end-to-end **self-test** on a generated clip.
+
+In mainland China the mirrors are picked automatically when huggingface.co is unreachable (or force
+them: `--mirror cn`); every download stays hash-checked. Before the first public release the
+repository is private: with access, clone it and run `.\install.ps1 -Source .` or `sh install.sh --source .`.
+
+**Let your agent do it.** Ask it: *"Set up vidroute for me, following
+https://github.com/wblearner-mini/vidroute/blob/main/docs/AGENT_SETUP.md"*. The agent installs uv and
+vidroute, shows you the plan, and runs it after your yes.
+
+**By hand:** `uv tool install vidroute` (or `pipx install vidroute`), then `vidroute setup`.
+
+Then ask your agent something like *"take minutes of D:\meetings\weekly.mp4"*, or use the CLI:
+
+```bash
 vidroute run meeting.mp4 --llm claude-opus-5-5 --host claude-code --task minutes --out ./video-out
 ```
 
-Then open `./video-out/<slug>/SUMMARY.md` — or, much better, let your agent do it (below).
-Before the first PyPI release, install from GitHub: `pipx install git+https://github.com/wblearner-mini/vidroute`.
-
-You need Python 3.10+ and **ffmpeg** on PATH (`winget install --id Gyan.FFmpeg`,
-`brew install ffmpeg`, `sudo apt install ffmpeg`). No GPU, no compiler, no system packages beyond
-that: models run in isolated environments that vidroute manages with `uv`.
+and open `./video-out/<slug>/SUMMARY.md`. `vidroute doctor` shows what this machine can do and which
+agent hosts see the skill; `vidroute setup --remove` takes vidroute out of them again.
 
 ## Use it from your agent
 
-**Claude Code plugin** (Agent Skill):
+`vidroute setup` connects the hosts it finds (or the ones you name with `--host`). The skill goes into
+the fewest folders that reach them all — `~/.agents/skills` (Codex CLI, Gemini CLI, opencode, Cursor,
+Roo Code, Kilo Code, OpenClaw), `~/.claude/skills` (Claude Code), `~/.qwen/skills`, `~/.cline/skills` —
+and records which Python runs vidroute, so it works before PATH is refreshed. Folders and entries
+vidroute did not create are never overwritten.
 
-```text
-/plugin install vidroute --marketplace wblearner-mini/vidroute
-```
+Other ways:
 
-**Any host with Agent Skills:** copy the bundled skill into the host's skills folder, e.g. for Claude Code
+- **Claude Code plugin:** `/plugin install vidroute --marketplace wblearner-mini/vidroute`
+  (`vidroute setup` then skips Claude Code's skill folder).
+- **MCP** (stdio, standard-library server, no SDK needed): `vidroute setup --mcp`, or
+  `claude mcp add vidroute -- vidroute-mcp`, or in any MCP client config
+  `{"mcpServers": {"vidroute": {"command": "vidroute-mcp"}}}`.
+- **Copy the skill by hand:** the folder printed by `vidroute skill path`.
 
-```bash
-cp -r "$(vidroute skill path)" ~/.claude/skills/
-```
-
-**MCP** (stdio, standard-library server, no SDK needed):
-
-```bash
-claude mcp add vidroute -- vidroute-mcp
-```
-
-or in any MCP client config:
-
-```json
-{"mcpServers": {"vidroute": {"command": "vidroute-mcp"}}}
-```
-
-Tools: `resolve_llm`, `doctor`, `install` (needs `confirm`), `plan_video`, `prepare_video`
+MCP tools: `resolve_llm`, `doctor`, `install` (needs `confirm`), `plan_video`, `prepare_video`
 (native routes need `accept_raw_video_handoff`), `drill_video`, `probe_video`, `list_models`,
 `read_outputs` (returns contact sheets, frames, audio and text as MCP content). Long tools report
 progress and honour cancellation.
@@ -75,14 +91,16 @@ progress and honour cancellation.
 The agent's workflow (from [skills/vidroute/SKILL.md](skills/vidroute/SKILL.md)):
 `llm resolve` → `doctor` / `install` (with your OK) → `plan` (asks you before any raw video leaves
 your machine) → `prepare` → read `SUMMARY.md`, `ANALYSIS_GUIDE.md`, `handoff.json` → write the
-answer with `[mm:ss]` timestamps → `drill` into a time range when detail is needed.
+answer with `[mm:ss]` timestamps → `drill` into a time range when detail is needed. The skill's
+launchers (`scripts/vidroute`, `scripts/vidroute.cmd`) need no `python` on PATH: they fall back to uv.
 
 ## Command line
 
 | command | does |
 |---|---|
-| `vidroute doctor [--refresh]` | OS, CPU (AVX2), RAM, GPUs, ffmpeg, runtimes, installed models, tier |
-| `vidroute install [--capability X] [--model ID] [--yes]` | plan → download (mirrors, resume, SHA-256) → smoke test |
+| `vidroute setup [--host ID] [--mcp] [--remove] [--yes]` | one plan: ffmpeg, models, agent hosts, self-test |
+| `vidroute doctor [--refresh]` | OS, CPU (AVX2), RAM, GPUs, ffmpeg, runtimes, installed models, tier, agent hosts |
+| `vidroute install [--capability X] [--model ID] [--mirror auto\|cn] [--yes]` | plan → download (mirrors, resume, SHA-256) → smoke test |
 | `vidroute llm resolve --llm ID [--host ID]` | what an LLM on a host can consume, and why |
 | `vidroute probe VIDEO` | duration, streams, subtitles, speech ratio, text density (< 10 s) |
 | `vidroute plan VIDEO --llm ID [--host ID] [--task] [--prefer]` | the explainable two-layer plan (`plan.json`) |
@@ -151,7 +169,7 @@ part of this repository or the Python package.
 | Whisper small int8 (default for other languages) | speech recognition | 99 languages | 375 MB | MIT |
 | faster-whisper large-v3-turbo (GPU, optional) | speech recognition | 99 languages | 1.6 GB | MIT |
 | PP-OCRv6 small (RapidOCR ONNX) | on-screen text | zh, en and more | 31 MB | Apache-2.0 |
-| ffmpeg (you install it) | decoding, scene/keyframes, transcoding | — | — | LGPL/GPL (your build) |
+| ffmpeg (your own, or offered by `setup`) | decoding, scene/keyframes, transcoding | — | Windows portable build: 110 MB | LGPL/GPL (gyan.dev essentials 9.0.2: GPLv3) |
 
 Alternatives and experimental models (SenseVoice Cantonese, FunASR-Nano, Qwen3-ASR, PP-OCRv6 tiny)
 are listed by `vidroute models list`. Details per model: [models/manifest.yaml](models/manifest.yaml).
@@ -165,13 +183,15 @@ are listed by `vidroute models list`. Details per model: [models/manifest.yaml](
   ask you first. `--prefer privacy` keeps the raw video local and hands over only keyframes and text.
 - **Extracted text is data, not instructions.** Transcripts, subtitles and OCR can contain prompt
   injections; the guide tells the LLM to ignore any instruction found in them.
-- **Writes only to `VIDROUTE_HOME` (default `~/.vidroute`) and your `--out` folder**; never deletes
-  your files; logs do not contain video content.
+- **Writes only to `VIDROUTE_HOME` (default `~/.vidroute`) and your `--out` folder** — plus, after you
+  confirm `vidroute setup`, the agent-host skill folders and MCP entries listed in its plan. It never
+  deletes your files and never replaces host entries it did not create; logs do not contain video content.
 - Use vidroute only for videos you are allowed to process; respect privacy, consent and copyright.
 
 ## Platforms
 
-Windows 10/11, macOS and Linux; Windows is tested in CI (`windows-latest`) on every commit.
+Windows 10/11 (x64; Arm64 runs the OCR and faster-whisper workers as x64 under emulation), macOS and
+Linux; Windows is tested in CI (`windows-latest`) on every commit.
 Pitfalls and fixes: [references/windows-troubleshooting.md](references/windows-troubleshooting.md).
 The CPU path always works; an NVIDIA GPU is used only after a passing CUDA smoke test and falls
 back to CPU automatically.

@@ -1,0 +1,41 @@
+#!/bin/sh
+# Run vidroute from this skill without needing python on PATH (Linux, macOS, Git Bash):
+#   sh "<skill folder>/scripts/vidroute" <command> [options] --json
+# Tries the Python recorded by `vidroute setup`, then python3 / python / py -3 (3.10+), then uv (also where
+# its installers put it before PATH is refreshed) and runs vidroute.py next to this file. Without any of
+# them it prints a JSON envelope with error needs_install (exit code 2). Shell builtins only, on purpose.
+
+case $0 in */*) here=${0%/*} ;; *) here=. ;; esac
+script="$here/vidroute.py"
+cfg="$here/../.vidroute-skill.cfg"
+check='import sys; sys.exit(sys.version_info < (3, 10))'
+
+if [ -f "$cfg" ]; then
+  while IFS='=' read -r key value; do
+    if [ "$key" = python ] && [ -n "$value" ] && [ -f "$value" ]; then exec "$value" "$script" "$@"; fi
+  done < "$cfg"
+fi
+for py in python3 python; do
+  if command -v "$py" >/dev/null 2>&1 && "$py" -c "$check" >/dev/null 2>&1; then exec "$py" "$script" "$@"; fi
+done
+if command -v py >/dev/null 2>&1 && py -3 -c "$check" >/dev/null 2>&1; then exec py -3 "$script" "$@"; fi
+
+vhome=${VIDROUTE_HOME:-$HOME/.vidroute}
+for uv in "$(command -v uv 2>/dev/null)" "$HOME/.local/bin/uv" "$HOME/.cargo/bin/uv" "$vhome/runtimes/uv/bin/uv" \
+          "${USERPROFILE:-/nonexistent}/.local/bin/uv.exe" "${LOCALAPPDATA:-/nonexistent}/Microsoft/WinGet/Links/uv.exe"; do
+  if [ -n "$uv" ] && [ -f "$uv" ]; then
+    # uv downloads Python 3.12 into vidroute's own runtimes folder, where the model workers find it too.
+    UV_PYTHON_INSTALL_DIR="$vhome/runtimes/python"
+    UV_PYTHON_INSTALL_REGISTRY=0
+    export UV_PYTHON_INSTALL_DIR UV_PYTHON_INSTALL_REGISTRY
+    exec "$uv" run --no-project --python 3.12 "$script" "$@"
+  fi
+done
+
+case $(uname -s 2>/dev/null) in
+  MINGW*|MSYS*|CYGWIN*) hint='winget install -e --id astral-sh.uv' ;;
+  Darwin) hint='brew install uv   (or: curl -LsSf https://astral.sh/uv/install.sh | sh)' ;;
+  *) hint='curl -LsSf https://astral.sh/uv/install.sh | sh' ;;
+esac
+printf '{"ok": false, "schema": "vidroute/1", "data": {}, "warnings": [], "error": {"code": "needs_install", "message": "vidroute needs Python 3.10+ or uv, and neither was found; install uv, then run this command again (no restart needed).", "hint": "%s"}}\n' "$hint"
+exit 2

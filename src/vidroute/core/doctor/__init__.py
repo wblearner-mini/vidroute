@@ -2,7 +2,8 @@
 
 All probes run concurrently with a per-probe timeout and never block; results
 are cached in state.json (TTL) and ``--refresh`` forces a re-check. Install and
-remove operations invalidate the cache.
+remove operations invalidate the cache. Which agent hosts are installed and
+whether they see the vidroute skill is cheap and checked on every run.
 """
 
 from __future__ import annotations
@@ -156,6 +157,12 @@ def derive_warnings(data: dict[str, Any], ctx: Ctx) -> None:
     net = data.get("network") or {}
     if net.get("checked") and net.get("online") is False:
         ctx.warn("offline", "No download mirror is reachable; installs will fail until the network is back.")
+    for host in (data.get("integrations") or {}).get("hosts") or []:
+        skill = host.get("skill") or {}
+        if skill.get("managed") and (not skill.get("current") or skill.get("python_ok") is False):
+            ctx.warn("skill_outdated", f"{host['name']}: the vidroute skill in {skill['path']} is from vidroute "
+                                       f"{skill.get('version')} or points at a Python that is gone.",
+                     "vidroute setup --no-install")
 
 
 def run(refresh: bool = False, offline: bool | None = None, ctx: Ctx | None = None) -> dict[str, Any]:
@@ -169,5 +176,8 @@ def run(refresh: bool = False, offline: bool | None = None, ctx: Ctx | None = No
         data = dict(data, cached=False)
     else:
         data = dict(data, cached=True)
+    from vidroute.core import integrate
+
+    data["integrations"] = integrate.status()
     derive_warnings(data, ctx)
     return data

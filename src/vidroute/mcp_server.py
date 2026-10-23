@@ -86,7 +86,7 @@ TOOLS: list[dict[str, Any]] = [
          "capabilities": {"type": "array", "items": {"type": "string", "enum": ["asr", "vad", "ocr", "scene"]}},
          "profile": {"type": "string", "enum": ["auto", "lite", "full"], "default": "auto"},
          "models": {"type": "array", "items": _STR},
-         "mirror": {"type": "string", "enum": ["auto", "github", "hf", "modelscope"]},
+         "mirror": {"type": "string", "enum": ["auto", "cn", "github", "hf", "modelscope"]},
          "accept_licenses": {"type": "array", "items": _STR},
          "confirm": _BOOL, "dry_run": _BOOL}),
      "annotations": {"title": "Install local models", "readOnlyHint": False, "destructiveHint": False,
