@@ -28,7 +28,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 MIN_PYTHON = (3, 10)
-INSTALL_HINT = "uv tool install git+https://github.com/wblearner-mini/vidroute   (then: vidroute setup)"
+INSTALL_HINT = "uv tool install https://github.com/wblearner-mini/vidroute/archive/refs/heads/main.tar.gz   (then: vidroute setup)"
 # Python puts this script's folder first on sys.path; since the script is called vidroute.py it would
 # shadow the vidroute package on `import vidroute`.
 sys.path[:] = [p for p in sys.path if Path(p or ".").resolve() != HERE]

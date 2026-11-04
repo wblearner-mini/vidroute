@@ -48,6 +48,7 @@ def make_plan(
     route_override: str = "auto",
     force_asr: bool = False,
     ctx: Ctx | None = None,
+    diarize: str = "auto",
 ) -> dict[str, Any]:
     ctx = ctx or Ctx()
     _check("task", task, TASKS)
@@ -69,7 +70,7 @@ def make_plan(
         ocr_frames = min(rules["frames"]["max_frames"], int(float(info["duration"] or 0) // 4) + 1)
     decision = route.decide(info, resolution, rules, task, prefer, bool(config.get("allow_raw_video_handoff")),
                             budget, ocr_frames=ocr_frames, forced=route_override)
-    steps, needs = local.plan_steps(info, decision, tier, rules, manifest, task, language, ocr, force_asr)
+    steps, needs = local.plan_steps(info, decision, tier, rules, manifest, task, language, ocr, force_asr, diarize)
     for n in needs:
         if n.get("optional"):
             ctx.warn("optional_install", f"{n['capability']}: {n['why']}", n["hint"])
@@ -89,7 +90,7 @@ def make_plan(
         "vidroute_version": __version__,
         "request": {"video": str(Path(video).expanduser().resolve()), "llm": resolution["llm"]["model"],
                     "host": resolution["host"]["id"], "task": task, "prefer": prefer, "language": language,
-                    "ocr": ocr, "route": route_override, "force_asr": force_asr, "modalities": modalities,
+                    "ocr": ocr, "route": route_override, "force_asr": force_asr, "diarize": diarize, "modalities": modalities,
                     "audio_in_video": audio_in_video},
         "video": {k: info.get(k) for k in ("path", "name", "duration", "size_mb", "format", "video", "has_audio",
                                            "speech_ratio", "text_density", "visual_change", "text_subtitles",

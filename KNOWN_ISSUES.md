@@ -40,8 +40,8 @@ users and what would close it.
 * **MCP registration** is automated for Claude Code, Codex CLI, Gemini CLI,
   Qwen Code, Cursor and opencode; Cline, Roo Code, Kilo Code and OpenClaw get
   the skill only (their MCP settings live in editor storage).
-* **The one-line installers** (`irm … | iex`, `curl … | sh`) need the
-  repository to be public; until then they run from a checkout.
+* **Linux/macOS still need ffmpeg from the system package manager**, usually
+  with sudo. `setup` says so before downloading anything.
 * **Windows on Arm**: the x64-emulated OCR / faster-whisper environments are
   not validated on real Arm hardware (no Arm runner for private repositories).
 
@@ -64,5 +64,15 @@ users and what would close it.
 * **Contact-sheet tiles are too small for UI text** in 1080p screen recordings;
   OCR and the full-resolution `frames/` cover it. The guide tells the agent to
   open single frames.
+* **Speaker labels** were checked on synthetic dialogues of distinct recorded
+  voices, not on real meetings. A turn of a few seconds can get its own label
+  (seen once: one voice split into two labels), and overlapping speech goes to
+  one speaker. Diarization adds about 0.08 x speech length on 16 threads.
+  Embedded subtitles used instead of ASR get no labels.
+* **Interrupted runs:** ASR and finished steps resume; a diarization pass that was
+  cut off starts over.
+* **Long videos can have more shots than the 60-frame budget.** Shots on screen
+  for 5 s or more that were left out are listed in `omitted-shots.md` with a
+  warning; getting them still takes a `drill`.
 * **OCR cost** is ~1.2 s per dense 1080p frame on an 8-core CPU (60 frames max,
   so ~1–2 minutes at worst).

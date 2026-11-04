@@ -42,20 +42,24 @@ Python), installs vidroute, then runs **`vidroute setup`**, which shows one plan
 
 - **ffmpeg** if it is missing (Windows: winget, or a pinned portable build when winget is unavailable;
   Linux/macOS: the package-manager command to run);
-- **local models**: speech recognition, voice activity, on-screen text (~0.8 GB, CPU only);
+- **local models**: speech recognition, voice activity, on-screen text, speaker labels (~0.85 GB, CPU only);
 - **your agent hosts**: the vidroute skill for every host it finds — Claude Code, Codex CLI, Gemini CLI,
   Qwen Code, opencode, Cursor, Cline, Roo Code, Kilo Code, OpenClaw (`--mcp` also registers the MCP server);
 - an end-to-end **self-test** on a generated clip.
 
 In mainland China the mirrors are picked automatically when huggingface.co is unreachable (or force
-them: `--mirror cn`); every download stays hash-checked. Before the first public release the
-repository is private: with access, clone it and run `.\install.ps1 -Source .` or `sh install.sh --source .`.
+them: `--mirror cn`); every download stays hash-checked. You can also clone the repository and run `.\install.ps1 -Source .` or
+`sh install.sh --source .`.
+
+**What the system must have:** only `curl` or `wget` (nothing on Windows): no git, Python or unzip. On Linux and macOS,
+install ffmpeg with the system package manager first; if it is missing, `setup` gives you the command before downloading
+anything.
 
 **Let your agent do it.** Ask it: *"Set up vidroute for me, following
 https://github.com/wblearner-mini/vidroute/blob/main/docs/AGENT_SETUP.md"*. The agent installs uv and
 vidroute, shows you the plan, and runs it after your yes.
 
-**By hand:** `uv tool install vidroute` (or `pipx install vidroute`), then `vidroute setup`.
+**By hand:** `uv tool install https://github.com/wblearner-mini/vidroute/archive/refs/heads/main.tar.gz` (not on PyPI yet), then `vidroute setup`.
 
 Then ask your agent something like *"take minutes of D:\meetings\weekly.mp4"*, or use the CLI:
 
@@ -112,7 +116,7 @@ launchers (`scripts/vidroute`, `scripts/vidroute.cmd`) need no `python` on PATH:
 Every command takes `--json` and prints one envelope on stdout
 (`{"ok", "schema": "vidroute/1", "data", "warnings", "error": {"code", "message", "hint"}}`);
 logs go to stderr. Exit codes: `0` ok · `1` usage · `2` needs install · `3` needs your confirmation ·
-`4` hardware cannot run it · `5` run failed. `error.hint` is always a command that fixes the problem.
+`4` hardware cannot run it · `5` run failed. `error.hint`, when present, is always a command that fixes the problem.
 
 ## What `prepare` writes
 
@@ -126,6 +130,9 @@ logs go to stderr. Exit codes: `0` ok · `1` usage · `2` needs install · `3` n
   contact-sheets/     labelled keyframe grids + index.md              — frames route
   frames/  transcript.{md,srt,json}  ocr.{md,json}  timeline.md  audio/16k.wav  drill/<range>/
 ```
+
+`--task minutes` (or `--diarize on`) labels `Speaker 1`, `Speaker 2`, … in the transcript: voice groups, not identities,
+and they can be wrong. Longer shots that the keyframe budget left out are listed in `omitted-shots.md`; `drill` shows them.
 
 All timestamps are **global** (also inside segments and drill output). The evidence order is
 picture/sound > on-screen text (OCR) > local transcript, and the guide makes the LLM correct the
@@ -169,6 +176,7 @@ part of this repository or the Python package.
 | Whisper small int8 (default for other languages) | speech recognition | 99 languages | 375 MB | MIT |
 | faster-whisper large-v3-turbo (GPU, optional) | speech recognition | 99 languages | 1.6 GB | MIT |
 | PP-OCRv6 small (RapidOCR ONNX) | on-screen text | zh, en and more | 31 MB | Apache-2.0 |
+| pyannote segmentation-3.0 + CAM++ | speaker labels | any | 34 MB | MIT + Apache-2.0 |
 | ffmpeg (your own, or offered by `setup`) | decoding, scene/keyframes, transcoding | — | Windows portable build: 110 MB | LGPL/GPL (gyan.dev essentials 9.0.2: GPLv3) |
 
 Alternatives and experimental models (SenseVoice Cantonese, FunASR-Nano, Qwen3-ASR, PP-OCRv6 tiny)

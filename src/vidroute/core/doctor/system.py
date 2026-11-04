@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from vidroute.core.util import proc
+from vidroute.core.util import limits, proc
 
 GIB = 1024**3
 
@@ -134,6 +134,7 @@ def cpu_info() -> dict[str, Any]:
     arch = platform.machine().lower()
     data["arch"] = arch
     data["logical_cores"] = os.cpu_count()
+    data["usable_cores"] = limits.usable_cpus()
     # AVX2 only matters on x86; ARM CPUs use NEON, which every runtime we ship supports.
     data["x86"] = arch in ("x86_64", "amd64", "i386", "i686", "x86")
     return data
@@ -180,11 +181,23 @@ def _windows_memory() -> dict[str, float | None]:
     return {"total_gb": round(stat.ullTotalPhys / GIB, 2), "available_gb": round(stat.ullAvailPhys / GIB, 2)}
 
 
+def apply_memory_limit(info: dict[str, float | None], limit: tuple[int, int] | None) -> dict[str, Any]:
+    """Inside a container /proc/meminfo describes the host: a smaller cgroup limit is what counts."""
+    total = info.get("total_gb")
+    if limit is None or total is None or limit[0] / GIB >= total:
+        return info
+    free = round(max(0, limit[0] - limit[1]) / GIB, 2)
+    avail = info.get("available_gb")
+    return {"total_gb": round(limit[0] / GIB, 2), "available_gb": min(free, avail) if avail is not None else free,
+            "limited": True}
+
+
 def memory_info() -> dict[str, float | None]:
     system = platform.system()
     try:
         if system == "Linux":
-            return parse_meminfo(Path("/proc/meminfo").read_text(encoding="utf-8", errors="replace"))
+            info = parse_meminfo(Path("/proc/meminfo").read_text(encoding="utf-8", errors="replace"))
+            return apply_memory_limit(info, limits.cgroup_memory())
         if system == "Windows":
             return _windows_memory()
         if system == "Darwin":

@@ -7,6 +7,7 @@ import os
 import socket
 import tarfile
 import threading
+import time
 import zipfile
 
 import pytest
@@ -30,7 +31,7 @@ class _State:
 
 class Handler(http.server.BaseHTTPRequestHandler):
     state: _State = None  # type: ignore[assignment]
-    files = {"/good.bin": DATA, "/bad.bin": BAD}
+    files = {"/good.bin": DATA, "/bad.bin": BAD, "/slow.bin": DATA}
 
     def log_message(self, *args):  # silence
         pass
@@ -70,6 +71,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.wfile.flush()
             self.connection.shutdown(socket.SHUT_RDWR)
             self.close_connection = True
+            return
+        if self.path == "/slow.bin":
+            for i in range(0, len(body), 64 * 1024):
+                self.wfile.write(body[i:i + 64 * 1024])
+                self.wfile.flush()
+                time.sleep(0.2)
             return
         self.wfile.write(body)
 
@@ -242,3 +249,37 @@ def test_extract_zip(tmp_path):
         zf.writestr("root/a.txt", "A")
         zf.writestr("root/sub/b.txt", "B")
     assert sorted(extract(path, tmp_path / "o", "root/")) == ["a.txt", "sub/b.txt"]
+
+
+def test_crawling_mirror_is_left_for_the_next_one_and_partial_data_is_reused(server, tmp_path):
+    base, st = server
+    dl = Downloader(["127.0.0.1"], retries=3, timeout=5, backoff=0, part_dir=tmp_path / "parts",
+                    min_speed=2_000_000, speed_window=0.05)
+    dest = tmp_path / "out.bin"
+    dl.fetch([f"{base}/slow.bin", f"{base}/good.bin"], dest, SHA, len(DATA))
+    assert dest.read_bytes() == DATA and dl.slow_seen
+    assert [p for p, _ in st.requests].count("/slow.bin") == 1  # no retries on the same slow source
+    good = next(rng for p, rng in st.requests if p == "/good.bin")
+    assert good and good.startswith("bytes=")
+
+
+def test_only_slow_source_still_installs_on_the_second_pass(monkeypatch):
+    from vidroute.core.install import models as m
+    from vidroute.core.install.manifest import load_manifest
+
+    manifest = load_manifest()
+    entry = manifest.model("vad-silero")
+    dl = Downloader(manifest.allowed_domains)
+    speeds = []
+
+    def from_files(_entry, _sources, staging, d):
+        speeds.append(d.min_speed)
+        if d.min_speed:
+            d.slow_seen = True
+            raise RunFailed("too slow", code="download_failed")
+        (staging / "silero_vad.onnx").write_bytes(b"x")
+
+    monkeypatch.setattr(m, "_from_files", from_files)
+    monkeypatch.setattr(m, "_verify_dir", lambda *a: [])
+    assert m.install_model(entry, manifest, Ctx(), downloader=dl, force=True)["status"] != "failed"
+    assert speeds[0] > 0 and speeds[-1] == 0

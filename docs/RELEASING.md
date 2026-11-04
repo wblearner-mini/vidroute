@@ -33,7 +33,6 @@
    `release.yml`, environment `pypi`. Then Actions → Release → Run workflow with
    `publish_to_pypi = true` on the tag.
 6. Users verify downloads with `sha256sum -c SHA256SUMS.txt`.
-7. After the first PyPI upload, switch the install source from the git URL to the package name:
+7. After the first PyPI upload, switch the install source from the source archive URL to the package name:
    `install.ps1` / `install.sh` (default `Source`), `INSTALL_HINT` in `skills/vidroute/scripts/vidroute.py`
-   and `docs/AGENT_SETUP.md` step 2 (`uv tool install vidroute`). The `irm … | iex` / `curl … | sh`
-   lines in the README work as soon as the repository is public.
+   and `docs/AGENT_SETUP.md` step 2 (`uv tool install vidroute`).

@@ -39,18 +39,21 @@ curl -LsSf https://raw.githubusercontent.com/wblearner-mini/vidroute/main/instal
 然后运行 **`vidroute setup`**——给出**一份**计划，只问一次：
 
 - 缺 **ffmpeg** 时补上（Windows：用 winget，没有 winget 时用固定版本的便携包；Linux/macOS：给出包管理器命令）；
-- **本地模型**：语音识别、人声检测、屏幕文字（约 0.8 GB，纯 CPU）；
+- **本地模型**：语音识别、人声检测、屏幕文字、说话人区分（约 0.85 GB，纯 CPU）；
 - **你的 Agent 宿主**：给找到的每个宿主装上 vidroute 技能——Claude Code、Codex CLI、Gemini CLI、Qwen Code、
   opencode、Cursor、Cline、Roo Code、Kilo Code、OpenClaw（加 `--mcp` 还会注册 MCP 服务）；
 - 最后用生成的样片做一次端到端**自检**。
 
 在中国大陆，检测到 huggingface.co 不通时会自动改用国内镜像（也可用 `--mirror cn` 强制），所有下载仍然逐一校验
-哈希。正式公开前仓库是私有的：有权限的话，克隆后运行 `.\install.ps1 -Source .` 或 `sh install.sh --source .`。
+哈希。也可以克隆后运行 `.\install.ps1 -Source .` 或 `sh install.sh --source .`。
+
+**系统前提：** 只需 `curl` 或 `wget`（Windows 无需额外工具），不需要预装 git、Python 或 unzip。Linux/macOS 上 ffmpeg
+要先用系统包管理器安装：缺它时 `setup` 会在下载任何东西之前就告诉你要运行的命令。
 
 **交给 Agent 来装。** 对它说：*"按照 https://github.com/wblearner-mini/vidroute/blob/main/docs/AGENT_SETUP.md
 帮我装好 vidroute"*。Agent 会装好 uv 和 vidroute，把计划拿给你看，你同意后再执行。
 
-**手动安装：** `uv tool install vidroute`（或 `pipx install vidroute`），然后 `vidroute setup`。
+**手动安装：** `uv tool install https://github.com/wblearner-mini/vidroute/archive/refs/heads/main.tar.gz`（尚未发布到 PyPI），然后 `vidroute setup`。
 
 之后直接对 Agent 说"把 D:\会议\周会.mp4 整理成会议纪要"即可，或者用命令行：
 
@@ -103,7 +106,7 @@ Agent 的工作流（见 [skills/vidroute/SKILL.md](skills/vidroute/SKILL.md)）
 所有命令都支持 `--json`，在 stdout 输出一个统一外壳
 （`{"ok", "schema": "vidroute/1", "data", "warnings", "error": {"code", "message", "hint"}}`），日志走 stderr。
 退出码：`0` 成功 · `1` 用法错误 · `2` 需要安装 · `3` 需要你确认 · `4` 硬件不足 · `5` 运行失败。
-`error.hint` 永远是一条能解决问题的命令。
+`error.hint` 如果有，就是一条能解决问题的命令；用户只能自己处理时（比如文件损坏）为空，原因写在 `message` 里。
 
 ## `prepare` 的输出
 
@@ -117,6 +120,9 @@ Agent 的工作流（见 [skills/vidroute/SKILL.md](skills/vidroute/SKILL.md)）
   contact-sheets/     带时间标签的关键帧拼图 + index.md  — frames 路线
   frames/  transcript.{md,srt,json}  ocr.{md,json}  timeline.md  audio/16k.wav  drill/<区间>/
 ```
+
+`--task minutes`（或 `--diarize on`）会在转写里标出 `Speaker 1`、`Speaker 2`……；这只是按声音分组，不代表身份，也可能分错。
+关键帧预算放不下的较长镜头列在 `omitted-shots.md`，可用 `drill` 查看。
 
 所有时间戳都是**全局时间**（分段与钻取输出中也是）。证据层级：画面/声音 > 屏幕文字（OCR）> 本地转写；
 指南要求 LLM 只能凭看得见（或听得见）的证据改写转写，并保留纠错清单。
@@ -156,6 +162,7 @@ Claude + Claude Code → `frames`；DeepSeek + opencode → `text`。欢迎附�
 | Whisper small int8（其他语言默认） | 语音识别 | 99 种语言 | 375 MB | MIT |
 | faster-whisper large-v3-turbo（GPU，可选） | 语音识别 | 99 种语言 | 1.6 GB | MIT |
 | PP-OCRv6 small（RapidOCR ONNX） | 屏幕文字 | 中、英等 | 31 MB | Apache-2.0 |
+| pyannote segmentation-3.0 + CAM++ | 说话人区分 | 任意 | 34 MB | MIT + Apache-2.0 |
 | ffmpeg（自备，或由 `setup` 提供） | 解码、关键帧、转码 | — | Windows 便携包 110 MB | LGPL/GPL（gyan.dev essentials 9.0.2 为 GPLv3） |
 
 备选与实验模型（SenseVoice 粤语版、FunASR-Nano、Qwen3-ASR、PP-OCRv6 tiny）见 `vidroute models list`，

@@ -22,8 +22,8 @@
 #>
 [CmdletBinding()]
 param(
-    # What `uv tool install` installs: a PyPI name, git+https URL, wheel URL or local folder.
-    [string]$Source = $(if ($env:VIDROUTE_SOURCE) { $env:VIDROUTE_SOURCE } else { "git+https://github.com/wblearner-mini/vidroute" }),
+    # What `uv tool install` installs: a PyPI name, source archive URL (the default: needs no git), wheel URL or local folder.
+    [string]$Source = $(if ($env:VIDROUTE_SOURCE) { $env:VIDROUTE_SOURCE } else { "https://github.com/wblearner-mini/vidroute/archive/refs/heads/main.tar.gz" }),
     # Agent hosts to connect (default: every host vidroute finds); "none" connects none.
     [string[]]$AgentHost = @(),
     # auto: use mirrors in mainland China only when huggingface.co is unreachable; cn: always.

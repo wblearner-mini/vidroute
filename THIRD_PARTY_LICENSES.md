@@ -14,6 +14,7 @@ Regenerate the package tables with `python tools/license_report.py <lock files>`
 | model | status | license | license text | downloaded from |
 |---|---|---|---|---|
 | `vad-silero` | default | MIT | [Silero VAD](https://github.com/snakers4/silero-vad/blob/master/LICENSE) | sherpa-onnx releases (GitHub) |
+| `diarize-pyannote-campplus` | default | MIT (pyannote segmentation-3.0) + Apache-2.0 (3D-Speaker CAM++) | [3D-Speaker](https://github.com/modelscope/3D-Speaker/blob/main/LICENSE) | Hugging Face, hf-mirror (sherpa-onnx exports) |
 | `asr-sensevoice-small-int8` | default | FunASR Model Open Source License v1.1 | [MODEL_LICENSE](https://github.com/modelscope/FunASR/blob/main/MODEL_LICENSE) | sherpa-onnx releases (GitHub), Hugging Face, hf-mirror |
 | `asr-sensevoice-yue-int8` | alternative | Apache-2.0 (+ FunASR attribution) | [WSYue-ASR](https://huggingface.co/ASLP-lab/WSYue-ASR) | sherpa-onnx releases (GitHub) |
 | `asr-whisper-small-int8` | default (non-Chinese) | MIT | [OpenAI Whisper](https://github.com/openai/whisper/blob/main/LICENSE) | Hugging Face (`csukuangfj/sherpa-onnx-whisper-small`), hf-mirror |

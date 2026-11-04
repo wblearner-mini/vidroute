@@ -2,7 +2,7 @@
 
 1. the install plan — ffmpeg, uv, the Python runtime, worker environments and
    models — exactly as ``vidroute install`` computes it (default: speech, voice
-   activity and on-screen text, about 0.8 GB);
+   activity, on-screen text and speaker labels, about 0.85 GB);
 2. connecting vidroute to the agent hosts on this machine (skill folders and,
    with ``--mcp``, MCP servers), see :mod:`vidroute.core.integrate`;
 3. an end-to-end self-test on a generated clip (:mod:`vidroute.core.selftest`).
@@ -14,13 +14,15 @@ gets the self-test only.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from vidroute.core import integrate
 from vidroute.core.context import Ctx
 from vidroute.core.errors import NeedsInstall, RunFailed, VidrouteError
+from vidroute.core.integrate import skills
 
-DEFAULT_CAPABILITIES = ("asr", "vad", "ocr", "scene")
+DEFAULT_CAPABILITIES = ("asr", "vad", "ocr", "scene", "diarize")
 
 
 def plan(hosts: list[str] | None = None, skill: bool = True, mcp: bool = False, install: bool = True,
@@ -64,6 +66,23 @@ def _cli_args(hosts: list[str] | None, skill: bool, mcp: bool, install: bool, ca
     return "".join(parts)
 
 
+def ffmpeg_blocker(the_plan: dict[str, Any]) -> str | None:
+    """The command the user must run first: ffmpeg is missing and this plan cannot provide it (Linux, macOS)."""
+    inst = the_plan.get("install") or {}
+    item = next((i for i in inst.get("items", []) if i["kind"] == "ffmpeg" and i["action"] == "manual"), None)
+    return item["command"] if item else None
+
+
+def _warn_conflicts(integration: dict[str, Any], ctx: Ctx) -> None:
+    """Skipping a folder we did not create is right; calling the host connected would not be."""
+    for item in integration.get("items", []):
+        if item.get("kind") != "skill" or item.get("action") != "skip" or skills.is_vidroute_skill(Path(item["path"])):
+            continue
+        ctx.warn("skill_conflict", f"Not connected: {', '.join(item['hosts'])}. {item['path']} holds a different skill "
+                                   "with the same name, and it was left alone.",
+                 "vidroute setup --force --no-install" + "".join(f" --host {h}" for h in item["hosts"]))
+
+
 def execute(the_plan: dict[str, Any], ctx: Ctx, mirror: str = "auto") -> dict[str, Any]:
     from vidroute.core import doctor, selftest
     from vidroute.core.install import runner
@@ -83,6 +102,7 @@ def execute(the_plan: dict[str, Any], ctx: Ctx, mirror: str = "auto") -> dict[st
     out["integration"] = integrate.apply(the_plan["integration"], ctx)
     if not out["integration"]["ok"]:
         problems.append("connecting an agent host")
+    _warn_conflicts(the_plan["integration"], ctx)
     ffmpeg.reset_cache()
     doctor.invalidate()
     if the_plan.get("selftest"):

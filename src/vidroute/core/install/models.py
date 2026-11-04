@@ -170,26 +170,31 @@ def install_model(
                     plan.append(("archive", s))
                 elif ("files", None) not in plan:
                     plan.append(("files", None))
-            for kind, src in plan:
-                ctx.check_cancelled()
-                try:
-                    if kind == "files":
-                        _from_files(entry, file_sources, staging, dl)
-                        used = ",".join(sorted({s.type for s in file_sources}))
-                    else:
-                        _from_archive(entry, src, staging, dl, ctx)
-                        used = f"{src.type}:archive"
-                    bad = _verify_dir(entry, staging)
-                    if bad:
-                        raise RunFailed(f"verification failed: {bad}", code="checksum_mismatch")
+            # Fastest honest order: skip crawling sources first; if nothing else worked, a slow download beats none.
+            for _pass in (1, 2):
+                for kind, src in plan:
+                    ctx.check_cancelled()
+                    try:
+                        if kind == "files":
+                            _from_files(entry, file_sources, staging, dl)
+                            used = ",".join(sorted({s.type for s in file_sources}))
+                        else:
+                            _from_archive(entry, src, staging, dl, ctx)
+                            used = f"{src.type}:archive"
+                        bad = _verify_dir(entry, staging)
+                        if bad:
+                            raise RunFailed(f"verification failed: {bad}", code="checksum_mismatch")
+                        break
+                    except RunFailed as exc:
+                        if exc.code == "cancelled":
+                            raise
+                        errors.append(f"{kind}: {exc.message}")
+                        for child in staging.iterdir():
+                            shutil.rmtree(child, ignore_errors=True) if child.is_dir() else child.unlink()
+                        used = None
+                if used is not None or not dl.slow_seen or not dl.min_speed:
                     break
-                except RunFailed as exc:
-                    if exc.code == "cancelled":
-                        raise
-                    errors.append(f"{kind}: {exc.message}")
-                    for child in staging.iterdir():
-                        shutil.rmtree(child, ignore_errors=True) if child.is_dir() else child.unlink()
-                    used = None
+                dl.min_speed = 0
             if used is None:
                 raise RunFailed(
                     f"Could not install {entry.id}: every source failed.",

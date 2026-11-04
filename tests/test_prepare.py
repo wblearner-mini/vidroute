@@ -361,3 +361,35 @@ def test_prepare_with_a_plan_path_writes_next_to_the_plan(media, tmp_path, fake)
     assert env.ok, env.error
     assert Path(env.data["out_dir"]) == Path(planned.data["plan_path"]).parent
     assert env.data["plan_source"] == planned.data["plan_path"]
+
+
+# ---------------------------------------------------------- speakers, forced ASR, omitted shots
+
+
+def test_chunks_are_cut_where_the_speaker_changes():
+    turns = [{"start": 0.0, "end": 10.0, "speaker": 0}, {"start": 10.0, "end": 12.0, "speaker": 0},
+             {"start": 12.0, "end": 20.0, "speaker": 1}, {"start": 20.2, "end": 30.0, "speaker": 0}]
+    assert tr.split_at_turns([[0.0, 25.0]], turns) == [[0.0, 12.0], [12.0, 20.2], [20.2, 25.0]]
+    assert tr.split_at_turns([[0.0, 12.2]], turns) == [[0.0, 12.2]]  # a sliver stays with its neighbour
+    assert tr.split_at_turns([[1.0, 2.0]], []) == [[1.0, 2.0]]
+
+
+def test_speakers_are_numbered_by_first_appearance_and_one_voice_gets_no_label():
+    turns = [{"start": 0, "end": 5, "speaker": 7}, {"start": 5, "end": 9, "speaker": 2}, {"start": 9, "end": 12, "speaker": 7}]
+    segs = [{"start": 0.5, "end": 4, "text": "a"}, {"start": 4.8, "end": 8, "text": "b"}, {"start": 9.5, "end": 11, "text": "c"},
+            {"start": 50, "end": 51, "text": "no turn here"}]
+    assert tr.label_speakers(segs, turns) == 2
+    assert [s.get("speaker") for s in segs] == ["Speaker 1", "Speaker 2", "Speaker 1", None]
+    assert tr.spoken(segs[1]) == "Speaker 2: b" and tr.spoken(segs[3]) == "no turn here"
+    alone = [{"start": 0, "end": 3, "text": "a"}]
+    assert tr.label_speakers(alone, turns[:1]) == 1 and "speaker" not in alone[0]
+
+
+def test_budget_reports_long_shots_it_left_out():
+    w, h = 16, 16
+    cands = [kf.Candidate(float(i * 30), bytes([i * 20]) * (w * h)) for i in range(12)]
+    rules = {"frames": {"change_threshold": 10, "min_interval_seconds": 2, "omitted_min_seconds": 5}}
+    frames, stats = kf.select(cands, (w, h), rules, 4, 0.0, 360.0)
+    assert len(frames) == 4 and stats["unique_shots"] == 12 and len(stats["omitted"]) == 8
+    _, roomy = kf.select(cands, (w, h), rules, 12, 0.0, 360.0)
+    assert roomy["omitted"] == []

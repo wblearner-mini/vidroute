@@ -37,6 +37,10 @@ def installed(model_id: str, manifest: Manifest) -> bool:
         return False
 
 
+def want_speakers(diarize: str, task: str) -> bool:
+    return diarize == "on" or (diarize == "auto" and task == "minutes")
+
+
 def selector_for(language: str | None, rules: dict[str, Any]) -> str:
     if not language or language == "auto":
         return "auto"
@@ -103,6 +107,7 @@ def plan_steps(
     language: str,
     ocr_mode: str = "auto",
     force_asr: bool = False,
+    diarize: str = "auto",
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     loc = rules["local"]
     est = rules["estimates"]
@@ -160,6 +165,16 @@ def plan_steps(
                                hint="vidroute install --capability asr", tried=choice["tried"]))
             needs.append({"capability": "asr", "why": "speech must be transcribed for this route",
                           "hint": "vidroute install --capability asr"})
+        if choice["selected"] and want_speakers(diarize, task):
+            model = "diarize-pyannote-campplus"
+            if installed(model, manifest):
+                steps.append(_step("diarize", model, "label who speaks when (Speaker 1, 2, ...) in the transcript",
+                                   est_seconds=speech_seconds * float(est.get("diarize_rtf", 0.1))))
+            else:
+                steps.append(_step("diarize", None, "speaker labels need the diarization model", status="needs_install",
+                                   hint="vidroute install --capability diarize"))
+                needs.append({"capability": "diarize", "why": "no speaker labels in the transcript without it",
+                              "hint": "vidroute install --capability diarize", "optional": "true"})
 
     # --------------------------------------------------------------- pictures
     frames = decision.get("frames")

@@ -73,6 +73,10 @@ class DownloadResult:
     seconds: float
 
 
+class TooSlow(RunFailed):
+    """The source works but crawls."""
+
+
 class Downloader:
     def __init__(
         self,
@@ -82,6 +86,8 @@ class Downloader:
         timeout: float = 30.0,
         backoff: float = 1.5,
         part_dir: Path | None = None,
+        min_speed: float = 50 * 1024,
+        speed_window: float = 30.0,
     ) -> None:
         self.allowed = tuple(d.lower() for d in allowed_domains)
         self.ctx = ctx or Ctx()
@@ -89,6 +95,11 @@ class Downloader:
         self.timeout = timeout
         self.backoff = backoff
         self.part_dir = part_dir or paths.downloads_dir()
+        # A source slower than min_speed (bytes/s) over speed_window seconds is left for the next one: a trickle never
+        # hits the socket timeout, and 240 MB at 20 KB/s takes hours. 0 turns the check off (see install_model).
+        self.min_speed = min_speed
+        self.speed_window = speed_window
+        self.slow_seen = False
         self.opener = urllib.request.build_opener(_CheckedRedirects(self.allowed))
 
     # ------------------------------------------------------------- public
@@ -111,6 +122,11 @@ class Downloader:
                 except ChecksumMismatch as exc:
                     errors.append(f"{url}: {exc.message}")
                     break  # bad bytes from this mirror: do not retry it
+                except TooSlow as exc:
+                    self.slow_seen = True
+                    errors.append(f"{url}: {exc.message}")
+                    self.ctx.progress("download", None, None, f"{label}: {exc.message}, trying the next source")
+                    break  # partial data is kept: the next mirror resumes it
                 except (OSError, urllib.error.URLError, TimeoutError, http.client.HTTPException, RunFailed) as exc:
                     msg = getattr(exc, "message", None) or str(getattr(exc, "reason", exc))
                     errors.append(f"{url} (attempt {attempt}): {msg}")
@@ -174,6 +190,7 @@ class Downloader:
                 with part.open(mode) as fh:
                     done = have
                     last_report = 0.0
+                    window_start, window_bytes = time.monotonic(), 0
                     while True:
                         if self.ctx.cancelled:
                             fh.flush()
@@ -185,6 +202,13 @@ class Downloader:
                         done += len(chunk)
                         downloaded += len(chunk)
                         now = time.monotonic()
+                        window_bytes += len(chunk)
+                        if self.min_speed and now - window_start >= self.speed_window:
+                            speed = window_bytes / (now - window_start)
+                            if speed < self.min_speed:
+                                fh.flush()
+                                raise TooSlow(f"too slow ({speed / 1024:.0f} KB/s)", code="too_slow")
+                            window_start, window_bytes = now, 0
                         if now - last_report > 0.5:
                             self.ctx.progress("download", done, total, label)
                             last_report = now

@@ -107,6 +107,15 @@ def inspect(target: Path) -> dict[str, Any]:
     return info
 
 
+def is_vidroute_skill(target: Path) -> bool:
+    """A copy of this skill (say, copied by hand), as opposed to another skill that happens to use the folder name."""
+    try:
+        text = (target / "SKILL.md").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    return "name: vidroute" in text and (target / "scripts" / "vidroute").is_file()
+
+
 def _swap(staging: Path, target: Path) -> None:
     old = target.with_name(f"{target.name}.old-{os.getpid()}")
     if target.exists():

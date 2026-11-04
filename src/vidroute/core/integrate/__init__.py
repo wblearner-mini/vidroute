@@ -306,7 +306,8 @@ def status(which: Which = proc.which) -> dict[str, Any]:
             if target.exists():
                 st = skills.inspect(target)
                 skill = {"path": str(target), "managed": st["ours"], "current": st["current"],
-                         "version": st.get("version"), "python_ok": st.get("python_ok")}
+                         "version": st.get("version"), "python_ok": st.get("python_ok"),
+                         "is_vidroute": skills.is_vidroute_skill(target)}
                 break
         if skill is None and h.id == "claude-code" and plugin:
             skill = {"path": "plugin vidroute", "managed": False, "current": True, "version": None, "plugin": True}

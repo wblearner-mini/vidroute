@@ -21,8 +21,8 @@ vidroute's only prerequisite is [uv](https://docs.astral.sh/uv/); uv brings its 
    Your shell keeps its old PATH, so call uv by its full path afterwards: Windows
    `%USERPROFILE%\.local\bin\uv.exe` or `%LOCALAPPDATA%\Microsoft\WinGet\Links\uv.exe`, elsewhere
    `~/.local/bin/uv`.
-2. `uv tool install git+https://github.com/wblearner-mini/vidroute`
-   (needs GitHub access while the repository is private; in mainland China set
+2. `uv tool install https://github.com/wblearner-mini/vidroute/archive/refs/heads/main.tar.gz`
+   (needs no git; in mainland China set
    `UV_DEFAULT_INDEX=https://mirrors.aliyun.com/pypi/simple/` for this command).
 3. vidroute is now in `~/.local/bin` (Windows: `%USERPROFILE%\.local\bin\vidroute.exe`). Use that full
    path for the rest of this session.
@@ -40,10 +40,12 @@ Run `vidroute setup --json`. Useful options:
 - `--mcp` also registers the MCP server (the skill alone is enough for all of these hosts).
 - `--mirror cn` uses mirrors in mainland China (picked automatically when huggingface.co is blocked).
 
-It exits **3** and downloads nothing. `data.plan` holds:
+It downloads nothing. If ffmpeg is missing and cannot be installed here (Linux, macOS) it exits **2** with
+`ffmpeg_missing`: tell the user `error.hint`, and run this step again once it is installed. Otherwise it exits **3**.
+`data.plan` holds:
 
 - `install.items`: ffmpeg (when missing), uv, the Python runtime, worker environments and models, with
-  sizes, sources and licenses; `install.total_download_mb` is the total (about 0.8 GB the first time).
+  sizes, sources and licenses; `install.total_download_mb` is the total (about 0.85 GB the first time).
 - `integration.items`: the skill folders and MCP entries it will create or update. These are in the
   hosts' own configuration folders, outside vidroute's data folder.
 
@@ -55,8 +57,6 @@ Summarize the plan for the user in a few lines and **ask**. Only after a yes, ru
 - Exit 0: `data.selftest.status` is `passed` (a generated clip went through transcription, OCR and
   keyframes). Tell the user `data.next_steps`: usually starting a new session of each host, so it loads
   the skill.
-- Exit 2 with `ffmpeg_missing` (Linux, macOS): ffmpeg comes from the system package manager; tell the
-  user `error.hint` (for example `sudo apt install ffmpeg`), then run `vidroute setup --json` again.
 - Exit 5: report `error.message`; running the same command again resumes where it stopped.
 
 `vidroute doctor --json` shows the state any time: `data.capabilities` (what runs locally) and

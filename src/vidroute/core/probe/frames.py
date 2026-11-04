@@ -122,7 +122,7 @@ def text_stats_from_boxes(results: list[dict]) -> dict[str, float | int]:
         area = 0.0
         for x0, y0, x1, y1 in r.get("boxes") or []:
             bw, bh = x1 - x0, y1 - y0
-            if bh <= 0 or bw <= 0 or bh > 0.2 * h or bw < 0.02 * w or bw * bh > 0.3 * w * h:
+            if bh <= 0 or bw <= 0 or bh > 0.4 * h or bw < 0.02 * w or bw * bh > 0.3 * w * h:
                 continue  # whole-frame blobs, slivers and specks are not lines of text
             area += bw * bh / float(w * h)
         areas.append(min(1.0, area))

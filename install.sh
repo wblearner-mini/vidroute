@@ -15,7 +15,8 @@ set -eu
 UV_VERSION=0.13.4  # same as vidroute's own bootstrap; hashes: GitHub release digests and PyPI (2026-10-23)
 PYPI_MIRROR=https://mirrors.aliyun.com/pypi/simple/
 PYTHON_MIRROR=https://registry.npmmirror.com/-/binary/python-build-standalone/
-source_spec=${VIDROUTE_SOURCE:-git+https://github.com/wblearner-mini/vidroute}
+# A source archive, not a git URL: uv would need a git executable, which a fresh machine often lacks.
+source_spec=${VIDROUTE_SOURCE:-https://github.com/wblearner-mini/vidroute/archive/refs/heads/main.tar.gz}
 mirror=${VIDROUTE_MIRROR:-auto}
 yes=${VIDROUTE_YES:-0}
 setup=1
@@ -57,10 +58,29 @@ case "$(uname -s)-$(uname -m)" in
   *) die "unsupported platform $(uname -s) $(uname -m); install uv yourself, then: uv tool install $source_spec" ;;
 esac
 
+# Install command for a system package, for error messages.
+pkg_hint() {
+  sudo=sudo; [ "$(id -u)" = 0 ] && sudo=""
+  for pm in "apt-get install -y" "dnf install -y" "yum install -y" "pacman -S --noconfirm" "zypper install -y" "apk add"; do
+    if command -v "${pm%% *}" >/dev/null 2>&1; then
+      printf '%s\n' "${sudo:+$sudo }$pm $*"; return 0
+    fi
+  done
+  if command -v brew >/dev/null 2>&1; then printf 'brew install %s\n' "$*"; else printf 'install %s with your package manager\n' "$*"; fi
+}
+
+# Everything this script needs from the system, checked before any download.
+command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 \
+  || die "this script needs curl or wget to download uv. Install one, then run it again: $(pkg_hint curl ca-certificates)"
+
+# A stalled transfer must fail and move on to the next source instead of hanging without output:
+# below 10 KB/s for 20 seconds counts as stalled, however large the file.
 fetch() {  # url file
-  if command -v curl >/dev/null 2>&1; then curl -fsSL --retry 2 -o "$2" "$1"
-  elif command -v wget >/dev/null 2>&1; then wget -q -O "$2" "$1"
-  else die "neither curl nor wget is installed"; fi
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL --retry 2 --connect-timeout 10 --speed-limit 10240 --speed-time 20 -o "$2" "$1"
+  else
+    wget -q -T 20 -t 3 -O "$2" "$1"
+  fi
 }
 reachable() {
   if command -v curl >/dev/null 2>&1; then curl -s -o /dev/null -I --max-time 4 "$1"
@@ -71,7 +91,39 @@ sha256_of() {
   else shasum -a 256 "$1" | cut -d' ' -f1; fi
 }
 verified() {  # url sha file
-  fetch "$1" "$3" && [ "$(sha256_of "$3")" = "$2" ] || { say "  $1: download failed or SHA-256 mismatch"; return 1; }
+  fetch "$1" "$3" && [ "$(sha256_of "$3")" = "$2" ] || { say "  $1: download failed, stalled or SHA-256 mismatch"; return 1; }
+}
+
+# A wheel is a zip. Extract one member with whatever is here: unzip, python3, or (nothing else on a fresh
+# machine) the zip's local headers read with od and its deflate stream inflated by gzip. The wheel's SHA-256
+# is already checked and the caller runs the extracted binary, so a failure here cannot go unnoticed.
+le() { od -An -tu1 -j "$2" -N "$3" "$1" | awk '{ v = 0; for (i = NF; i >= 1; i--) v = v * 256 + $i; print v }'; }
+zip_member() {  # zip member out
+  if command -v unzip >/dev/null 2>&1; then unzip -p "$1" "$2" > "$3"; return; fi
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import sys, zipfile; sys.stdout.buffer.write(zipfile.ZipFile(sys.argv[1]).read(sys.argv[2]))' "$1" "$2" > "$3"
+    return
+  fi
+  off=0
+  size=$(wc -c < "$1")
+  while [ "$off" -lt "$size" ] && [ "$(le "$1" "$off" 4)" = 67324752 ]; do  # "PK\3\4"
+    flags=$(le "$1" $((off + 6)) 2); method=$(le "$1" $((off + 8)) 2); csize=$(le "$1" $((off + 18)) 4)
+    nlen=$(le "$1" $((off + 26)) 2); xlen=$(le "$1" $((off + 28)) 2)
+    [ $((flags & 8)) = 0 ] || return 1  # sizes are stored after the data: cannot walk this zip
+    name=$(tail -c +$((off + 31)) "$1" | head -c "$nlen")
+    start=$((off + 30 + nlen + xlen))
+    if [ "$name" = "$2" ]; then
+      case $method in
+        0) tail -c +$((start + 1)) "$1" | head -c "$csize" > "$3" ;;
+        8) { printf '\037\213\010\000\000\000\000\000\000\000'; tail -c +$((start + 1)) "$1" | head -c "$csize"; } \
+             | gzip -dc > "$3" 2>/dev/null || true ;;  # no gzip trailer: gzip complains after writing everything
+        *) return 1 ;;
+      esac
+      return 0
+    fi
+    off=$((start + csize))
+  done
+  return 1
 }
 
 find_uv() {
@@ -93,20 +145,25 @@ install_uv() {  # china_first
     case $src in
       github)
         say "downloading uv $UV_VERSION from $github"
-        if verified "$github" "$tar_sha" "$tmp/uv.tar.gz" && tar -xzf "$tmp/uv.tar.gz" -C "$tmp"; then
+        if verified "$github" "$tar_sha" "$tmp/uv.tar.gz" && tar -xzf "$tmp/uv.tar.gz" -C "$tmp" \
+            && "$tmp/${tarball%.tar.gz}/uv" --version >/dev/null 2>&1; then
           cp "$tmp/${tarball%.tar.gz}/uv" "$tmp/${tarball%.tar.gz}/uvx" "$dest/"; break; fi ;;
       pypi|aliyun)
         base=https://files.pythonhosted.org; [ "$src" = aliyun ] && base=https://mirrors.aliyun.com/pypi
         say "downloading uv $UV_VERSION from $base"
         if verified "$base/$wheel" "$wheel_sha" "$tmp/uv.whl"; then
-          if command -v unzip >/dev/null 2>&1; then unzip -q -o "$tmp/uv.whl" "uv-$UV_VERSION.data/scripts/*" -d "$tmp"
-          else python3 -m zipfile -e "$tmp/uv.whl" "$tmp" >/dev/null 2>&1 || continue; fi
-          cp "$tmp/uv-$UV_VERSION.data/scripts/uv" "$tmp/uv-$UV_VERSION.data/scripts/uvx" "$dest/"; break; fi ;;
+          if zip_member "$tmp/uv.whl" "uv-$UV_VERSION.data/scripts/uv" "$tmp/uv" && chmod +x "$tmp/uv" \
+              && "$tmp/uv" --version >/dev/null 2>&1; then
+            cp "$tmp/uv" "$dest/uv"; break
+          fi
+          say "  could not unpack the uv wheel from $base; trying the next source"
+        fi ;;
     esac
   done
   rm -rf "$tmp"
-  [ -f "$dest/uv" ] || die "could not download uv; install it (https://docs.astral.sh/uv/) and run this script again"
-  chmod +x "$dest/uv" "$dest/uvx"
+  [ -f "$dest/uv" ] || die "could not get uv from any source (see the lines above). If every download failed, check the network and CA certificates ($(pkg_hint ca-certificates)); or install uv yourself (https://docs.astral.sh/uv/) and run this script again"
+  chmod +x "$dest/uv"
+  [ ! -f "$dest/uvx" ] || chmod +x "$dest/uvx"
   printf '%s\n' "$dest/uv"
 }
 

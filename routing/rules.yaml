@@ -42,6 +42,9 @@ frames:
   base_interval_seconds: 4
   min_interval_seconds: 2
   max_interval_seconds: 30
+  # A shot on screen at least this long that the frame budget left out is
+  # reported (warning + omitted-shots.md), so nobody takes the frames as complete.
+  omitted_min_seconds: 5
   # Keyframe selection analyses at most this many tiny candidate thumbnails
   # (the video's own keyframes when they are dense enough, otherwise an evenly
   # decoded grid of at most 4 per second); see core/prepare/keyframes.py.
@@ -94,6 +97,7 @@ local:
 estimates:
   transcript_tokens_per_speech_second: 3.5
   ocr_tokens_per_frame: 120
+  diarize_rtf: 0.1
   timeline_overhead_tokens: 800
   asr_rtf:
     cpu-lite: 0.25

@@ -29,7 +29,7 @@ def test_setup_asks_first_then_connects_the_host(user_home, monkeypatch):
 def test_default_plan_installs_speech_voice_and_screen_text(user_home, monkeypatch):
     plan = setupmod.plan(hosts=["none"], selftest=False)
     caps = {i.get("capability") for i in plan["install"]["items"] if i["kind"] == "model"}
-    assert caps == {"asr", "vad", "ocr"} and plan["integration"]["hosts"] == []
+    assert caps == {"asr", "vad", "ocr", "diarize"} and plan["integration"]["hosts"] == []
     assert plan["confirm_command"] == "vidroute setup --host none --no-selftest --yes"
 
 
@@ -73,3 +73,20 @@ def test_selftest_runs_the_pipeline_on_a_generated_clip(monkeypatch):
     assert res["status"] == "passed", res
     assert {c["check"] for c in res["checks"]} >= {"outputs", "keyframes"}
     assert res["seconds"] < 120
+
+
+def test_setup_stops_before_downloading_when_ffmpeg_cannot_be_provided(user_home, monkeypatch):
+    monkeypatch.setattr(setupmod, "ffmpeg_blocker", lambda plan: "sudo apt install ffmpeg")
+    monkeypatch.setattr(setupmod, "execute", lambda *a, **k: pytest.fail("must not start installing"))
+    for yes in (False, True):
+        env = api.setup(hosts=["none"], yes=yes, ctx=Ctx())
+        assert not env.ok and env.error["code"] == "ffmpeg_missing" and int(env.exit_code) == 2
+        assert env.error["hint"] == "sudo apt install ffmpeg" and env.data["plan"]
+
+
+def test_ffmpeg_blocker_only_for_a_manual_ffmpeg_item():
+    assert setupmod.ffmpeg_blocker({"install": None}) is None
+    download = {"install": {"items": [{"kind": "ffmpeg", "action": "download"}]}}
+    assert setupmod.ffmpeg_blocker(download) is None
+    manual = {"install": {"items": [{"kind": "ffmpeg", "action": "manual", "command": "brew install ffmpeg"}]}}
+    assert setupmod.ffmpeg_blocker(manual) == "brew install ffmpeg"

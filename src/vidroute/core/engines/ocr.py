@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import os
 import tempfile
 from pathlib import Path
 from typing import Any
 
 from vidroute.core.context import Ctx
 from vidroute.core.engines.base import Engine, WorkerPool
+from vidroute.core.util.limits import usable_cpus
 
 
 class RapidOcr(Engine):
@@ -19,12 +21,19 @@ class RapidOcr(Engine):
         rec = next(f.path for f in self.model.files if "_rec_" in f.path)
         return self.path(det), self.path(rec)
 
+    @staticmethod
+    def _load_params(det: str, rec: str) -> dict[str, Any]:
+        params: dict[str, Any] = {"det": det, "rec": rec}
+        if usable_cpus() < (os.cpu_count() or 1):  # onnxruntime would start a thread per CPU of the host
+            params["num_threads"] = usable_cpus()
+        return params
+
     def recognize(self, ctx: Ctx, pool: WorkerPool, images: list[Path], min_score: float = 0.5) -> list[dict[str, Any]]:
         if not images:
             return []
         client = self.client(pool)
         det, rec = self._files()
-        key = client.call("ocr_load", {"det": det, "rec": rec})["key"]
+        key = client.call("ocr_load", self._load_params(det, rec))["key"]
         res = client.call("ocr", {"key": key, "images": [str(p) for p in images], "min_score": min_score})
         return res["results"]
 
@@ -34,7 +43,7 @@ class RapidOcr(Engine):
             return []
         client = self.client(pool)
         det, rec = self._files()
-        key = client.call("ocr_load", {"det": det, "rec": rec})["key"]
+        key = client.call("ocr_load", self._load_params(det, rec))["key"]
         return client.call("detect", {"key": key, "images": [str(p) for p in images]})["results"]
 
     def smoke_test(self, ctx: Ctx) -> dict[str, Any]:

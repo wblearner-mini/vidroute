@@ -6,6 +6,7 @@ logic: they parse arguments, call a function here and render the envelope.
 
 from __future__ import annotations
 
+import errno
 import functools
 import traceback
 from typing import Any, Callable
@@ -17,6 +18,19 @@ from vidroute.core.context import Ctx
 from vidroute.core.envelope import Envelope, failure, success
 from vidroute.core.errors import RunFailed, VidrouteError
 from vidroute.core.log import get_logger
+
+
+def _unexpected(exc: Exception) -> RunFailed:
+    """Name the problem when it is the machine's (full disk, no permission); never send people on a wild goose chase."""
+    if isinstance(exc, OSError):
+        where = exc.filename or "a file"
+        if exc.errno == errno.ENOSPC:
+            return RunFailed(f"The disk is full (writing {where}).", code="disk_full", hint="vidroute clean")
+        if exc.errno in (errno.EACCES, errno.EPERM, errno.EROFS):
+            return RunFailed(f"No permission to write {where}: {exc.strerror}.", code="not_writable",
+                             hint="vidroute config set out_root <a folder you can write to>")
+    return RunFailed(f"Unexpected error: {type(exc).__name__}: {exc}. Run again with -v for details; this may be a "
+                     "bug, please report it: https://github.com/wblearner-mini/vidroute/issues")
 
 
 def command(fn: Callable[..., dict[str, Any]]) -> Callable[..., Envelope]:
@@ -33,11 +47,7 @@ def command(fn: Callable[..., dict[str, Any]]) -> Callable[..., Envelope]:
             return failure(RunFailed("Interrupted", code="cancelled"), warnings=ctx.warnings)
         except Exception as exc:  # noqa: BLE001 - last-resort envelope
             get_logger().debug("unhandled error:\n%s", traceback.format_exc())
-            err = RunFailed(
-                f"Unexpected error: {type(exc).__name__}: {exc}",
-                hint="vidroute doctor --refresh",
-            )
-            return failure(err, warnings=ctx.warnings)
+            return failure(_unexpected(exc), warnings=ctx.warnings)
         return success(data, warnings=ctx.warnings)
 
     return wrapper
@@ -137,7 +147,7 @@ def setup(
 ) -> dict[str, Any]:
     """Install plan + connecting agent hosts + self-test, behind one confirmation (exit 3 without ``yes``)."""
     from vidroute.core import setup as _setup
-    from vidroute.core.errors import InsufficientHardware, NeedsConfirmation
+    from vidroute.core.errors import InsufficientHardware, NeedsConfirmation, NeedsInstall
 
     mirror = mirror or _config.get("mirror") or "auto"
     the_plan = _setup.plan(hosts, skill, mcp, install, capabilities, profile, models, mirror, accept_licenses,
@@ -145,6 +155,11 @@ def setup(
     inst = the_plan["install"]
     if dry_run:
         return {"plan": the_plan, "executed": False}
+    blocker = _setup.ffmpeg_blocker(the_plan)
+    if blocker:  # say so now, not after a long download
+        raise NeedsInstall("Install ffmpeg first, then run vidroute setup again: vidroute cannot read videos without it "
+                           "and cannot install it here. Nothing has been downloaded or changed.",
+                           code="ffmpeg_missing", hint=blocker, data={"plan": the_plan})
     if inst and inst["license_acceptance_required"]:
         raise NeedsConfirmation(
             "Some models have restricted licenses that must be accepted explicitly: "
@@ -331,13 +346,15 @@ def probe(video: str, refresh: bool = False, *, ctx: Ctx) -> dict[str, Any]:
 @command
 def plan(video: str, llm: str | None, host: str | None = None, task: str = "summary", prefer: str = "quality",
          language: str = "auto", modalities: str | None = None, audio_in_video: str | None = None, ocr: str = "auto",
-         route: str = "auto", force_asr: bool = False, out: str | None = None, *, ctx: Ctx) -> dict[str, Any]:
+         route: str = "auto", force_asr: bool = False, out: str | None = None, diarize: str = "auto", *,
+         ctx: Ctx) -> dict[str, Any]:
     from pathlib import Path
 
     from vidroute.core.plan import make_plan
     from vidroute.core.util.jsonio import write_json_atomic
 
-    result = make_plan(video, llm, host, task, prefer, language, modalities, audio_in_video, ocr, route, force_asr, ctx)
+    result = make_plan(video, llm, host, task, prefer, language, modalities, audio_in_video, ocr, route, force_asr, ctx,
+                       diarize=diarize)
     if out:
         target = Path(out).expanduser().resolve() / paths.video_slug(Path(video)) / "plan.json"
         write_json_atomic(target, result)
@@ -349,24 +366,24 @@ def plan(video: str, llm: str | None, host: str | None = None, task: str = "summ
 def prepare(video: str, plan: str | None = None, route: str = "auto", out: str | None = None,
             accept_raw_video_handoff: bool = False, llm: str | None = None, host: str | None = None,
             task: str = "summary", prefer: str = "quality", language: str = "auto", modalities: str | None = None,
-            audio_in_video: str | None = None, ocr: str = "auto", force_asr: bool = False, *,
+            audio_in_video: str | None = None, ocr: str = "auto", force_asr: bool = False, diarize: str = "auto", *,
             ctx: Ctx) -> dict[str, Any]:
     from vidroute.core.prepare import prepare as _prepare
 
     return _prepare(video, plan, route, out, accept_raw_video_handoff, llm, host, task, prefer, language, modalities,
-                    audio_in_video, ocr, force_asr, ctx=ctx)
+                    audio_in_video, ocr, force_asr, ctx=ctx, diarize=diarize)
 
 
 @command
 def run(video: str, llm: str | None = None, host: str | None = None, task: str = "summary", prefer: str = "quality",
         language: str = "auto", modalities: str | None = None, audio_in_video: str | None = None, ocr: str = "auto",
         route: str = "auto", force_asr: bool = False, out: str | None = None, accept_raw_video_handoff: bool = False,
-        *, ctx: Ctx) -> dict[str, Any]:
+        diarize: str = "auto", *, ctx: Ctx) -> dict[str, Any]:
     from vidroute.core.prepare import run as _run
 
     return _run(video, llm, host=host, task=task, prefer=prefer, language=language, modalities=modalities,
                 audio_in_video=audio_in_video, ocr=ocr, route=route, force_asr=force_asr, out=out,
-                accept_raw_video_handoff=accept_raw_video_handoff, ctx=ctx)
+                accept_raw_video_handoff=accept_raw_video_handoff, diarize=diarize, ctx=ctx)
 
 
 @command

@@ -15,7 +15,7 @@ from vidroute.core.util.jsonio import read_json
 from vidroute.core.util.yamlish import YamlError, load_file
 
 MARKER = ".vidroute-installed.json"
-CAPABILITIES = ("asr", "vad", "ocr", "scene", "vlm")
+CAPABILITIES = ("asr", "vad", "ocr", "scene", "diarize", "vlm")
 
 
 @dataclass(frozen=True)

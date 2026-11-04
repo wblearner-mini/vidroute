@@ -87,7 +87,7 @@ def test_manifest_integrity():
 
 def test_every_capability_has_a_cpu_default_path():
     manifest = load_file(ROOT / "models" / "manifest.yaml")
-    for cap in ("asr", "vad", "ocr", "scene"):
+    for cap in ("asr", "vad", "ocr", "scene", "diarize"):
         ok = [
             m for m in manifest["models"]
             if m["capability"] == cap and m["status"] == "default" and "cpu-lite" in m["tiers"] and not m.get("requires_gpu")

@@ -103,6 +103,8 @@ short mention to the user when they change the result (e.g. `unverified_profile`
 - **Timestamps are global** everywhere (also inside drill output and segments: `segments.json` gives each
   part's `offset_sec`).
 - **Do not guess what you cannot see or hear.** Unknown speaker → "a speaker"; unreadable → "items to verify".
+- **`Speaker 1`, `Speaker 2`** (with `--task minutes` or `--diarize on`) are machine-made voice groups, not identities.
+- **The keyframes may not show everything.** If `omitted-shots.md` exists, it lists shots without a frame: `drill` a span before making claims about it.
 - **Do not debug vidroute.** If an output looks wrong (e.g. the transcript does not fit the pictures), say so
   in "items to verify" and tell the user, citing `SUMMARY.md` and the warnings; do not inspect vidroute's
   code, models or environments.

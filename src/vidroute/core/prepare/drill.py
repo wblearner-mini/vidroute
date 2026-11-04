@@ -28,6 +28,7 @@ from vidroute.core.prepare import timeline
 from vidroute.core.prepare import transcript as tr
 from vidroute.core.prepare.layout import Layout, reset_dir
 from vidroute.core.probe import probe as run_probe
+from vidroute.core.util.filelock import exclusive
 from vidroute.core.util.jsonio import read_json, write_json_atomic
 from vidroute.core.util.timefmt import fmt_compact, fmt_ts, parse_range
 
@@ -84,6 +85,12 @@ def drill(out_dir: str | Path, range_text: str, fps: float | None = None, asr: b
           max_frames: int | None = None, ctx: Ctx | None = None) -> dict[str, Any]:
     ctx = ctx or Ctx()
     main, plan, video = _open(out_dir)
+    with exclusive(main.work / "lock", ctx, f"{main.root.name} is being prepared by another vidroute run"):
+        return _drill(main, plan, video, range_text, fps, asr, ocr, max_frames, ctx)
+
+
+def _drill(main: Layout, plan: dict[str, Any], video: Path, range_text: str, fps: float | None, asr: bool, ocr: bool,
+           max_frames: int | None, ctx: Ctx) -> dict[str, Any]:
     rules = load_rules()
     info = run_probe(video, ctx)
     duration = float(info["duration"] or 0)

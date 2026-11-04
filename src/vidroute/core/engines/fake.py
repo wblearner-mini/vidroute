@@ -8,6 +8,7 @@ placeholder text, OCR returns a placeholder line per frame. Output files say
 
 from __future__ import annotations
 
+import wave
 from pathlib import Path
 from typing import Any
 
@@ -59,4 +60,22 @@ class FakeOcr(Engine):
         return {"status": "passed", "detail": "fake engine"}
 
 
-FAKE_CLASSES: dict[str, type[Engine]] = {"asr": FakeAsr, "ocr": FakeOcr, "vad": FakeVad}
+class FakeDiarize(Engine):
+    """Two speakers taking 10-second turns."""
+
+    capability = "diarize"
+
+    def probe(self) -> dict[str, Any]:
+        return {"id": self.id, "installed": True, "fake": True}
+
+    def diarize(self, ctx: Ctx, pool: WorkerPool, wav: Path, num_speakers: int | None = None) -> list[dict[str, Any]]:
+        with wave.open(str(wav), "rb") as w:
+            duration = w.getnframes() / float(w.getframerate())
+        return [{"start": float(t), "end": min(float(t + 10), duration), "speaker": (t // 10) % 2}
+                for t in range(0, max(1, int(duration)), 10)]
+
+    def smoke_test(self, ctx: Ctx) -> dict[str, Any]:
+        return {"status": "passed", "detail": "fake engine"}
+
+
+FAKE_CLASSES: dict[str, type[Engine]] = {"asr": FakeAsr, "diarize": FakeDiarize, "ocr": FakeOcr, "vad": FakeVad}

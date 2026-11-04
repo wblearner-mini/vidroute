@@ -14,6 +14,7 @@ the raw video to the LLM provider refuse to run without
 from __future__ import annotations
 
 import os
+import shutil
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -21,9 +22,16 @@ from typing import Any
 
 from vidroute.core import paths
 from vidroute.core.context import Ctx
-from vidroute.core.engines import WorkerPool, fake_mode
-from vidroute.core.errors import NeedsConfirmation, NeedsInstall, NotFoundError, RunFailed, UsageError
-from vidroute.core.install.manifest import Manifest, load_manifest
+from vidroute.core.engines import WorkerPool, fake_mode, get_engine
+from vidroute.core.errors import (
+    NeedsConfirmation,
+    NeedsInstall,
+    NotFoundError,
+    RunFailed,
+    UsageError,
+    VidrouteError,
+)
+from vidroute.core.install.manifest import MARKER, Manifest, load_manifest
 from vidroute.core.plan import PLAN_SCHEMA, ROUTES, make_plan
 from vidroute.core.plan.local import asr_candidates, first_installed, installed
 from vidroute.core.plan.rules import load_rules
@@ -35,10 +43,11 @@ from vidroute.core.prepare import timeline
 from vidroute.core.prepare import transcript as tr
 from vidroute.core.prepare.layout import Layout, StepState, fingerprint, layout_for, remove_dir, reset_dir
 from vidroute.core.probe import probe as run_probe
+from vidroute.core.util.filelock import exclusive
 from vidroute.core.util.jsonio import read_json, write_json_atomic
 from vidroute.core.util.timefmt import fmt_ts
 
-PIPELINE_VERSION = 1  # bump to invalidate cached steps after an incompatible change
+PIPELINE_VERSION = 2  # bump to invalidate cached steps after an incompatible change
 
 
 def _same_file(a: str | Path, b: Path) -> bool:
@@ -75,10 +84,10 @@ def _plan_for(video: Path, layout: Layout, plan_path: str | None, route: str, re
         kw = {"llm": req["llm"], "host": req["host"], "task": req["task"], "prefer": req["prefer"],
               "language": req["language"], "modalities": req.get("modalities"),
               "audio_in_video": req.get("audio_in_video"), "ocr": req.get("ocr", "auto"),
-              "force_asr": bool(req.get("force_asr"))}
+              "force_asr": bool(req.get("force_asr")), "diarize": req.get("diarize", "auto")}
     plan = make_plan(video, kw.get("llm"), kw.get("host"), kw.get("task", "summary"), kw.get("prefer", "quality"),
                      kw.get("language", "auto"), kw.get("modalities"), kw.get("audio_in_video"), kw.get("ocr", "auto"),
-                     route, bool(kw.get("force_asr")), ctx)
+                     route, bool(kw.get("force_asr")), ctx, diarize=kw.get("diarize", "auto"))
     return plan, "new"
 
 
@@ -99,6 +108,7 @@ def prepare(
     force_asr: bool = False,
     replan: bool = False,
     ctx: Ctx | None = None,
+    diarize: str = "auto",
 ) -> dict[str, Any]:
     ctx = ctx or Ctx()
     started = time.monotonic()
@@ -115,8 +125,34 @@ def prepare(
         if plan_dir.name == paths.video_slug(path):
             out = str(plan_dir.parent)
     layout = layout_for(path, out)
+    _warn_broken_models(ctx)
     kw = {"llm": llm, "host": host, "task": task, "prefer": prefer, "language": language, "modalities": modalities,
-          "audio_in_video": audio_in_video, "ocr": ocr, "force_asr": force_asr}
+          "audio_in_video": audio_in_video, "ocr": ocr, "force_asr": force_asr, "diarize": diarize}
+    failed = False
+    try:
+        with exclusive(layout.work / "lock", ctx, f"{layout.root.name} is being prepared by another vidroute run"):
+            try:
+                return _prepare_in(path, layout, plan, route, replan, kw, accept_raw_video_handoff, started, ctx)
+            except BaseException:
+                failed = True
+                raise
+    finally:
+        if failed:  # only the run that held the lock: a waiter must not touch the folder another run is filling
+            _discard_if_empty(layout)
+
+
+def _discard_if_empty(layout: Layout) -> None:
+    """A run that failed before producing anything (say, an unreadable file) leaves no folder behind."""
+    try:
+        if any(p.is_file() and p != layout.work / "lock" for p in layout.root.rglob("*")):
+            return
+        shutil.rmtree(layout.root, ignore_errors=True)
+    except OSError:
+        pass
+
+
+def _prepare_in(path: Path, layout: Layout, plan: str | None, route: str, replan: bool, kw: dict[str, Any],
+                accept_raw_video_handoff: bool, started: float, ctx: Ctx) -> dict[str, Any]:
     the_plan, source = _plan_for(path, layout, plan, route, replan, kw, ctx)
     if accept_raw_video_handoff:  # consent given: the planner's "ask the user first" warning is settled
         ctx.warnings[:] = [w for w in ctx.warnings if w.get("code") != "raw_video_handoff"]
@@ -141,7 +177,7 @@ def prepare(
             req = the_plan["request"]
             the_plan = make_plan(path, req["llm"], req["host"], req["task"], req["prefer"], req["language"],
                                  req.get("modalities"), req.get("audio_in_video"), req.get("ocr", "auto"), "frames",
-                                 bool(req.get("force_asr")), ctx)
+                                 bool(req.get("force_asr")), ctx, diarize=req.get("diarize", "auto"))
             the_plan["delivery"]["degraded_from"] = [
                 {"route": chosen, "why": f"prepared files exceed the limit: {exc.message}"}] + [
                 g for g in the_plan["delivery"]["degraded_from"] if g["route"] != chosen]
@@ -159,6 +195,18 @@ def prepare(
         raise UsageError(f"Route {chosen!r} cannot be prepared locally.")
     result.update(plan_path=str(plan_path), plan_source=source, elapsed_seconds=round(time.monotonic() - started, 1))
     return result
+
+
+def _warn_broken_models(ctx: Ctx) -> None:
+    """A model that was installed and is now damaged would otherwise just be replaced by the next engine."""
+    if fake_mode():
+        return
+    for model in load_manifest().models.values():
+        if model.builtin or not (model.model_dir / MARKER).exists() or model.installed_status()["installed"]:
+            continue
+        ctx.warn("model_damaged", f"Model {model.id} is damaged (files missing or the wrong size): vidroute will not "
+                                  "use it, and results may come from a fallback engine.",
+                 f"vidroute install --model {model.id} --force --yes")
 
 
 # ------------------------------------------------------------------- steps
@@ -190,7 +238,27 @@ def _transcript(video: Path, layout: Layout, plan: dict[str, Any], info: dict[st
     force_asr = bool(req.get("force_asr"))
     loc = rules["local"]
     required = force_asr or float(info.get("speech_ratio") or 0) >= float(loc["speech_ratio_skip_asr"])
+    diarize_step = _plan_step(plan, "diarize")
+    diarizer = None
+    if diarize_step.get("status") == "planned" and asr_allowed:
+        def diarizer(wav: Path) -> list[dict[str, Any]]:
+            try:
+                # Costly on long videos, and ASR's resume cache is keyed by chunks cut at these turns: keep them.
+                key = [diarize_step["engine"], wav.stat().st_size]
+                saved = read_json(layout.work / "turns.json", default={}) or {}
+                if saved.get("key") == key:
+                    return saved["turns"]
+                ctx.progress("diarize", None, None, diarize_step["engine"])
+                turns = get_engine(diarize_step["engine"], manifest).diarize(ctx, pool, wav)
+                write_json_atomic(layout.work / "turns.json", {"key": key, "turns": turns})
+                return turns
+            except VidrouteError as exc:
+                if exc.code == "cancelled":
+                    raise
+                ctx.warn("diarize_failed", f"Speaker labels were skipped: {exc.message[:160]}")
+                return []
     fp = fingerprint("transcript", PIPELINE_VERSION, layout.root.name, language, force_asr, role_if_any, asr_allowed,
+                     diarizer is not None,
                      asr_candidates(language, tier, rules, manifest), first_installed(loc["vad_chain"], manifest),
                      loc)
     prev = state.get("transcript")
@@ -205,7 +273,7 @@ def _transcript(video: Path, layout: Layout, plan: dict[str, Any], info: dict[st
             raise NeedsInstall("No ASR engine is installed, so the speech cannot be transcribed.",
                                hint="vidroute install --capability asr", data={"needs": ["asr"]})
         tinfo = tr.build_transcript(video, layout, info, rules, manifest, tier, language, force_asr, ctx, pool,
-                                    required=required, subtitles_only=not asr_allowed)
+                                    required=required, subtitles_only=not asr_allowed, diarizer=diarizer)
         if tinfo.get("engine") and not str(tinfo["engine"]).startswith("subtitle:"):
             tinfo["engine"] = _label(tinfo["engine"])
         for name in ("transcript.json", "transcript.srt", "transcript.md"):
@@ -248,6 +316,7 @@ def _keyframes(video: Path, layout: Layout, plan: dict[str, Any], info: dict[str
         data = read_json(work)
         frames = [kf.Keyframe(**k) for k in data["frames"]]
         if all((layout.frames / k.file).exists() for k in frames if k.file):
+            _report_omitted(layout, data["stats"].get("omitted") or [], target, ctx)
             _step(outcome, "keyframes", "cached", data["detail"])
             return frames, fp
     reset_dir(layout.frames, layout)
@@ -269,11 +338,32 @@ def _keyframes(video: Path, layout: Layout, plan: dict[str, Any], info: dict[str
         detail += "; tiles unlabelled (ffmpeg drawtext unavailable)"
         ctx.warn("no_tile_labels", "ffmpeg cannot draw text here: contact-sheet tiles carry no timestamps "
                                    "(see contact-sheets/index.md).")
+    if stats["omitted"]:
+        detail += f"; {len(stats['omitted'])} longer shots left out (omitted-shots.md)"
+    _report_omitted(layout, stats["omitted"], target, ctx)
     write_json_atomic(work, {"meta": meta, "stats": stats, "grab": grab, "detail": detail,
                              "frames": [asdict(k) for k in frames]})
     state.mark("keyframes", fp, labels=grab["labels"])
     _step(outcome, "keyframes", "done", detail)
     return frames, fp
+
+
+def _report_omitted(layout: Layout, omitted: list[list[float]], target: int, ctx: Ctx) -> None:
+    """The frame budget left out shots that stayed on screen: say so, and say how to get them."""
+    path = layout.file("omitted-shots.md")
+    path.unlink(missing_ok=True)
+    if not omitted:
+        return
+    start, end = omitted[0]
+    drill = f'vidroute drill "{layout.root}" --range {fmt_ts(start)}-{fmt_ts(end)} --ocr'
+    lines = ["# Shots without a keyframe", "",
+             f"The budget of {target} frames left out these {len(omitted)} shots, each on screen for several seconds. "
+             "The keyframes do NOT show them. Before you claim anything about these spans, or if the question "
+             "concerns them, look with:", "", f"    {drill}", ""]
+    lines += [f"- {fmt_ts(s)}–{fmt_ts(e)}" for s, e in omitted]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    ctx.warn("frames_omitted", f"{len(omitted)} shots that stayed on screen have no keyframe (budget {target} frames); "
+                               "the frames do not show everything: see omitted-shots.md.", drill)
 
 
 def _sheets(layout: Layout, frames: list[kf.Keyframe], rules: dict[str, Any], state: StepState, kf_fp: str,

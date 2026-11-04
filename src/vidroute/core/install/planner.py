@@ -65,7 +65,9 @@ def default_for(cap: str, tier: str, manifest: Manifest) -> list[str]:
         return ["ocr-ppocrv6-tiny" if tier == "cpu-lite" else "ocr-ppocrv6-small"]
     if cap == "scene":
         return []  # built in (ffmpeg)
-    raise UsageError(f"Unknown capability {cap!r}; use asr, vad, ocr or scene")
+    if cap == "diarize":
+        return ["diarize-pyannote-campplus"]
+    raise UsageError(f"Unknown capability {cap!r}; use asr, vad, ocr, scene or diarize")
 
 
 def _python_runtime_present(request: str) -> bool:

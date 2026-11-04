@@ -632,3 +632,59 @@ frames` into `$VIDROUTE_HOME/cache/selftest`. Checks: outputs written, a
 contact sheet, speech transcribed (when ASR is installed), the slide text read
 back (when OCR is installed). On this machine with the real models: passed in
 6.0 s ("开放时间早上9点至下午5点。", "VIDROUTE SELF TEST").
+
+## D-047 Fresh-machine installers (2026-11-04)
+
+From a review on a clean Ubuntu container: the default `git+https` source needs git, and the Aliyun uv wheel could not
+be unpacked without unzip or Python, which led to a GitHub download that stalled with no timeout. The default source is
+now the GitHub source archive. `install.sh` reads the wheel's zip headers with `od` and inflates with `gzip` as the last
+resort; the wheel's SHA-256 is checked first and the extracted binary is run before use. A transfer below 10 KB/s for
+20 s counts as stalled. The repository became public on 2026-11-04 (owner's decision); tag, Release and PyPI stay open.
+
+## D-048 ffmpeg is checked before the plan (2026-11-04)
+
+On Linux and macOS vidroute cannot install ffmpeg, yet `setup` downloaded about 850 MB and only then failed. `setup` now
+exits 2 before asking or downloading. `--no-install` keeps its warning.
+
+## D-049 Speaker labels (2026-11-04)
+
+sherpa-onnx offline diarization (pyannote segmentation-3.0 + 3D-Speaker CAM++, already in the `sherpa` env, 34 MB, on the
+default path because minutes need it). Runs for `--task minutes` or `--diarize on`; `auto` skips other tasks because it
+costs about 0.08 x speech length on 16 threads. Turns are computed before ASR and chunks are cut at speaker changes, so
+one segment holds one speaker. One detected voice gets no labels. A failure only warns. Labels are voice groups, never
+identities, and the guide says so. Checked with distinct recorded voices (6 turns: 5 right, one 3 s turn got its own
+label); not yet with real meetings.
+
+## D-050 Reporting what the frame budget leaves out (2026-11-04)
+
+The 60-frame budget stays: it protects tokens and dense-image limits. Shots on screen for at least
+`frames.omitted_min_seconds` (5 s) without a frame go to `omitted-shots.md` plus a warning with a `drill` command, so
+fast cuts add no noise and a 120-slide deck does not look complete at 60 frames. The OCR box filter's height limit went
+from 20 % to 40 % of the frame: large title lines had been thrown away, which skipped OCR on sparse slides.
+
+## D-051 Runs on one output folder wait for each other (2026-11-04)
+
+Three simultaneous runs on one video and folder used to crash two of them (`FileNotFoundError` while one run rebuilt
+what another was reading). A kernel lock on `.work/lock` (`flock`, `msvcrt.locking`) now serializes `prepare`, `run` and
+`drill` per output folder. Waiting beats failing: the second run gets cached results, and agents retry by themselves
+anyway. The kernel drops the lock on any exit, including `kill -9`, so no stale-lock handling is needed. It gives up after
+one hour. Filesystems without locks run unprotected, as before.
+
+## D-052 A hint is a command, or nothing (2026-11-04)
+
+Generic failures used to suggest `vidroute doctor --refresh` and unreadable files a raw `ffprobe` line, neither of which
+helps. Machine problems (full disk, no permission) now get their own codes. When only the user can fix something (a
+damaged file), `error.hint` is null and `message` says what to do. Unexpected errors ask for a report with `-v` output.
+
+## D-053 Resource limits come from the process, not the host (2026-11-04)
+
+`os.cpu_count()` and `/proc/meminfo` describe the host, so a 2 GB container looked like 19.8 GB and `cpu-full`. RAM now
+uses the tightest cgroup limit (v1 and v2, walking up from this process's cgroup); CPUs use the affinity mask and the
+quota. The tier, default OCR model and thread counts follow. Unlimited machines keep their previous thread counts.
+Measured in a 2-CPU 2-GB container: `cpu-lite`, no out-of-memory, 20 min video with speaker labels in 194 s.
+
+## D-054 Resume granularity (2026-11-04)
+
+ASR already resumed by chunk, but saved only every 300 s of speech. It now saves every 60 s. Speaker turns are stored in
+`.work/turns.json`, because they cost as much as ASR and the chunk cache is keyed by chunks cut at those turns.
+

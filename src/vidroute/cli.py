@@ -55,6 +55,11 @@ def _yes(flag: object) -> str:
     return "yes" if flag else ("no" if flag is not None else "?")
 
 
+def _usable(cpu: dict[str, Any]) -> str:
+    usable = cpu.get("usable_cores")
+    return f" ({usable} usable)" if usable and usable != cpu.get("logical_cores") else ""
+
+
 def render_doctor(env: Envelope, args: argparse.Namespace) -> str:
     d = env.data
     cpu = d.get("cpu") or {}
@@ -63,8 +68,8 @@ def render_doctor(env: Envelope, args: argparse.Namespace) -> str:
         f"vidroute doctor  ({'cached' if d.get('cached') else 'fresh'}, {d.get('probe_seconds')}s)",
         f"  system   {d.get('os', {}).get('system')} {d.get('os', {}).get('release')} {d.get('os', {}).get('machine')}"
         f" | python {d.get('os', {}).get('python')}",
-        f"  cpu      {cpu.get('model') or '?'} | {cpu.get('logical_cores')} threads | AVX2 {_yes(cpu.get('avx2'))}",
-        f"  memory   {d.get('ram_gb')} GB (available {d.get('ram_available_gb')} GB) | disk free {d.get('disk_free_gb')} GB",
+        f"  cpu      {cpu.get('model') or '?'} | {cpu.get('logical_cores')} threads{_usable(cpu)} | AVX2 {_yes(cpu.get('avx2'))}",
+        f"  memory   {d.get('ram_gb')} GB{' (container limit)' if d.get('ram_limited') else ''} (available {d.get('ram_available_gb')} GB) | disk free {d.get('disk_free_gb')} GB",
         f"  ffmpeg   {('found ' + str(ff.get('version'))) if ff.get('found') else 'MISSING -> ' + str(ff.get('install_hint'))}",
     ]
     gpus = d.get("gpus") or []
@@ -97,8 +102,12 @@ def render_doctor(env: Envelope, args: argparse.Namespace) -> str:
         elif skill.get("plugin"):
             seen = "skill from the vidroute plugin"
         else:
-            state_txt = ("current" if skill.get("current") else "outdated -> vidroute setup") if skill.get("managed") \
-                else "copied by hand"
+            if skill.get("managed"):
+                state_txt = "current" if skill.get("current") else "outdated -> vidroute setup"
+            elif skill.get("is_vidroute"):
+                state_txt = "copied by hand, setup does not update it"
+            else:
+                state_txt = f"NOT vidroute: another skill uses this name -> vidroute setup --force --no-install --host {h['id']}"
             seen = f"skill {skill['path']} ({state_txt})"
         mcp = f"; MCP via {h['mcp']['method']}" if h.get("mcp") else ""
         lines.append(f"  agent    {h['name']}: {seen}{mcp}" + ("" if h.get("detected") else " (host not found)"))
@@ -298,6 +307,12 @@ def _confirm(question: str) -> bool:
     return answer.strip().lower() in ("y", "yes")
 
 
+def _unconfirmed_plan(env: Envelope, args: argparse.Namespace) -> bool:
+    """No terminal to ask on and no JSON to read it from: the plan must still be shown."""
+    return (not env.ok and bool(env.error) and env.error.get("code") == "needs_confirmation"
+            and bool(env.data.get("plan")) and not getattr(args, "json", False))
+
+
 def h_install(args: argparse.Namespace, ctx: Ctx) -> Envelope:
     from vidroute.core.install.planner import describe
 
@@ -311,6 +326,8 @@ def h_install(args: argparse.Namespace, ctx: Ctx) -> Envelope:
         if _confirm("Proceed with this install?"):
             ctx.warnings.clear()
             env = api.install(yes=True, ctx=ctx, **kwargs)
+    elif _unconfirmed_plan(env, args):
+        sys.stderr.write(describe(env.data["plan"]) + "\n")  # scripts cannot confirm what they cannot see
     return env
 
 
@@ -334,6 +351,8 @@ def h_setup(args: argparse.Namespace, ctx: Ctx) -> Envelope:
         if _confirm("Proceed with this setup?"):
             ctx.warnings.clear()
             env = api.setup(yes=True, ctx=ctx, **kwargs)
+    elif _unconfirmed_plan(env, args):
+        sys.stderr.write(describe_setup(env.data["plan"]) + "\n")
     return env
 
 
@@ -385,7 +404,7 @@ def h_probe(args: argparse.Namespace, ctx: Ctx) -> Envelope:
 
 def h_plan(args: argparse.Namespace, ctx: Ctx) -> Envelope:
     return api.plan(args.video, args.llm, args.host, args.task, args.prefer, args.language, args.modalities,
-                    args.audio_in_video, args.ocr, args.route, args.force_asr, args.out, ctx=ctx)
+                    args.audio_in_video, args.ocr, args.route, args.force_asr, args.out, args.diarize, ctx=ctx)
 
 
 def _with_handoff_consent(call: Callable[[bool], Envelope], ctx: Ctx, accepted: bool) -> Envelope:
@@ -403,7 +422,7 @@ def h_prepare(args: argparse.Namespace, ctx: Ctx) -> Envelope:
     def call(accept: bool) -> Envelope:
         return api.prepare(args.video, args.plan, args.route, args.out, accept, args.llm, args.host, args.task,
                            args.prefer, args.language, args.modalities, args.audio_in_video, args.ocr, args.force_asr,
-                           ctx=ctx)
+                           args.diarize, ctx=ctx)
 
     return _with_handoff_consent(call, ctx, args.accept_raw_video_handoff)
 
@@ -411,7 +430,7 @@ def h_prepare(args: argparse.Namespace, ctx: Ctx) -> Envelope:
 def h_run(args: argparse.Namespace, ctx: Ctx) -> Envelope:
     def call(accept: bool) -> Envelope:
         return api.run(args.video, args.llm, args.host, args.task, args.prefer, args.language, args.modalities,
-                       args.audio_in_video, args.ocr, args.route, args.force_asr, args.out, accept, ctx=ctx)
+                       args.audio_in_video, args.ocr, args.route, args.force_asr, args.out, accept, args.diarize, ctx=ctx)
 
     return _with_handoff_consent(call, ctx, args.accept_raw_video_handoff)
 
@@ -469,7 +488,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--offline", action="store_true", help="skip download-mirror reachability checks")
 
     p = add("install", "Plan and (after confirmation) install local models and runtimes", h_install, render_install)
-    p.add_argument("--capability", action="append", choices=["asr", "vad", "ocr", "scene"], help="capability to install (repeatable)")
+    p.add_argument("--capability", action="append", choices=["asr", "vad", "ocr", "scene", "diarize"], help="capability to install (repeatable)")
     p.add_argument("--profile", choices=["auto", "lite", "full"], default="auto", help="package set when no --capability/--model is given")
     p.add_argument("--model", action="append", help="exact model id from `vidroute models list` (repeatable)")
     p.add_argument("--mirror", choices=["auto", "cn", "github", "hf", "modelscope"],
@@ -488,7 +507,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--mcp", action="store_true", help="also register the vidroute MCP server with those hosts")
     p.add_argument("--no-skill", action="store_true", help="do not copy the Agent Skill into the hosts")
     p.add_argument("--no-install", action="store_true", help="skip ffmpeg, runtimes and models")
-    p.add_argument("--capability", action="append", choices=["asr", "vad", "ocr", "scene"],
+    p.add_argument("--capability", action="append", choices=["asr", "vad", "ocr", "scene", "diarize"],
                    help="capabilities to install (default: asr, vad, ocr, scene)")
     p.add_argument("--profile", choices=["auto", "lite", "full"], default="auto", help="package set instead of --capability")
     p.add_argument("--model", action="append", help="exact model id from `vidroute models list` (repeatable)")
@@ -578,6 +597,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--ocr", default="auto", choices=["auto", "on", "off"])
     p.add_argument("--route", default="auto", choices=["auto", "native-av", "native-v", "frames", "text"])
     p.add_argument("--force-asr", action="store_true", help="run ASR even with subtitles / no detected speech")
+    p.add_argument("--diarize", choices=["auto", "on", "off"], default="auto", help="label speakers in the transcript; auto: only for --task minutes")
     p.add_argument("--out", help="output root; plan.json is written to <out>/<slug>/plan.json")
     llm_flags(p)
 
@@ -590,6 +610,7 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--ocr", default="auto", choices=["auto", "on", "off"])
         sp.add_argument("--route", default="auto", choices=["auto", "native-av", "native-v", "frames", "text"])
         sp.add_argument("--force-asr", action="store_true", help="run ASR even with subtitles / no detected speech")
+        sp.add_argument("--diarize", choices=["auto", "on", "off"], default="auto", help="label speakers in the transcript; auto: only for --task minutes")
         sp.add_argument("--out", help="output root (default: config out_root or $VIDROUTE_HOME/out); "
                                       "files go to <out>/<slug>/")
         sp.add_argument("--accept-raw-video-handoff", action="store_true",

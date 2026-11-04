@@ -9,6 +9,7 @@ from typing import Any
 from vidroute.core import state
 from vidroute.core.context import Ctx
 from vidroute.core.engines.base import Engine, WorkerPool, write_wav
+from vidroute.core.util.limits import engine_threads
 
 SENSEVOICE_LANGS = {"zh", "en", "ja", "ko", "yue"}
 
@@ -27,7 +28,7 @@ class AsrEngine(Engine):
         if not segments:
             return []
         client = self.client(pool)
-        key = client.call("asr_load", self.load_params(language))["key"]
+        key = client.call("asr_load", {"num_threads": engine_threads(), **self.load_params(language)})["key"]
         params: dict[str, Any] = {"key": key, "wav": str(wav), "segments": segments}
         if initial_prompt:
             params["initial_prompt"] = initial_prompt

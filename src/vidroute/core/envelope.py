@@ -3,7 +3,7 @@
     {"ok": true, "schema": "vidroute/1", "data": {...}, "warnings": [...], "error": null}
 
 On failure ``ok`` is false and ``error`` is ``{"code", "message", "hint"}``,
-where ``hint`` is a command that can be executed as-is. Warnings are objects
+where ``hint``, when there is one, is a command that can be executed as-is. Warnings are objects
 ``{"code", "message", "hint"?}`` so both agents and programs can consume them.
 """
 

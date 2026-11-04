@@ -160,7 +160,7 @@ def test_doctor_end_to_end_is_fast_and_cached(monkeypatch):
     data = doctor.run(refresh=True, offline=True)
     assert time.monotonic() - start < 10
     assert data["cached"] is False and data["tier"] in tier.TIERS
-    assert set(data["capabilities"]) == {"asr", "vad", "ocr", "scene"}
+    assert set(data["capabilities"]) == {"asr", "vad", "ocr", "scene", "diarize"}
     assert data["network"]["checked"] is False
     again = doctor.run(refresh=False, offline=True)
     assert again["cached"] is True and again["checked_at"] == data["checked_at"]

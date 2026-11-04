@@ -23,7 +23,7 @@ from vidroute.core.util.proc import run_parallel
 CACHE_KEY = "doctor"
 CACHE_TTL = 6 * 3600
 PROBE_TIMEOUT = 5.0
-CAPS = ("asr", "vad", "ocr", "scene")
+CAPS = ("asr", "vad", "ocr", "scene", "diarize")
 
 
 def invalidate() -> None:
@@ -112,6 +112,7 @@ def collect(offline: bool | None = None) -> dict[str, Any]:
         "os": value("os", {}),
         "cpu": cpu,
         "ram_gb": memory.get("total_gb"),
+        "ram_limited": bool(memory.get("limited")),
         "ram_available_gb": memory.get("available_gb"),
         "disk_free_gb": value("disk", {}).get("free_gb"),
         "ffmpeg": ff,

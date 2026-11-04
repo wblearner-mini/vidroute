@@ -469,6 +469,46 @@ models:
     notes: "Faster, fewer languages (the tiny language set); used on cpu-lite."
 
   # ----------------------------------------------------------------- scene
+  - id: diarize-pyannote-campplus
+    capability: diarize
+    engine: sherpa-diarize
+    env_group: sherpa
+    package: optional
+    status: default
+    languages: [any]
+    size_mb: 34.3
+    min_ram_gb: 2
+    min_vram_gb: null
+    tiers: [cpu-lite, cpu-full, gpu-cuda, gpu-vulkan]
+    license:
+      spdx: MIT AND Apache-2.0
+      restricted: false
+      gated: false
+      name: "pyannote segmentation-3.0 (MIT), 3D-Speaker CAM++ (Apache-2.0)"
+      url: "https://github.com/modelscope/3D-Speaker/blob/main/LICENSE"
+      notes: "ONNX exports as distributed by sherpa-onnx; the segmentation model's MIT license ships with its release archive."
+    files:
+      - {path: segmentation.onnx, size: 5992913, sha256: 220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079}
+      - {path: embedding.onnx, size: 28281164, sha256: aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2}
+    sources:
+      - type: hf
+        kind: files
+        base_url: "https://huggingface.co/csukuangfj/"
+        layout:
+          segmentation.onnx: sherpa-onnx-pyannote-segmentation-3-0/resolve/9403a6902bb58e3d5ae8c7e77c3422de279db2e0/model.onnx
+          embedding.onnx: speaker-embedding-models/resolve/0743f301363dec56491a490f6d6cbc9d67f9a3bf/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx
+      - type: hf
+        kind: files
+        base_url: "https://hf-mirror.com/csukuangfj/"
+        layout:
+          segmentation.onnx: sherpa-onnx-pyannote-segmentation-3-0/resolve/9403a6902bb58e3d5ae8c7e77c3422de279db2e0/model.onnx
+          embedding.onnx: speaker-embedding-models/resolve/0743f301363dec56491a490f6d6cbc9d67f9a3bf/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx
+    smoke_test: diarize_recording
+    verified_at: "2026-11-04"
+    notes: >-
+      Same bytes as the sherpa-onnx GitHub release (segmentation archive and embedding
+      asset) and hf-mirror.com, compared on 2026-11-04. Labels voices, not identities.
+
   - id: scene-ffmpeg
     capability: scene
     engine: ffmpeg-scene

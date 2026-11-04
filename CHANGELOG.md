@@ -6,8 +6,28 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Installers no longer need git, unzip or Python: the default source is a source archive, and `install.sh` unpacks
+  the uv wheel with coreutils and gzip when nothing else is there. Stalled downloads fail after 20 s and move to the
+  next source; a missing curl/wget is reported up front with the command to run.
+- `vidroute setup` stops before downloading when ffmpeg is missing and cannot be installed for you.
+- `--force-asr` now also runs when voice detection finds no speech.
+- A damaged model is reported instead of silently being replaced by the next engine.
+- Large title lines count as on-screen text, so sparse slides get OCR.
+
+- Runs on the same output folder wait for each other instead of crashing; the second one reuses the results.
+- Clear messages for empty, cut-off or damaged files, unwritable folders, a full disk and an ffmpeg that cannot run. A
+  failed run no longer leaves an empty folder behind.
+- A long run resumes after an interruption from the last 60 s of speech; speaker turns are kept.
+- `setup` and `install` show their plan without a terminal too, and `setup` warns when another skill blocks a host.
+- `doctor`, the tier and thread counts respect container limits and CPU affinity.
+
 ### Added
 
+- Speaker labels (`Speaker 1`, `Speaker 2`, ...) in the transcript for `--task minutes` or `--diarize on`:
+  new default model `diarize-pyannote-campplus` (34 MB, CPU).
+- `omitted-shots.md` and a warning when the frame budget leaves out shots that stayed on screen for 5 s or more.
 - `vidroute doctor`: OS/CPU/RAM/GPU/ffmpeg/runtime detection with concurrent probes, 5 s timeouts,
   a 6-hour cache and tiers `cpu-lite` / `cpu-full` / `gpu-cuda`.
 - `vidroute install`: install plans, allow-listed downloads with mirror fallback, resume and SHA-256

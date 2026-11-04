@@ -39,6 +39,7 @@ from vidroute.core.context import Ctx
 from vidroute.core.errors import RunFailed
 from vidroute.core.prepare import media
 from vidroute.core.util import ffmpeg, proc
+from vidroute.core.util.limits import usable_cpus
 from vidroute.core.util.timefmt import fmt_compact, fmt_ts
 
 SMALL = 64  # long side of the analysis thumbnails
@@ -309,8 +310,11 @@ def select(cands: list[Candidate], size: tuple[int, int], rules: dict[str, Any],
     chosen = choose(unique, max(1, target), start, end, float(f["min_interval_seconds"]))
     frames = [Keyframe(i + 1, s.t, round(s.start, 3), round(s.end, 3), s.change,
                        [[round(a, 3), round(b, 3)] for a, b in s.repeats]) for i, s in enumerate(chosen)]
+    min_len = float(f.get("omitted_min_seconds", 5))
+    omitted = [[round(s.start, 3), round(s.end, 3)] for s in unique
+               if s.length >= min_len and not any(s is c for c in chosen)]
     stats = {"shots": len(shots), "unique_shots": len(unique), "selected": len(frames), "target": target,
-             "repeats_folded": len(shots) - len(unique)}
+             "repeats_folded": len(shots) - len(unique), "omitted": sorted(omitted)}
     return frames, stats
 
 
@@ -364,7 +368,7 @@ def grab_all(video: Path, frames: list[Keyframe], out_dir: Path, thumbs_dir: Pat
         else:
             state["failed"].append(k.index)
 
-    workers = max(1, min(8, (os.cpu_count() or 2)))
+    workers = max(1, min(8, usable_cpus()))
     done = 0
     with ThreadPoolExecutor(max_workers=workers) as pool:
         for _ in pool.map(one, frames):

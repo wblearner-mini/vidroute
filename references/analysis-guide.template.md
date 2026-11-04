@@ -30,7 +30,8 @@ recognition gets names, technical terms, numbers and homophones wrong.
   `[mm:ss] original → corrected (evidence: frame N at mm:ss / OCR at mm:ss)`
 - If something important cannot be verified, list it under *Items to verify* instead of guessing.
 - Speaker names: only when they are visible (name tag, slide, caption) or stated in the transcript;
-  otherwise say "a speaker".
+  otherwise say "a speaker". `Speaker 1`, `Speaker 2`, … in the transcript are machine-made voice groups
+  (they can merge or split people): use them to tell speakers apart, never as evidence of who someone is.
 <!-- endif -->
 <!-- if:has:hearing -->
 **You can hear the audio**{{hearing_source}}. The local transcript is a timestamped reference. When it

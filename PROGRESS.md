@@ -302,3 +302,38 @@ hosts; the repository stays private for now (D-039 … D-046).
   1 min 45 s for the whole job; Ubuntu passed the same way. The portable FFmpeg
   path is covered by tests with a local server; the runner had winget.
 
+
+## Phase 6.7 — fixes from a user-perspective review (2026-11-04)
+
+A review on a clean Ubuntu 24.04 container and with poisoned environments found installation and result-completeness
+gaps (D-047 … D-050). The owner made the repository public the same day; tag, Release and PyPI remain open.
+
+* **Installers:** no git, unzip or Python needed; missing curl/wget reported first; stalled transfers move on.
+* **`setup`:** stops before any download when ffmpeg must come from the system package manager; hints name the
+  package manager found and drop `sudo` for root.
+* **Downloads:** a source under 50 KB/s for 30 s is left for the next one, keeping partial data; if nothing else works, a
+  second pass accepts the slow one.
+* **Results:** `--force-asr` works when VAD hears nothing; damaged models are reported; `omitted-shots.md` and a warning
+  for long shots without a frame; large title lines count as text for OCR.
+* **Speaker labels:** `--task minutes` or `--diarize on`, model `diarize-pyannote-campplus` (34 MB).
+* Tests: 288 passing (+10); real-model tests 5 passed, 2 skipped (optional models not installed).
+* **Acceptance (clean `ubuntu:24.04`, real network in mainland China):** no curl → clear message, exit 1. With only curl
+  (no git, unzip, Python, ffmpeg) → uv from the Aliyun wheel, vidroute installed, exit 2 with the ffmpeg command after
+  13 s and 36 MB. `uv tool install` of the public GitHub archive works without git. After `apt install ffmpeg`,
+  `setup --yes` took 180 s (886 MB) and the self-test passed; a minutes run labelled speakers.
+* **Measured (16 threads):** chinese narration CER still 1.3 %, one voice got no labels; 6-turn dialogue of recorded voices:
+  5 turns right, a 3 s turn got its own label. A 1-hour minutes run took 285 s (59 s without labels and OCR).
+* **Not verified:** Windows (`install.ps1` default source changed; needs CI after a push), macOS, real meetings for
+  speaker labels, and the slow-mirror switch on a real network (covered by tests with a throttled local server).
+
+## Phase 6.8 — stability fixes from the same review (2026-11-04)
+
+D-051 … D-054. Tests: 310 passing (+22); real-model tests 5 passed, 2 skipped.
+
+* **Concurrency (real models):** 3 runs on one folder, 3 on separate folders and 2 identical drills all exit 0.
+* **Resume:** a 20 min minutes run takes 114 s; killed with `kill -9` at 78 s, the rerun took 34 s. No leftover workers.
+* **Errors:** empty, cut-off and random files, an unwritable folder and a broken `LD_LIBRARY_PATH` each get a specific
+  message; failed runs leave no folder.
+* **Clean `ubuntu:24.04`, 2 CPUs, 2 GB:** `doctor` reports `16 threads (2 usable)`, `2.0 GB (container limit)`, `cpu-lite`;
+  `setup` installs `ocr-ppocrv6-tiny` in 100 s; a 20 min minutes run takes 194 s without running out of memory.
+* **Not verified:** the Windows lock (`msvcrt.locking`) and all of this on Windows or macOS; needs CI after a push.

@@ -12,6 +12,7 @@ import json
 import os
 import platform
 import re
+import shutil
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -36,7 +37,12 @@ def install_hint() -> str:
         return "vidroute install --capability scene   (plans FFmpeg: winget, or a portable build)"
     if system == "Darwin":
         return "brew install ffmpeg"
-    return "sudo apt install ffmpeg  (or your distribution's package manager)"
+    sudo = "" if hasattr(os, "geteuid") and os.geteuid() == 0 else "sudo "
+    for tool, command in (("apt", "apt install ffmpeg"), ("dnf", "dnf install ffmpeg"), ("yum", "yum install ffmpeg"),
+                          ("pacman", "pacman -S ffmpeg"), ("zypper", "zypper install ffmpeg"), ("apk", "apk add ffmpeg")):
+        if shutil.which(tool):
+            return sudo + command
+    return sudo + "apt install ffmpeg  (or your distribution's package manager)"
 
 
 def _candidates(name: str) -> list[Path]:
@@ -145,12 +151,34 @@ def require() -> FFmpegInfo:
     info = _cached_detect()
     if not info.found:
         _cached_detect.cache_clear()
+        if info.ffmpeg and info.ffprobe:  # present, but it does not run: reinstalling is rarely the answer
+            broken_libs = "shared libraries" in (info.error or "") and os.environ.get("LD_LIBRARY_PATH")
+            raise NeedsInstall(
+                f"{info.ffmpeg} is installed but cannot run: {info.error}"
+                + (" LD_LIBRARY_PATH is set and probably points at incompatible libraries." if broken_libs else ""),
+                code="ffmpeg_broken",
+                hint="env -u LD_LIBRARY_PATH vidroute doctor --refresh" if broken_libs else f'"{info.ffmpeg}" -version',
+            )
         raise NeedsInstall(
             f"ffmpeg/ffprobe are required but were not found ({info.error}).",
             code="ffmpeg_missing",
             hint=install_hint(),
         )
     return info
+
+
+def unreadable_message(path: Path, stderr: str) -> str:
+    """Why a file cannot be read, in terms of what the user can do about it."""
+    detail = stderr.strip()
+    if path.stat().st_size == 0:
+        why = "the file is empty"
+    elif "moov atom not found" in detail:
+        why = "the file is incomplete or damaged (it may still be recording or copying, or the download was cut off)"
+    elif "Invalid data" in detail:
+        why = "it is damaged, or not a video or audio file"
+    else:
+        return f"Could not read {path.name}: {detail[:300] or 'ffprobe timed out'}"
+    return f"Could not read {path.name}: {why}. Get a complete copy of the file and try again."
 
 
 def ffprobe_json(path: Path, timeout: float = 60.0) -> dict[str, Any]:
@@ -160,11 +188,7 @@ def ffprobe_json(path: Path, timeout: float = 60.0) -> dict[str, Any]:
         timeout=timeout,
     )
     if not res.ok:
-        raise RunFailed(
-            f"ffprobe could not read {path.name}: {(res.stderr or '').strip()[:300] or 'timed out'}",
-            code="probe_failed",
-            hint=f'ffprobe -v error -show_format "{path}"',
-        )
+        raise RunFailed(unreadable_message(path, res.stderr or ""), code="probe_failed")
     try:
         return json.loads(res.stdout)
     except ValueError as exc:

@@ -22,7 +22,7 @@ from vidroute.core.probe import frames as fr
 from vidroute.core.util import ffmpeg, proc
 from vidroute.core.util.jsonio import read_json, write_json_atomic
 
-PROBE_VERSION = 3
+PROBE_VERSION = 4
 TEXT_SUB_CODECS = {"subrip", "srt", "ass", "ssa", "mov_text", "webvtt", "text", "microdvd", "subviewer", "jacosub", "sami"}
 IMAGE_SUB_CODECS = {"hdmv_pgs_subtitle", "dvd_subtitle", "dvb_subtitle", "xsub"}
 SAMPLE_FRAMES = 8

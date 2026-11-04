@@ -107,7 +107,7 @@ def render(secs: list[Section], video_name: str, route: str, transcript_role: st
             body.append("")
         if s.said:
             body.append("**Said:**")
-            body += [f"- [{fmt_ts(x['start'])}] {x['text']}" for x in s.said]
+            body += [f"- [{fmt_ts(x['start'])}] {x['speaker'] + ': ' if x.get('speaker') else ''}{x['text']}" for x in s.said]
             body.append("")
     if not body:
         body = ["_(nothing to show: no keyframes and no transcript)_"]

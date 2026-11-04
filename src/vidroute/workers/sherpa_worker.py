@@ -148,6 +148,36 @@ def m_asr(p, rid):
     return {"segments": out}
 
 
+def m_diarize(p, rid):
+    """Who speaks when: pyannote segmentation + speaker embeddings + clustering over the whole file."""
+    cfg = so.OfflineSpeakerDiarizationConfig(
+        segmentation=so.OfflineSpeakerSegmentationModelConfig(
+            pyannote=so.OfflineSpeakerSegmentationPyannoteModelConfig(model=p["segmentation"]),
+            num_threads=int(p.get("num_threads", 4)),
+        ),
+        embedding=so.SpeakerEmbeddingExtractorConfig(model=p["embedding"], num_threads=int(p.get("num_threads", 4))),
+        clustering=so.FastClusteringConfig(num_clusters=int(p.get("num_speakers") or -1),
+                                           threshold=float(p.get("threshold", 0.5))),
+        min_duration_on=float(p.get("min_on", 0.3)),
+        min_duration_off=float(p.get("min_off", 0.5)),
+    )
+    if not cfg.validate():
+        raise ValueError("invalid diarization config: check the model files")
+    sd = so.OfflineSpeakerDiarization(cfg)
+    wav = P.Wav(p["wav"])
+    if wav.sr != sd.sample_rate:
+        raise ValueError(f"expected {sd.sample_rate} Hz audio, got {wav.sr}")
+    samples = wav.read(0.0, wav.duration)
+    wav.close()
+
+    def on_progress(done, total, _arg=None):
+        P.progress(rid, done, total, "diarize")
+        return 0
+
+    result = sd.process(samples, callback=on_progress).sort_by_start_time()
+    return {"turns": [{"start": round(t.start, 3), "end": round(t.end, 3), "speaker": int(t.speaker)} for t in result]}
+
+
 if __name__ == "__main__":
-    P.serve({"ping": m_ping, "vad": m_vad, "asr_load": m_asr_load, "asr": m_asr},
+    P.serve({"ping": m_ping, "vad": m_vad, "asr_load": m_asr_load, "asr": m_asr, "diarize": m_diarize},
             {"worker": "sherpa", "python": sys.version.split()[0]})

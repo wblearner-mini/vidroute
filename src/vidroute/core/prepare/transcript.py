@@ -10,6 +10,7 @@ the ASR chain (zh/yue -> "zh" selector, everything else -> "multi").
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +24,7 @@ from vidroute.core.prepare.layout import Layout
 from vidroute.core.util.jsonio import read_json, write_json_atomic
 from vidroute.core.util.timefmt import fmt_ts
 
-BATCH_SECONDS = 300.0  # cache granularity for resumable ASR
+BATCH_SECONDS = 60.0  # cache granularity for resumable ASR
 LID_SECONDS = 30.0
 NON_SPEECH_LANGS = {"nospeech", "", "unk"}
 ISO639_2 = {"eng": "en", "chi": "zh", "zho": "zh", "cmn": "zh", "jpn": "ja", "kor": "ko", "fre": "fr", "fra": "fr",
@@ -123,6 +124,7 @@ def build_transcript(
     pool: WorkerPool,
     required: bool = True,
     subtitles_only: bool = False,
+    diarizer: Callable[[Path], list[dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     """Transcript info: segments (global time) plus source/engine/language and notes for SUMMARY.md.
 
@@ -130,6 +132,8 @@ def build_transcript(
     without an installed ASR engine then only warns instead of failing.
     ``subtitles_only`` extracts embedded subtitles but never runs VAD/ASR (the
     model hears the audio itself and no verbatim text was requested).
+    ``diarizer`` returns speaker turns for the WAV; chunks are cut at speaker
+    changes before ASR, so one segment holds one speaker.
     """
     loc = rules["local"]
     duration = float(probe["duration"] or 0)
@@ -184,10 +188,17 @@ def build_transcript(
         info["notes"].append(f"embedded subtitles cover only {cov:.0%} of the speech: running ASR as well")
 
     ratio = speech_seconds / max(duration, 1e-6)
-    if speech_seconds < 0.5 or (ratio < float(loc["speech_ratio_skip_asr"]) and not force_asr):
+    forced_blind = force_asr and speech_seconds < 0.5
+    if forced_blind:  # the user insists: voice detection found nothing, so ASR hears the whole track
+        ctx.warn("forced_asr_no_speech", "--force-asr: voice detection found no speech, so the whole audio track is "
+                                         "transcribed; expect errors or invented text if there really is none.")
+        speech = [[0.0, duration]]
+    elif speech_seconds < 0.5 or (ratio < float(loc["speech_ratio_skip_asr"]) and not force_asr):
         return use_cues(f"no speech detected (R2: {speech_seconds:.1f} s of speech, ratio {ratio:.3f})")
 
     chunks = make_chunks(speech, duration, max_len=float(loc["asr_chunk_max_seconds"]))
+    turns = diarizer(wav) if diarizer else []
+    chunks = split_at_turns(chunks, turns)
     lang = None if language in ("", "auto") else language
     candidates = asr_candidates(lang or "auto", tier, rules, manifest)
     if not candidates:
@@ -242,13 +253,62 @@ def build_transcript(
             engine_id = candidates[idx + 1]
 
     segments = [s for s in segments if s.get("text") and (s.get("lang") or "").lower() != "nospeech"]
+    if forced_blind:  # music alone tends to decode into lone punctuation
+        segments = [s for s in segments if any(ch.isalnum() for ch in s["text"])]
     for s in segments:
         s["source"] = "asr"
+    speakers = label_speakers(segments, turns)
+    if turns:
+        info["speakers"] = speakers
+        info["notes"].append(f"{speakers} speakers labelled" if speakers > 1 else
+                             "one speaker detected: no speaker labels")
     if cues:  # keep subtitle cues where ASR has nothing (partial coverage)
         segments = merge_sources(segments, cues)
     info.update(segments=segments, source="asr+embedded_subtitle" if cues else "asr", engine=engine_id,
                 language=lang or detect_language(segments))
     return info
+
+
+def split_at_turns(chunks: list[list[float]], turns: list[dict[str, Any]], min_len: float = 0.5) -> list[list[float]]:
+    """Cut ASR chunks where the speaker changes; pieces shorter than ``min_len`` stay with their neighbour."""
+    cuts = [round(b["start"], 3) for a, b in zip(turns, turns[1:]) if a["speaker"] != b["speaker"]]
+    out: list[list[float]] = []
+    for start, end in chunks:
+        cur = start
+        for c in cuts:
+            if cur + min_len <= c <= end - min_len:
+                out.append([cur, c])
+                cur = c
+        out.append([cur, end])
+    return out
+
+
+def label_speakers(segments: list[dict[str, Any]], turns: list[dict[str, Any]]) -> int:
+    """Set ``speaker`` on each segment from the turn it overlaps most ("Speaker 1" speaks first).
+
+    Returns the number of speakers heard in the segments. One speaker gets no
+    label: it would only add noise to every line.
+    """
+    names: dict[Any, str] = {}
+    picks: list[tuple[dict[str, Any], str]] = []
+    for seg in sorted(segments, key=lambda s: s["start"]):
+        overlap: dict[Any, float] = {}
+        for t in turns:
+            shared = min(seg["end"], t["end"]) - max(seg["start"], t["start"])
+            if shared > 0:
+                overlap[t["speaker"]] = overlap.get(t["speaker"], 0.0) + shared
+        if overlap:
+            who = max(overlap, key=lambda k: overlap[k])
+            picks.append((seg, names.setdefault(who, f"Speaker {len(names) + 1}")))
+    if len(names) > 1:
+        for seg, name in picks:
+            seg["speaker"] = name
+    return len(names)
+
+
+def spoken(seg: dict[str, Any]) -> str:
+    """Segment text with its speaker label, when it has one."""
+    return f"{seg['speaker']}: {seg['text']}" if seg.get("speaker") else seg["text"]
 
 
 def merge_sources(asr: list[dict[str, Any]], cues: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -267,11 +327,13 @@ def write_outputs(layout: Layout, info: dict[str, Any], role: str) -> list[Path]
         "role": role,
         "note": "Local transcript: reference only, may contain recognition errors. Timestamps are global (seconds).",
         "source": info.get("source"), "engine": info.get("engine"), "language": info.get("language"),
-        "segments": [{k: s.get(k) for k in ("start", "end", "text", "lang", "source", "engine")} for s in segs],
+        "speakers": info.get("speakers"),
+        "segments": [{k: s.get(k) for k in ("start", "end", "text", "lang", "source", "engine", "speaker")
+                      if k != "speaker" or s.get(k)} for s in segs],
     })
     files.append(tj)
     srt = layout.file("transcript.srt")
-    srt.write_text(media.format_srt(segs), encoding="utf-8")
+    srt.write_text(media.format_srt([{**s, "text": spoken(s)} for s in segs]), encoding="utf-8")
     files.append(srt)
     md = layout.file("transcript.md")
     head = {
@@ -280,9 +342,13 @@ def write_outputs(layout: Layout, info: dict[str, Any], role: str) -> list[Path]
         "reference": "Reference transcript with global timestamps; the LLM can hear the audio, which wins on conflicts.",
     }.get(role, "Machine transcript (reference only).")
     lines = ["# Transcript", "", f"> {head}", f"> source: {info.get('source')} · engine: {info.get('engine')} · "
-             f"language: {info.get('language') or 'unknown'}", ""]
+             f"language: {info.get('language') or 'unknown'}"]
+    if (info.get("speakers") or 0) > 1:
+        lines.append("> Speaker 1, 2, ... are machine-made voice groups, in order of first appearance: they can be wrong "
+                     "and say nothing about who the person is.")
+    lines.append("")
     for s in segs:
-        lines.append(f"[{fmt_ts(s['start'])}–{fmt_ts(s['end'])}] {s['text']}")
+        lines.append(f"[{fmt_ts(s['start'])}–{fmt_ts(s['end'])}] {spoken(s)}")
     if not segs:
         lines.append("_(no speech transcribed)_")
     md.write_text("\n".join(lines) + "\n", encoding="utf-8")

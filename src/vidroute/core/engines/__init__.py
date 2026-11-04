@@ -11,6 +11,7 @@ import os
 
 from vidroute.core.engines.asr import FasterWhisper, SherpaSenseVoice, SherpaWhisper
 from vidroute.core.engines.base import Engine, WorkerPool
+from vidroute.core.engines.diarize import SherpaDiarize
 from vidroute.core.engines.ocr import RapidOcr
 from vidroute.core.engines.scene import FfmpegScene
 from vidroute.core.engines.vad import EnergyVad, SileroVad
@@ -24,6 +25,7 @@ ENGINE_CLASSES: dict[str, type[Engine]] = {
     "faster-whisper": FasterWhisper,
     "rapidocr": RapidOcr,
     "ffmpeg-scene": FfmpegScene,
+    "sherpa-diarize": SherpaDiarize,
 }
 
 

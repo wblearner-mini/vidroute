@@ -66,7 +66,11 @@ def layout_for(video: Path, out: str | None) -> Layout:
     root = out_root(out) / paths.video_slug(video)
     if root.exists() and not root.is_dir():
         raise UsageError(f"Output path exists and is not a directory: {root}")
-    return Layout(root).ensure()
+    try:
+        return Layout(root).ensure()
+    except OSError as exc:
+        raise UsageError(f"Cannot write to the output folder {root}: {exc.strerror or exc}. Choose another with --out.",
+                         code="output_not_writable", hint="vidroute config set out_root <a folder you can write to>") from exc
 
 
 def reset_dir(path: Path, layout: Layout) -> Path:

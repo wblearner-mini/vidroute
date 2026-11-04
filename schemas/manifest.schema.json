@@ -104,7 +104,7 @@
       "additionalProperties": false,
       "properties": {
         "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$"},
-        "capability": {"enum": ["asr", "vad", "ocr", "scene", "vlm"]},
+        "capability": {"enum": ["asr", "vad", "ocr", "scene", "diarize", "vlm"]},
         "engine": {"type": "string"},
         "env_group": {"type": ["string", "null"]},
         "package": {"enum": ["base", "optional", "builtin"]},
