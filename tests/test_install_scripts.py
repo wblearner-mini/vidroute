@@ -89,4 +89,4 @@ def test_install_sh_without_a_downloader_says_what_to_install(tmp_path):
         (bin_dir / tool).symlink_to(shutil.which(tool))
     res = subprocess.run([shutil.which("sh"), str(SH), "--no-setup"], env={"PATH": str(bin_dir), "HOME": str(tmp_path)},
                          capture_output=True, text=True, timeout=30)
-    assert res.returncode == 1 and "needs curl or wget" in res.stderr and "not found" not in res.stderr
+    assert res.returncode == 1 and "需要 curl 或 wget" in res.stderr and "not found" not in res.stderr

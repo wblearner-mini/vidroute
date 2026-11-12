@@ -61,7 +61,7 @@ def llm_set(model_id: str, **opts: Any) -> dict[str, Any]:
     if opts.get("notes"):
         entry["notes"] = str(opts["notes"])
     if len(entry) == 2:
-        raise UsageError("Nothing to set; pass e.g. --modalities text,image,video --video-max-seconds 600")
+        raise UsageError("没有要设置的内容；请传入例如 --modalities text,image,video --video-max-seconds 600")
     entry["updated_at"] = datetime.now(timezone.utc).date().isoformat()
     _upsert("llm_profiles", entry)
     return entry
@@ -75,7 +75,7 @@ def host_set(host_id: str, **opts: Any) -> dict[str, Any]:
             entry[key] = parse_yes_no(opts[flag])
     if opts.get("video_delivery"):
         if opts["video_delivery"] not in VIDEO_DELIVERIES:
-            raise UsageError(f"--video-delivery must be one of {', '.join(VIDEO_DELIVERIES)}")
+            raise UsageError(f"--video-delivery 必须是 {', '.join(VIDEO_DELIVERIES)} 之一")
         entry["video_delivery"] = opts["video_delivery"]
         if opts["video_delivery"] == "native":
             entry.setdefault("can_attach_video", True)
@@ -84,7 +84,7 @@ def host_set(host_id: str, **opts: Any) -> dict[str, Any]:
     if opts.get("notes"):
         entry["notes"] = str(opts["notes"])
     if len(entry) == 1:
-        raise UsageError("Nothing to set; pass e.g. --attach-video yes --video-delivery native")
+        raise UsageError("没有要设置的内容；请传入例如 --attach-video yes --video-delivery native")
     entry["confidence"] = "user"
     entry["updated_at"] = datetime.now(timezone.utc).date().isoformat()
     _upsert("host_profiles", entry)
@@ -120,7 +120,7 @@ def sync_openrouter(timeout: float = 30.0) -> dict[str, Any]:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except (OSError, ValueError) as exc:
-        raise RunFailed(f"Could not fetch {OPENROUTER_MODELS}: {exc}", code="provider_sync_failed") from exc
+        raise RunFailed(f"无法获取 {OPENROUTER_MODELS}：{exc}", code="provider_sync_failed") from exc
     index: dict[str, Any] = {}
     for m in data.get("data", []):
         arch = m.get("architecture") or {}

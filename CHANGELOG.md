@@ -1,66 +1,62 @@
-# Changelog
+# 更新日志
 
-All notable changes are documented here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
-[Semantic Versioning](https://semver.org/).
+这里记录所有值得注意的变更。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
+版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [未发布]
 
-### Fixed
+### 变更
 
-- Installers no longer need git, unzip or Python: the default source is a source archive, and `install.sh` unpacks
-  the uv wheel with coreutils and gzip when nothing else is there. Stalled downloads fail after 20 s and move to the
-  next source; a missing curl/wget is reported up front with the command to run.
-- `vidroute setup` stops before downloading when ffmpeg is missing and cannot be installed for you.
-- `--force-asr` now also runs when voice detection finds no speech.
-- A damaged model is reported instead of silently being replaced by the next engine.
-- Large title lines count as on-screen text, so sparse slides get OCR.
+- 文档、技能、分析指南以及 CLI/MCP 面向用户的输出全部改为中文；README 只保留一份中文版（原 `README.zh-CN.md` 已合并）。
+  命令、参数、JSON 字段名和错误码保持不变。Windows 的 `install.ps1` 和 `vidroute.cmd` 仍输出英文，以免旧版
+  PowerShell/cmd 按系统代码页读取脚本时出错。
+- 移除了只对开发过程有用的 `PROGRESS.md` 和 `docs/RELEASING.md`。
 
-- Runs on the same output folder wait for each other instead of crashing; the second one reuses the results.
-- Clear messages for empty, cut-off or damaged files, unwritable folders, a full disk and an ffmpeg that cannot run. A
-  failed run no longer leaves an empty folder behind.
-- A long run resumes after an interruption from the last 60 s of speech; speaker turns are kept.
-- `setup` and `install` show their plan without a terminal too, and `setup` warns when another skill blocks a host.
-- `doctor`, the tier and thread counts respect container limits and CPU affinity.
+### 新增
 
-### Added
+- 说话人标签：`--task minutes` 或 `--diarize on` 时，转写中会标出 `Speaker 1`、`Speaker 2`……；
+  新增默认模型 `diarize-pyannote-campplus`（34 MB，纯 CPU）。
+- 关键帧预算漏掉了在屏幕上停留 5 秒及以上的镜头时，生成 `omitted-shots.md` 并给出警告。
+- `vidroute doctor`：并发探测系统/CPU/内存/GPU/ffmpeg/运行时，每项 5 秒超时，结果缓存 6 小时，
+  档位分为 `cpu-lite` / `cpu-full` / `gpu-cuda`。
+- `vidroute install`：安装计划、白名单下载与镜像回退、断点续传、SHA-256 校验、由 uv 管理的 worker 环境、
+  冒烟测试、许可确认，以及 `models list|verify|remove`、`clean`。
+- `vidroute llm resolve|set|unset|list|sync`、`host set|unset|list`：解析 LLM × 宿主的能力，每个值都注明来源；
+  内置带出处的档案。
+- `vidroute probe` 与 `vidroute plan`：快速获取视频信息，生成可解释的两层计划
+  （native-av / native-v / frames / text，并记录每次降级）。
+- `vidroute prepare` / `run`：转写（优先用字幕，VAD、语种识别、可续跑的 ASR）、关键帧与拼图、OCR、时间线、
+  原生路线所需的转码/分段视频，以及 `SUMMARY.md`、`ANALYSIS_GUIDE.md`、`handoff.json`、`segments.json`、`manifest.json`。
+- `vidroute drill`：对某个时间段补充细节。
+- MCP 服务 `vidroute-mcp`；Agent Skill `skills/vidroute`；Claude Code 插件与 marketplace 清单；`vidroute skill path`。
+- 中文文档；Windows 故障排查；路由参考。
+- `vidroute setup`：一份计划、一次确认，搞定 ffmpeg、运行时与模型，把 Agent Skill 装进找到的每个 Agent 宿主
+  （Claude Code、Codex CLI、Gemini CLI、Qwen Code、opencode、Cursor、Cline、Roo Code、Kilo Code、OpenClaw；
+  `--mcp` 还会注册 MCP 服务），最后做端到端自检；`setup --remove` 撤销宿主部分。`doctor` 会报告哪些宿主能看到技能。
+- 一行安装脚本 `install.ps1`（Windows）与 `install.sh`（Linux、macOS），不需要预装 Python。
+- `docs/AGENT_SETUP.md`：给 AI Agent 的分步安装说明。
+- 技能启动器 `scripts/vidroute`（sh）与 `scripts/vidroute.cmd`：PATH 上没有 `python` 也能用（会退回到 uv），
+  并使用 `vidroute setup` 记录的解释器。
+- `--mirror cn`，以及在中国大陆自动为 PyPI、uv 管理的 Python 和模型启用镜像；配置项 `pypi_index`、
+  `python_mirror`、`ffmpeg_source`。
+- Windows：winget 不可用或失败时，使用固定版本的 FFmpeg 9.0.2 便携包。
+- Windows on Arm：OCR 与 faster-whisper 环境使用 x64 worker Python。
 
-- Speaker labels (`Speaker 1`, `Speaker 2`, ...) in the transcript for `--task minutes` or `--diarize on`:
-  new default model `diarize-pyannote-campplus` (34 MB, CPU).
-- `omitted-shots.md` and a warning when the frame budget leaves out shots that stayed on screen for 5 s or more.
-- `vidroute doctor`: OS/CPU/RAM/GPU/ffmpeg/runtime detection with concurrent probes, 5 s timeouts,
-  a 6-hour cache and tiers `cpu-lite` / `cpu-full` / `gpu-cuda`.
-- `vidroute install`: install plans, allow-listed downloads with mirror fallback, resume and SHA-256
-  checks, uv-managed worker environments, smoke tests, license acceptance, `models list|verify|remove`,
-  `clean`.
-- `vidroute llm resolve|set|unset|list|sync`, `host set|unset|list`: LLM × host capability
-  resolution with sources for every value; bundled, cited profiles.
-- `vidroute probe` and `vidroute plan`: fast video facts and an explainable two-layer plan
-  (native-av / native-v / frames / text with recorded degradations).
-- `vidroute prepare` / `run`: transcripts (subtitles first, VAD, language ID, resumable ASR),
-  keyframes and contact sheets, OCR, timeline, transcoded/segmented video for native routes,
-  `SUMMARY.md`, `ANALYSIS_GUIDE.md`, `handoff.json`, `segments.json`, `manifest.json`.
-- `vidroute drill` for time ranges.
-- MCP server `vidroute-mcp`; Agent Skill `skills/vidroute`; Claude Code plugin and marketplace
-  manifests; `vidroute skill path`.
-- Documentation in English and Chinese; Windows troubleshooting; routing reference.
-- `vidroute setup`: one plan and one confirmation for ffmpeg, runtimes and models, the Agent Skill in
-  every agent host found (Claude Code, Codex CLI, Gemini CLI, Qwen Code, opencode, Cursor, Cline,
-  Roo Code, Kilo Code, OpenClaw; `--mcp` also registers the MCP server) and an end-to-end self-test;
-  `setup --remove` undoes the host part. `doctor` reports which hosts see the skill.
-- One-line installers `install.ps1` (Windows) and `install.sh` (Linux, macOS) that need no Python.
-- `docs/AGENT_SETUP.md`: step-by-step setup instructions for an AI agent.
-- Skill launchers `scripts/vidroute` (sh) and `scripts/vidroute.cmd` that need no `python` on PATH
-  (they fall back to uv) and use the interpreter `vidroute setup` recorded.
-- `--mirror cn` and automatic mirrors in mainland China for PyPI, uv-managed Python and models;
-  config keys `pypi_index`, `python_mirror`, `ffmpeg_source`.
-- Windows: a pinned portable FFmpeg 9.0.2 build when winget is unavailable or fails.
-- Windows on Arm: x64 worker Python for the OCR and faster-whisper environments.
+### 修复
 
-### Fixed
+- 安装脚本不再需要 git、unzip 或 Python：默认来源改为源码压缩包，没有其他工具时 `install.sh` 用 coreutils 和
+  gzip 解开 uv 的 wheel。下载卡住 20 秒即判定失败并换下一个来源；缺少 curl/wget 时一开始就报告，并给出要运行的命令。
+- 缺少 ffmpeg 且无法代为安装时，`vidroute setup` 会在下载前停下。
+- `--force-asr` 在人声检测没发现语音时也会执行。
+- 模型损坏时会报告出来，而不是悄悄换成下一个引擎。
+- 大号标题行也算作屏幕文字，内容稀疏的幻灯片也会做 OCR。
+- 对同一输出目录的多次运行会互相等待而不是崩溃；后一次直接复用结果。
+- 空文件、被截断或损坏的文件、不可写的目录、磁盘已满、ffmpeg 无法运行时，都会给出清楚的提示。运行失败后不再留下空目录。
+- 长时间运行被中断后，会从最后 60 秒语音处续跑，说话人分段得以保留。
+- 没有终端时 `setup` 和 `install` 也会展示计划；另一个技能挡住某个宿主时，`setup` 会给出警告。
+- `doctor`、档位和线程数会遵守容器限制与 CPU 亲和性。
+- 错误提示里曾写了不存在的参数（`install --retry`、`install --repair`）；现在有测试会把源码中引用的每条
+  `vidroute ...` 命令与真实 CLI 对照。
+- `vidroute install --force` 现在会真正重建 worker 环境。
 
-- Error hints named flags that do not exist (`install --retry`, `install --repair`); a test now checks
-  every `vidroute ...` command quoted in the source against the real CLI.
-- `vidroute install --force` now really rebuilds worker environments.
-
-[Unreleased]: https://github.com/wblearner-mini/vidroute/commits/main
+[未发布]: https://github.com/wblearner-mini/vidroute/commits/main

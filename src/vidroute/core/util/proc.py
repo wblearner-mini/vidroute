@@ -96,7 +96,7 @@ def run_bytes(
         cp = subprocess.run(argv, capture_output=True, timeout=timeout, env=child_env(env),
                             stdin=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW, check=False)
     except subprocess.TimeoutExpired:
-        return -1, b"", "timed out"
+        return -1, b"", "超时"
     except OSError as exc:
         return 127, b"", str(exc)
     return cp.returncode, cp.stdout, _decode(cp.stderr)
@@ -157,7 +157,7 @@ def run_parallel(tasks: Mapping[str, Callable[[], Any]], timeout: float) -> dict
                 value = fut.result(timeout=remaining)
                 results[name] = TaskOutcome(True, value, elapsed=time.monotonic() - started)
             except (TimeoutError, FuturesTimeout):
-                results[name] = TaskOutcome(False, error=f"timed out after {timeout:.0f}s", timed_out=True)
+                results[name] = TaskOutcome(False, error=f"{timeout:.0f} 秒后超时", timed_out=True)
             except Exception as exc:  # noqa: BLE001 - probe failures are data
                 results[name] = TaskOutcome(False, error=f"{type(exc).__name__}: {exc}")
     finally:

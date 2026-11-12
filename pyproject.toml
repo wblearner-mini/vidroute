@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "vidroute"
 dynamic = ["version"]
-description = "Give coding agents eyes and ears for local video: route each video to what the agent's LLM and host can actually consume (native video, keyframes + transcript, or text)."
+description = "让编程 Agent 能看、能听本地视频：按 Agent 所用 LLM 与宿主的实际能力，把视频转换成原生视频、关键帧 + 转写或纯文本。"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -81,7 +81,6 @@ include = [
     "tests/",
     "docs/",
     "README.md",
-    "README.zh-CN.md",
     "install.ps1",
     "install.sh",
     "LICENSE",

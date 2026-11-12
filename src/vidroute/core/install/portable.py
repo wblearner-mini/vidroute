@@ -44,8 +44,8 @@ def install(entry: RuntimeEntry, manifest: Manifest, ctx: Ctx, downloader: Downl
     bad = [f.path for f in entry.files if not verify_file(staging / f.path, f.sha256, f.size)]
     if bad:
         shutil.rmtree(staging, ignore_errors=True)
-        raise RunFailed(f"{entry.id}: extracted files do not match the manifest: {', '.join(bad)}",
-                        code="checksum_mismatch", hint="vidroute install --yes   (the archive is downloaded again)")
+        raise RunFailed(f"{entry.id}：解压出的文件与清单不符：{', '.join(bad)}",
+                        code="checksum_mismatch", hint="vidroute install --yes   （会重新下载压缩包）")
     write_json_atomic(staging / MARKER, {"id": entry.id, "version": entry.version, "source": source.url,
                                          "installed_at": datetime.now(timezone.utc).isoformat(timespec="seconds")})
     old = entry.path.with_name(entry.path.name + ".old")

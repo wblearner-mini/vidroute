@@ -162,7 +162,7 @@ def picture_stats(video: Path, duration: float, ctx: Ctx | None = None) -> dict[
             stats.update(text_density=ocr_stats["text_density"], text_area=ocr_stats["text_area"],
                          method=f"ocr-detect:{engine.id}", heuristic_text_density=stats["text_density"])
         except Exception as exc:  # noqa: BLE001 - fall back to the heuristic
-            ctx.warn("ocr_probe_failed", f"OCR text detection failed during probe ({exc}); using the heuristic.")
+            ctx.warn("ocr_probe_failed", f"探测时 OCR 文字检测失败（{exc}）；改用启发式方法。")
     return stats
 
 
@@ -188,7 +188,7 @@ def _extract_windows_wav(video: Path, windows: list[list[float]], out: Path) -> 
     args += ["-filter_complex", graph, "-map", "[a]", "-c:a", "pcm_s16le", str(out)]
     res = proc.run(args, timeout=120)
     if not res.ok:
-        raise RuntimeError((res.stderr or "ffmpeg failed")[-300:])
+        raise RuntimeError((res.stderr or "ffmpeg 失败")[-300:])
     offsets = []
     cursor = 0.0
     for s, e in windows:
@@ -222,7 +222,7 @@ def speech_stats(video: Path, duration: float, has_audio: bool, ctx: Ctx) -> dic
             return {"speech_ratio": round(min(1.0, speech / covered), 3) if covered else 0.0,
                     "method": "silero-vad", "windows": windows, "speech_seconds_sampled": round(speech, 2)}
         except Exception as exc:  # noqa: BLE001
-            ctx.warn("vad_probe_failed", f"Silero VAD failed during probe ({exc}); using energy detection.")
+            ctx.warn("vad_probe_failed", f"探测时 Silero VAD 失败（{exc}）；改用能量检测。")
     from vidroute.core.engines.vad import parse_silencedetect
 
     info = ffmpeg.require()
@@ -232,7 +232,7 @@ def speech_stats(video: Path, duration: float, has_audio: bool, ctx: Ctx) -> dic
                         "-vn", "-af", "silencedetect=noise=-35dB:d=0.4", "-f", "null", "-"], timeout=60)
         sound += sum(b - a for a, b in parse_silencedetect(res.stderr, e - s))
     return {"speech_ratio": round(min(1.0, sound / covered), 3) if covered else 0.0,
-            "method": "energy (any sound counts; install vad-silero for real speech detection)",
+            "method": "energy（任何声音都算；安装 vad-silero 才能真正检测语音）",
             "windows": windows}
 
 
@@ -244,9 +244,9 @@ def probe(video: str | os.PathLike[str], ctx: Ctx | None = None, refresh: bool =
     ctx = ctx or Ctx()
     path = Path(video).expanduser()
     if not path.exists():
-        raise NotFoundError(f"Video not found: {path}")
+        raise NotFoundError(f"找不到视频：{path}")
     if not path.is_file():
-        raise UsageError(f"Not a file: {path}")
+        raise UsageError(f"不是文件：{path}")
     path = path.resolve()
     cache = _cache_path(path)
     if not refresh:
@@ -255,14 +255,14 @@ def probe(video: str | os.PathLike[str], ctx: Ctx | None = None, refresh: bool =
             cached["cached"] = True
             return cached
     t0 = time.monotonic()
-    ctx.progress("probe", None, None, "reading streams")
+    ctx.progress("probe", None, None, "正在读取流信息")
     info = parse_ffprobe(ffmpeg.ffprobe_json(path), path)
     if not info["has_video"] and not info["has_audio"]:
-        raise UsageError(f"{path.name} has neither video nor audio streams")
+        raise UsageError(f"{path.name} 既没有视频流也没有音频流")
     duration = info["duration"]
     with ThreadPoolExecutor(max_workers=2) as pool:
         pic = pool.submit(picture_stats, path, duration, ctx) if info["has_video"] else None
-        ctx.progress("probe", None, None, "sampling speech")
+        ctx.progress("probe", None, None, "正在抽样检测语音")
         speech = speech_stats(path, duration, info["has_audio"], ctx)
         pictures = pic.result() if pic else {"frames": 0, "visual_change": 0.0, "text_density": 0.0, "text_area": 0.0}
     info.update({

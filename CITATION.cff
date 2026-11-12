@@ -1,9 +1,9 @@
 cff-version: 1.2.0
-message: "If you use vidroute in your work, please cite it as below."
-title: "vidroute: routing local video to what an agent's LLM can consume"
+message: "如果你在工作中使用了 vidroute，请按以下信息引用。"
+title: "vidroute：把本地视频转换成 Agent 的 LLM 能消费的形式"
 type: software
 authors:
-  - name: "vidroute contributors"
+  - name: "vidroute 贡献者"
     website: "https://github.com/wblearner-mini/vidroute"
 repository-code: "https://github.com/wblearner-mini/vidroute"
 license: MIT
@@ -15,7 +15,5 @@ keywords:
   - LLM agents
   - Model Context Protocol
 abstract: >-
-  vidroute decides what to hand an AI agent's language model for a local video — the video itself,
-  keyframes with a local transcript, or text — from the model's and the host's capabilities, prepares
-  it locally (speech recognition, OCR, keyframes, transcoding) and guides the analysis with global
-  timestamps and evidence-based proofreading.
+  vidroute 根据模型与宿主的能力，决定本地视频该以什么形式交给 AI Agent 的语言模型——视频本身、关键帧加本地转写，
+  还是纯文本——在本机完成准备（语音识别、OCR、关键帧、转码），并以全局时间戳和基于证据的校对来引导分析。

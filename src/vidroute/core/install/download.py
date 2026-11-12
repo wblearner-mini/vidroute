@@ -55,8 +55,8 @@ class _CheckedRedirects(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
         if not host_allowed(newurl, self.allowed):
             raise DomainNotAllowed(
-                f"Download redirected to a domain that is not allowed: {urllib.parse.urlsplit(newurl).hostname}",
-                hint="Check models/manifest.yaml allowed_domains or try another --mirror",
+                f"下载被重定向到不允许的域名：{urllib.parse.urlsplit(newurl).hostname}",
+                hint="请检查 models/manifest.yaml 中的 allowed_domains，或换一个 --mirror",
             )
         new = super().redirect_request(req, fp, code, msg, headers, newurl)
         if new is not None and req.has_header("Range"):
@@ -111,7 +111,7 @@ class Downloader:
         errors: list[str] = []
         for url in urls:
             if not host_allowed(url, self.allowed):
-                errors.append(f"{url}: domain not allowed")
+                errors.append(f"{url}：域名不在白名单中")
                 continue
             for attempt in range(1, self.retries + 1):
                 self.ctx.check_cancelled()
@@ -125,7 +125,7 @@ class Downloader:
                 except TooSlow as exc:
                     self.slow_seen = True
                     errors.append(f"{url}: {exc.message}")
-                    self.ctx.progress("download", None, None, f"{label}: {exc.message}, trying the next source")
+                    self.ctx.progress("download", None, None, f"{label}：{exc.message}，尝试下一个来源")
                     break  # partial data is kept: the next mirror resumes it
                 except (OSError, urllib.error.URLError, TimeoutError, http.client.HTTPException, RunFailed) as exc:
                     msg = getattr(exc, "message", None) or str(getattr(exc, "reason", exc))
@@ -133,9 +133,9 @@ class Downloader:
                     if attempt < self.retries:
                         time.sleep(self.backoff * attempt)
         raise RunFailed(
-            f"Could not download {label} from any mirror.",
+            f"无法从任何镜像下载 {label}。",
             code="download_failed",
-            hint="vidroute install --mirror auto  (re-run to resume; partial data is kept)",
+            hint="vidroute install --mirror auto  （重新运行会续传；已下载的部分会保留）",
             data={"errors": errors[-6:]},
         )
 
@@ -169,7 +169,7 @@ class Downloader:
             with resp:
                 final_url = resp.geturl()
                 if not host_allowed(final_url, self.allowed):
-                    raise DomainNotAllowed(f"Download ended on a domain that is not allowed: {final_url}")
+                    raise DomainNotAllowed(f"下载最终落在不允许的域名上：{final_url}")
                 status = getattr(resp, "status", 200)
                 if have and status == 206:
                     m = re.match(r"bytes (\d+)-", resp.headers.get("Content-Range", ""))
@@ -184,7 +184,7 @@ class Downloader:
                 if total is None and length and length.isdigit():
                     total = int(length) + have
                 if have:
-                    self.ctx.progress("download", have, total, f"{label} (resuming at {have / 1e6:.1f} MB)")
+                    self.ctx.progress("download", have, total, f"{label}（从 {have / 1e6:.1f} MB 处续传）")
                 write_json_atomic(meta_path, {"url": url, "sha256": sha256, "size": total, "dest": str(dest)})
                 mode = "ab" if have else "wb"
                 with part.open(mode) as fh:
@@ -194,7 +194,7 @@ class Downloader:
                     while True:
                         if self.ctx.cancelled:
                             fh.flush()
-                            raise Cancelled("Download cancelled; partial data kept for resume")
+                            raise Cancelled("下载已取消；已下载的部分会保留以便续传")
                         chunk = resp.read(CHUNK)
                         if not chunk:
                             break
@@ -207,7 +207,7 @@ class Downloader:
                             speed = window_bytes / (now - window_start)
                             if speed < self.min_speed:
                                 fh.flush()
-                                raise TooSlow(f"too slow ({speed / 1024:.0f} KB/s)", code="too_slow")
+                                raise TooSlow(f"速度太慢（{speed / 1024:.0f} KB/s）", code="too_slow")
                             window_start, window_bytes = now, 0
                         if now - last_report > 0.5:
                             self.ctx.progress("download", done, total, label)
@@ -217,13 +217,13 @@ class Downloader:
                 self.ctx.progress("download", done, total, label)
         actual_size = part.stat().st_size
         if size is not None and actual_size < size:
-            raise RunFailed(f"incomplete download ({actual_size}/{size} bytes); will resume", code="incomplete")
+            raise RunFailed(f"下载不完整（{actual_size}/{size} 字节）；将续传", code="incomplete")
         digest = sha256_file(part)
         if digest != sha256 or (size is not None and actual_size != size):
             part.unlink(missing_ok=True)
             meta_path.unlink(missing_ok=True)
             raise ChecksumMismatch(
-                f"SHA-256 mismatch for {label}: expected {sha256[:12]}…, got {digest[:12]}… ({actual_size} bytes)"
+                f"{label} 的 SHA-256 不匹配：应为 {sha256[:12]}…，实际为 {digest[:12]}…（{actual_size} 字节）"
             )
         dest.parent.mkdir(parents=True, exist_ok=True)
         os.replace(part, dest)

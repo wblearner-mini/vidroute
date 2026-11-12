@@ -71,25 +71,25 @@ class Host:
 
 HOSTS: tuple[Host, ...] = (
     Host("claude-code", "Claude Code", ("claude",), (claude_dir,), ("claude",), "claude-cli",
-         "start a new Claude Code session (or run /reload-skills in an open one)"),
+         "新开一个 Claude Code 会话（或在已打开的会话中运行 /reload-skills）"),
     Host("codex-cli", "Codex CLI", ("codex",), (codex_dir,), ("agents",), "codex-cli",
-         "restart Codex if the skill does not show up"),
+         "如果技能没有出现，请重启 Codex"),
     Host("gemini-cli", "Gemini CLI", ("gemini",), (lambda: user_home() / ".gemini",), ("agents",), "gemini-json",
-         "restart Gemini CLI"),
+         "重启 Gemini CLI"),
     Host("qwen-code", "Qwen Code", ("qwen",), (lambda: user_home() / ".qwen",), ("qwen",), "qwen-json",
-         "restart Qwen Code"),
+         "重启 Qwen Code"),
     Host("opencode", "opencode", ("opencode",), (lambda: xdg_config_dir() / "opencode",), ("agents", "claude"),
-         "opencode-json", "restart opencode"),
+         "opencode-json", "重启 opencode"),
     Host("cursor", "Cursor", ("cursor-agent", "cursor"), (lambda: user_home() / ".cursor",), ("agents", "claude"),
-         "cursor-json", "restart Cursor (or reload its window)"),
+         "cursor-json", "重启 Cursor（或重新加载其窗口）"),
     Host("cline", "Cline", ("cline",), (lambda: user_home() / ".cline",), ("cline",), None,
-         "reload the editor window", vscode_extension="saoudrizwan.claude-dev"),
+         "重新加载编辑器窗口", vscode_extension="saoudrizwan.claude-dev"),
     Host("roo", "Roo Code", (), (lambda: user_home() / ".roo",), ("agents",), None,
-         "reload the editor window", vscode_extension="rooveterinaryinc.roo-cline"),
+         "重新加载编辑器窗口", vscode_extension="rooveterinaryinc.roo-cline"),
     Host("kilo", "Kilo Code", ("kilocode",), (lambda: user_home() / ".kilo", lambda: user_home() / ".kilocode"),
-         ("agents",), None, "reload the editor window", vscode_extension="kilocode.kilo-code"),
+         ("agents",), None, "重新加载编辑器窗口", vscode_extension="kilocode.kilo-code"),
     Host("openclaw", "OpenClaw", ("openclaw",), (openclaw_dir,), ("agents",), None,
-         "start a new OpenClaw session"),
+         "新开一个 OpenClaw 会话"),
 )
 
 BY_ID = {h.id: h for h in HOSTS}
@@ -104,7 +104,7 @@ def get(host_id: str) -> Host:
         profile = find_host(key, builtin_host_profiles())
         key = profile["id"] if profile else key
     if key not in BY_ID:
-        raise UsageError(f"vidroute cannot connect to host {host_id!r} by itself; supported: {', '.join(BY_ID)}",
+        raise UsageError(f"vidroute 无法自行接入宿主 {host_id!r}；支持的宿主：{', '.join(BY_ID)}",
                          hint="vidroute setup --host claude-code")
     return BY_ID[key]
 

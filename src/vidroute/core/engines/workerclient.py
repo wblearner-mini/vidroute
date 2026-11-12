@@ -63,7 +63,7 @@ class WorkerClient:
     def start(self) -> "WorkerClient":
         if not self.group.python_exe.is_file():
             raise NeedsInstall(
-                f"Worker environment '{self.group.name}' is not installed.",
+                f"worker 环境 '{self.group.name}' 未安装。",
                 code="env_missing",
                 hint=f"vidroute install --capability {'ocr' if self.group.name == 'ocr' else 'asr'}",
             )
@@ -84,7 +84,7 @@ class WorkerClient:
         threading.Thread(target=self._read, daemon=True, name=f"vidroute-{self.worker}-reader").start()
         ready = self._next_message(READY_TIMEOUT, expect_id=None)
         if ready.get("event") != "ready":
-            raise WorkerError(f"{self.worker} worker did not start: {ready}")
+            raise WorkerError(f"{self.worker} worker 未能启动：{ready}")
         self.info = ready
         return self
 
@@ -147,17 +147,17 @@ class WorkerClient:
         while True:
             if self.ctx.cancelled:
                 self._kill()
-                raise Cancelled(f"{self.worker} worker cancelled")
+                raise Cancelled(f"{self.worker} worker 已取消")
             try:
                 line = self.lines.get(timeout=0.2)
             except queue.Empty:
                 if deadline is not None and time.monotonic() > deadline:
                     self._kill()
-                    raise WorkerError(f"{self.worker} worker timed out", data={"stderr": self._stderr_tail()})
+                    raise WorkerError(f"{self.worker} worker 超时", data={"stderr": self._stderr_tail()})
                 continue
             if line is None:
                 raise WorkerError(
-                    f"{self.worker} worker exited unexpectedly (code {self.proc.poll() if self.proc else '?'})",
+                    f"{self.worker} worker 意外退出（退出码 {self.proc.poll() if self.proc else '?'}）",
                     data={"stderr": self._stderr_tail(), "log": str(self.log_path)},
                 )
             line = line.strip()

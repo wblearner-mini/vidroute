@@ -34,8 +34,8 @@ done
 
 case $(uname -s 2>/dev/null) in
   MINGW*|MSYS*|CYGWIN*) hint='winget install -e --id astral-sh.uv' ;;
-  Darwin) hint='brew install uv   (or: curl -LsSf https://astral.sh/uv/install.sh | sh)' ;;
+  Darwin) hint='brew install uv   （或：curl -LsSf https://astral.sh/uv/install.sh | sh）' ;;
   *) hint='curl -LsSf https://astral.sh/uv/install.sh | sh' ;;
 esac
-printf '{"ok": false, "schema": "vidroute/1", "data": {}, "warnings": [], "error": {"code": "needs_install", "message": "vidroute needs Python 3.10+ or uv, and neither was found; install uv, then run this command again (no restart needed).", "hint": "%s"}}\n' "$hint"
+printf '{"ok": false, "schema": "vidroute/1", "data": {}, "warnings": [], "error": {"code": "needs_install", "message": "vidroute 需要 Python 3.10+ 或 uv，但两者都没有找到；请安装 uv，然后重新运行这条命令（无需重启）。", "hint": "%s"}}\n' "$hint"
 exit 2

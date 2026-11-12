@@ -23,7 +23,7 @@ class SherpaDiarize(Engine):
     def smoke_test(self, ctx: Ctx) -> dict[str, Any]:
         sample = self.manifest.model("asr-sensevoice-small-int8").model_dir / "test_wavs" / "zh.wav"
         if not sample.exists():
-            return {"status": "skipped", "detail": "no sample recording to test with"}
+            return {"status": "skipped", "detail": "没有可用于测试的示例录音"}
         with WorkerPool(ctx) as pool:
             turns = self.diarize(ctx, pool, sample)
-        return {"status": "passed" if turns else "failed", "detail": f"{len(turns)} turn(s) on the sample recording"}
+        return {"status": "passed" if turns else "failed", "detail": f"示例录音中有 {len(turns)} 段发言"}

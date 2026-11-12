@@ -40,4 +40,4 @@ class Ctx:
 
     def check_cancelled(self) -> None:
         if self.cancel_event.is_set():
-            raise Cancelled("Cancelled by request", hint=None)
+            raise Cancelled("已按请求取消", hint=None)

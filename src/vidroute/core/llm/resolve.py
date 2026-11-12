@@ -34,7 +34,7 @@ def parse_modalities(raw: str | list[str] | None) -> list[str] | None:
     mods = [m.strip().lower() for m in items if m.strip()]
     bad = set(mods) - set(P.MODALITIES)
     if bad:
-        raise UsageError(f"Unknown modality {sorted(bad)}; use text,image,audio,video")
+        raise UsageError(f"未知模态 {sorted(bad)}；请使用 text,image,audio,video")
     if "text" not in mods:
         mods.insert(0, "text")
     return list(dict.fromkeys(mods))
@@ -48,7 +48,7 @@ def parse_yes_no(raw: str | bool | None) -> bool | None:
         return True
     if val in ("no", "n", "false", "0"):
         return False
-    raise UsageError(f"Expected yes or no, got {raw!r}")
+    raise UsageError(f"应为 yes 或 no，实际为 {raw!r}")
 
 
 def raw_limit_mb(mb: float | None, is_base64: bool) -> float | None:
@@ -66,8 +66,8 @@ def resolve_llm(
     ctx = ctx or Ctx()
     model_id = model_id or config.get("default_llm")
     if not model_id:
-        raise UsageError("Which LLM will read the result? Pass --llm <model-id> (e.g. claude-opus-5-5, gemini-3.8-flash).",
-                         hint="vidroute llm resolve --llm <model-id>")
+        raise UsageError("由哪个 LLM 来读结果？请传入 --llm <模型 id>（例如 claude-opus-5-5、gemini-3.8-flash）。",
+                         hint="vidroute llm resolve --llm <模型 id>")
     sources: dict[str, str] = {}
     builtin, pattern = P.match_llm(model_id, P.builtin_llm_profiles())
     fallback = next(p for p in P.builtin_llm_profiles() if p["id"] == "*")
@@ -105,18 +105,18 @@ def resolve_llm(
     flag_aiv = parse_yes_no(audio_in_video)
     # Warn only about what nobody told us: the user's own profile (config) or flags take responsibility.
     if origin == "default" and sources["modalities_in"] == "default":
-        ctx.warn("unknown_model", f"Unknown model {model_id!r}: treated as image-only with conservative limits.",
-                 f"vidroute llm set {model_id} --modalities text,image,video  (or pass --modalities)")
+        ctx.warn("unknown_model", f"未知模型 {model_id!r}：按只支持图片、采用保守限额处理。",
+                 f"vidroute llm set {model_id} --modalities text,image,video  （或传入 --modalities）")
     elif unverified and not user_prof:
         ctx.warn("unverified_profile",
-                 f"The profile for {model_id!r} ({prof.get('id')}) is unverified; limits are conservative guesses.",
+                 f"{model_id!r} 的档案（{prof.get('id')}）未经核实；限额为保守估计。",
                  f"vidroute llm set {model_id} --video-max-seconds N ...")
 
     mods = list(prof.get("modalities_in") or ["text"])
     if "video" in mods and not prof.get("video"):
         prof["video"] = dict(CONSERVATIVE_VIDEO)
         sources["video"] = "default"
-        ctx.warn("video_limits_unknown", f"{model_id!r} takes video but its limits are unknown; using conservative limits.",
+        ctx.warn("video_limits_unknown", f"{model_id!r} 能接收视频，但限额未知；使用保守限额。",
                  f"vidroute llm set {model_id} --video-max-seconds N --video-max-mb N")
     if "image" in mods and not prof.get("image"):
         prof["image"] = dict(CONSERVATIVE_IMAGE)
@@ -158,15 +158,15 @@ def resolve_host(host_id: str | None, ctx: Ctx | None = None) -> dict[str, Any]:
         detected, var = P.detect_host()
         if detected:
             host_id, source = detected, f"detected:{var}"
-            ctx.warn("host_detected", f"Host guessed as {detected!r} from ${var}; pass --host to be explicit.")
+            ctx.warn("host_detected", f"根据 ${var} 推测宿主为 {detected!r}；可传入 --host 明确指定。")
     builtin = P.find_host(host_id, P.builtin_host_profiles()) if host_id else None
     if builtin is None:
         if host_id:
-            ctx.warn("unknown_host", f"Unknown host {host_id!r}: assuming it can attach images but not video or audio.",
+            ctx.warn("unknown_host", f"未知宿主 {host_id!r}：假定它能附带图片，但不能附带视频或音频。",
                      f"vidroute host set {host_id} --attach-video yes|no --video-delivery native|none")
         else:
-            ctx.warn("host_missing", "No host given: assuming an image-only agent host.",
-                     "pass --host claude-code|codex-cli|gemini-cli|qwen-code|opencode|...")
+            ctx.warn("host_missing", "未指定宿主：假定为只支持图片的 Agent 宿主。",
+                     "传入 --host claude-code|codex-cli|gemini-cli|qwen-code|opencode|...")
         builtin = P.find_host("unknown", P.builtin_host_profiles())
         source = "default"
     host = dict(builtin or {})
@@ -175,7 +175,7 @@ def resolve_host(host_id: str | None, ctx: Ctx | None = None) -> dict[str, Any]:
         host = P.deep_merge(host, {k: v for k, v in user.items() if k not in ("id", "aliases")})
         source = "config"
     if host.get("confidence") == "unverified" and source != "config":
-        ctx.warn("unverified_host", f"Host profile {host['id']!r} is unverified; conservative assumptions apply.",
+        ctx.warn("unverified_host", f"宿主档案 {host['id']!r} 未经核实；采用保守假设。",
                  f"vidroute host set {host['id']} ...")
     host["requested"] = host_id
     host["source"] = source
@@ -188,20 +188,20 @@ def effective_capabilities(llm: dict[str, Any], host: dict[str, Any]) -> dict[st
 
     image = "image" in mods and bool(host.get("can_attach_image"))
     if "image" in mods and not image:
-        blocked.append({"modality": "image", "why": f"host {host['id']} cannot attach images"})
+        blocked.append({"modality": "image", "why": f"宿主 {host['id']} 不能附带图片"})
 
     delivery = host.get("video_delivery", "none")
     video_ok_host = bool(host.get("can_attach_video")) and delivery == "native"
     video = "video" in mods and video_ok_host
     if "video" in mods and not video:
-        why = {"frame-sampled": "turns video into frames itself", "preprocessed": "converts video to text itself"}.get(
-            delivery, "cannot attach video files")
-        blocked.append({"modality": "video", "why": f"host {host['id']} {why} (limited by the host, not the model)"})
+        why = {"frame-sampled": "会自己把视频转成帧", "preprocessed": "会自己把视频转成文本"}.get(
+            delivery, "不能附带视频文件")
+        blocked.append({"modality": "video", "why": f"宿主 {host['id']} {why}（受宿主限制，而非模型限制）"})
     audio_in_video = bool(video and (llm.get("video") or {}).get("audio_in_video") and host.get("video_includes_audio"))
 
     audio = "audio" in mods and bool(host.get("can_attach_audio"))
     if "audio" in mods and not audio:
-        blocked.append({"modality": "audio", "why": f"host {host['id']} cannot attach audio"})
+        blocked.append({"modality": "audio", "why": f"宿主 {host['id']} 不能附带音频"})
 
     host_mb = host.get("max_attachment_mb")
     inline = host.get("delivery", "inline") == "inline"
@@ -265,6 +265,6 @@ def resolve(
     eff = effective_capabilities(llm, host)
     for b in eff["blocked_by_host"]:
         if b["modality"] == "video":
-            ctx.warn("host_blocks_video", f"{llm['model']} understands video, but {b['why']}.",
-                     "vidroute plan ... (D3 keyframes + transcript will be used)")
+            ctx.warn("host_blocks_video", f"{llm['model']} 能理解视频，但{b['why']}。",
+                     "vidroute plan ...（将使用 D3 关键帧 + 转写）")
     return {"llm": llm, "host": host, "effective": eff}

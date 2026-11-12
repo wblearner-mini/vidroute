@@ -25,12 +25,12 @@ def _unexpected(exc: Exception) -> RunFailed:
     if isinstance(exc, OSError):
         where = exc.filename or "a file"
         if exc.errno == errno.ENOSPC:
-            return RunFailed(f"The disk is full (writing {where}).", code="disk_full", hint="vidroute clean")
+            return RunFailed(f"磁盘已满（正在写入 {where}）。", code="disk_full", hint="vidroute clean")
         if exc.errno in (errno.EACCES, errno.EPERM, errno.EROFS):
-            return RunFailed(f"No permission to write {where}: {exc.strerror}.", code="not_writable",
-                             hint="vidroute config set out_root <a folder you can write to>")
-    return RunFailed(f"Unexpected error: {type(exc).__name__}: {exc}. Run again with -v for details; this may be a "
-                     "bug, please report it: https://github.com/wblearner-mini/vidroute/issues")
+            return RunFailed(f"没有权限写入 {where}：{exc.strerror}。", code="not_writable",
+                             hint="vidroute config set out_root <一个你有写权限的目录>")
+    return RunFailed(f"意外错误：{type(exc).__name__}：{exc}。加 -v 重新运行可查看详情；这可能是一个 bug，"
+                     "请报告：https://github.com/wblearner-mini/vidroute/issues")
 
 
 def command(fn: Callable[..., dict[str, Any]]) -> Callable[..., Envelope]:
@@ -44,7 +44,7 @@ def command(fn: Callable[..., dict[str, Any]]) -> Callable[..., Envelope]:
         except VidrouteError as err:
             return failure(err, warnings=ctx.warnings)
         except KeyboardInterrupt:
-            return failure(RunFailed("Interrupted", code="cancelled"), warnings=ctx.warnings)
+            return failure(RunFailed("已中断", code="cancelled"), warnings=ctx.warnings)
         except Exception as exc:  # noqa: BLE001 - last-resort envelope
             get_logger().debug("unhandled error:\n%s", traceback.format_exc())
             return failure(_unexpected(exc), warnings=ctx.warnings)
@@ -102,7 +102,7 @@ def install(
         return {"plan": plan, "executed": False}
     if plan["license_acceptance_required"]:
         raise NeedsConfirmation(
-            "Some models have restricted licenses that must be accepted explicitly: "
+            "部分模型的许可受限，必须明确接受："
             + ", ".join(plan["license_acceptance_required"]),
             code="license_not_accepted",
             hint=plan["accept_command"],
@@ -112,13 +112,13 @@ def install(
         from vidroute.core.errors import InsufficientHardware
 
         raise InsufficientHardware(
-            f"Not enough disk space: ~{plan['disk_needed_gb']} GB needed, {plan['disk_free_gb']} GB free.",
-            hint="Free some space or set VIDROUTE_HOME to a larger drive", data={"plan": plan})
+            f"磁盘空间不足：需要约 {plan['disk_needed_gb']} GB，剩余 {plan['disk_free_gb']} GB。",
+            hint="请腾出空间，或把 VIDROUTE_HOME 设到更大的磁盘", data={"plan": plan})
     if plan["nothing_to_do"]:
-        return {"plan": plan, "executed": False, "message": "Everything requested is already installed."}
+        return {"plan": plan, "executed": False, "message": "请求的内容都已安装。"}
     if not yes:
         raise NeedsConfirmation(
-            "Review the install plan and confirm (nothing has been downloaded).",
+            "请查看安装计划并确认（尚未下载任何东西）。",
             code="needs_confirmation",
             hint=plan["confirm_command"],
             data={"plan": plan},
@@ -157,21 +157,21 @@ def setup(
         return {"plan": the_plan, "executed": False}
     blocker = _setup.ffmpeg_blocker(the_plan)
     if blocker:  # say so now, not after a long download
-        raise NeedsInstall("Install ffmpeg first, then run vidroute setup again: vidroute cannot read videos without it "
-                           "and cannot install it here. Nothing has been downloaded or changed.",
+        raise NeedsInstall("请先安装 ffmpeg，然后重新运行 vidroute setup：没有它 vidroute 无法读取视频，"
+                           "而在这里也无法代为安装。尚未下载或修改任何东西。",
                            code="ffmpeg_missing", hint=blocker, data={"plan": the_plan})
     if inst and inst["license_acceptance_required"]:
         raise NeedsConfirmation(
-            "Some models have restricted licenses that must be accepted explicitly: "
+            "部分模型的许可受限，必须明确接受："
             + ", ".join(inst["license_acceptance_required"]),
             code="license_not_accepted", hint=inst["accept_command"], data={"plan": the_plan})
     if inst and not inst["disk_ok"]:
         raise InsufficientHardware(
-            f"Not enough disk space: ~{inst['disk_needed_gb']} GB needed, {inst['disk_free_gb']} GB free.",
-            hint="Free some space or set VIDROUTE_HOME to a larger drive", data={"plan": the_plan})
+            f"磁盘空间不足：需要约 {inst['disk_needed_gb']} GB，剩余 {inst['disk_free_gb']} GB。",
+            hint="请腾出空间，或把 VIDROUTE_HOME 设到更大的磁盘", data={"plan": the_plan})
     if not the_plan["nothing_to_do"] and not yes:
         raise NeedsConfirmation(
-            "Review the setup plan and confirm (nothing has been downloaded or changed).",
+            "请查看安装计划并确认（尚未下载或修改任何东西）。",
             code="needs_confirmation", hint=the_plan["confirm_command"], data={"plan": the_plan})
     return _setup.execute(the_plan, ctx, mirror=mirror)
 
@@ -188,7 +188,7 @@ def setup_remove(hosts: list[str] | None = None, yes: bool = False, dry_run: boo
         return {"plan": the_plan, "executed": False}
     if not yes:
         hint = "vidroute setup --remove" + "".join(f" --host {h}" for h in hosts or []) + " --yes"
-        raise NeedsConfirmation("Review what would be removed from your agent hosts and confirm.",
+        raise NeedsConfirmation("请查看将从 Agent 宿主中移除的内容并确认。",
                                 code="needs_confirmation", hint=hint, data={"plan": the_plan})
     return {"plan": the_plan, "executed": True, **integrate.remove(the_plan, ctx)}
 
@@ -224,7 +224,7 @@ def models_verify(model_ids: list[str] | None = None, *, ctx: Ctx) -> dict[str, 
         results.append(verify_model(manifest.model(mid)))
     bad = [r["id"] for r in results if not r["ok"]]
     if bad:
-        ctx.warn("verify_failed", f"Integrity check failed: {', '.join(bad)}",
+        ctx.warn("verify_failed", f"完整性校验失败：{', '.join(bad)}",
                  "vidroute install " + " ".join(f"--model {b}" for b in bad) + " --force --yes")
     return {"results": results, "ok": not bad}
 
@@ -239,7 +239,7 @@ def models_remove(model_ids: list[str], yes: bool = False, *, ctx: Ctx) -> dict[
     manifest = load_manifest()
     entries = [manifest.model(mid) for mid in model_ids]
     if not yes:
-        raise NeedsConfirmation(f"Remove {', '.join(model_ids)} from {paths.models_dir()}?",
+        raise NeedsConfirmation(f"要从 {paths.models_dir()} 删除 {', '.join(model_ids)} 吗？",
                                 hint="vidroute models remove " + " ".join(model_ids) + " --yes")
     removed = [e.id for e in entries if remove_model(e)]
     _doctor.invalidate()
@@ -262,7 +262,7 @@ def clean(downloads: bool = True, logs: bool = True, outputs: bool = False, yes:
     if outputs:
         targets.append(paths.default_out_root())
     if outputs and not yes:
-        raise NeedsConfirmation(f"This deletes all outputs under {paths.default_out_root()}.",
+        raise NeedsConfirmation(f"这会删除 {paths.default_out_root()} 下的所有输出。",
                                 hint="vidroute clean --outputs --yes")
     removed = []
     for t in targets:
@@ -311,7 +311,7 @@ def llm_sync(provider: str = "openrouter", *, ctx: Ctx) -> dict[str, Any]:
     from vidroute.core.llm import manage
 
     if provider != "openrouter":
-        raise UsageError("Only --provider openrouter is supported")
+        raise UsageError("只支持 --provider openrouter")
     return manage.sync_openrouter()
 
 

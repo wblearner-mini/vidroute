@@ -78,8 +78,8 @@ def _warn_conflicts(integration: dict[str, Any], ctx: Ctx) -> None:
     for item in integration.get("items", []):
         if item.get("kind") != "skill" or item.get("action") != "skip" or skills.is_vidroute_skill(Path(item["path"])):
             continue
-        ctx.warn("skill_conflict", f"Not connected: {', '.join(item['hosts'])}. {item['path']} holds a different skill "
-                                   "with the same name, and it was left alone.",
+        ctx.warn("skill_conflict", f"未接入：{', '.join(item['hosts'])}。{item['path']} 中有一个同名的其他技能，"
+                                   "已保持原样未动。",
                  "vidroute setup --force --no-install" + "".join(f" --host {h}" for h in item["hosts"]))
 
 
@@ -98,26 +98,26 @@ def execute(the_plan: dict[str, Any], ctx: Ctx, mirror: str = "auto") -> dict[st
             if exc.code == "cancelled":
                 raise
             out["install"] = {**(exc.data or {}), "ok": False, "error": exc.message}
-            problems.append("installing runtimes or models")
+            problems.append("安装运行时或模型")
     out["integration"] = integrate.apply(the_plan["integration"], ctx)
     if not out["integration"]["ok"]:
-        problems.append("connecting an agent host")
+        problems.append("接入 Agent 宿主")
     _warn_conflicts(the_plan["integration"], ctx)
     ffmpeg.reset_cache()
     doctor.invalidate()
     if the_plan.get("selftest"):
         out["selftest"] = selftest.run(ctx)
         if out["selftest"]["status"] == "failed":
-            problems.append("the self-test")
+            problems.append("自检")
     out["next_steps"] = out["integration"].get("next_steps", [])
     if not ffmpeg.detect().found:
-        message = "ffmpeg/ffprobe are still missing: vidroute cannot read videos without them."
+        message = "仍然缺少 ffmpeg/ffprobe：没有它们 vidroute 无法读取视频。"
         if inst is None:  # --no-install: the user chose not to install anything now
             ctx.warn("ffmpeg_missing", message, ffmpeg.install_hint())
         else:
             raise NeedsInstall(message, code="ffmpeg_missing", hint=ffmpeg.install_hint(), data=out)
     if problems:
-        raise RunFailed("Setup finished with problems in " + ", ".join(problems) + ".", code="setup_failed",
-                        hint="vidroute doctor --refresh   (then run vidroute setup again: finished parts are kept)",
+        raise RunFailed("安装已结束，但以下环节有问题：" + "、".join(problems) + "。", code="setup_failed",
+                        hint="vidroute doctor --refresh   （然后重新运行 vidroute setup：已完成的部分会保留）",
                         data=out)
     return out

@@ -67,9 +67,9 @@ def test_lock_dies_with_a_killed_process(tmp_path):
 
 
 @pytest.mark.parametrize("name,content,stderr,expected", [
-    ("empty.mp4", b"", "moov atom not found", "the file is empty"),
-    ("cut.mp4", b"x", "x: moov atom not found", "incomplete or damaged"),
-    ("junk.mp4", b"x", "x: Invalid data found when processing input", "damaged"),
+    ("empty.mp4", b"", "moov atom not found", "文件是空的"),
+    ("cut.mp4", b"x", "x: moov atom not found", "不完整或已损坏"),
+    ("junk.mp4", b"x", "x: Invalid data found when processing input", "已损坏"),
     ("other.mp4", b"x", "something rare", "something rare"),
 ])
 def test_unreadable_files_are_explained(tmp_path, name, content, stderr, expected):
@@ -196,7 +196,7 @@ def test_setup_warns_when_another_skill_blocks_a_host(user_home, capsys):
     assert cli.main(["setup", "--host", "claude-code", "--no-install", "--no-selftest", "--yes", "--json"]) == 0
     out = json.loads(capsys.readouterr().out)
     warned = [w for w in out["warnings"] if w["code"] == "skill_conflict"]
-    assert warned and "Claude Code" not in warned[0]["message"].split("holds")[1]
+    assert warned and "Claude Code" not in warned[0]["message"].split("中有一个")[1]
     assert warned[0]["hint"] == "vidroute setup --force --no-install --host claude-code"
     assert (target / "SKILL.md").read_text() == "my own skill"
 
@@ -204,4 +204,4 @@ def test_setup_warns_when_another_skill_blocks_a_host(user_home, capsys):
 def test_plan_is_shown_without_a_terminal(user_home, capsys):
     assert cli.main(["setup", "--host", "claude-code", "--no-install", "--no-selftest"]) == 3
     err = capsys.readouterr().err
-    assert "skill" in err and "create" in err and "Review the setup plan" in err
+    assert "skill" in err and "create" in err and "请查看安装计划" in err

@@ -1,24 +1,23 @@
-# vidroute output folder
+# vidroute 输出目录
 
-`vidroute prepare` writes everything to `<out>/<slug>/` (`<slug>` = file name + short hash).
-All times are **global** seconds of the original video.
+`vidroute prepare` 把所有内容写到 `<out>/<slug>/`（`<slug>` = 文件名 + 短哈希）。所有时间都是原视频的**全局**秒数。
 
-| file | what it is |
+| 文件 | 是什么 |
 |---|---|
-| `SUMMARY.md` | start here: route, reasons, what was produced or skipped and why, warnings, budget |
-| `ANALYSIS_GUIDE.md` | how to read and proofread for this route, minutes template, drill advice |
-| `handoff.json` | machine-readable list of what to attach (schema `vidroute/handoff/1`) |
-| `plan.json` | the routing plan (schema `vidroute/plan/1`) |
-| `manifest.json` | every file with SHA-256, engines/models used and their licenses |
-| `segments.json` | native routes: the video parts and their `offset_sec` |
-| `native/` | native routes: the (transcoded) video or its parts |
-| `contact-sheets/` | `sheet-NN.jpg` grids of keyframes with time labels, and `index.md` |
-| `frames/` | full-resolution keyframes, `NNN_<time>.jpg` |
-| `transcript.md/.srt/.json` | local transcript; JSON segments `{start, end, text, lang, source, engine}` |
-| `ocr.md/.json` | on-screen text per keyframe (repeated lines omitted in the `.md`) |
-| `timeline.md` | pictures, on-screen text and speech merged by time |
-| `audio/16k.wav` | the extracted audio (used by drill `--asr`) |
-| `drill/<start>-<end>/` | drill output: `frames/`, `contact-sheets/`, `transcript.*`, `ocr.*`, `timeline.md`, `drill.json` |
+| `SUMMARY.md` | 从这里开始：路线、原因、生成或跳过了什么及原因、警告、预算 |
+| `ANALYSIS_GUIDE.md` | 本路线下如何阅读和校对、纪要模板、钻取建议 |
+| `handoff.json` | 机器可读的附带清单（schema `vidroute/handoff/1`） |
+| `plan.json` | 路由计划（schema `vidroute/plan/1`） |
+| `manifest.json` | 每个文件的 SHA-256、所用引擎/模型及其许可 |
+| `segments.json` | 原生路线：视频各部分及其 `offset_sec` |
+| `native/` | 原生路线：（转码后的）视频或其分段 |
+| `contact-sheets/` | 带时间标签的关键帧拼图 `sheet-NN.jpg`，以及 `index.md` |
+| `frames/` | 全分辨率关键帧，`NNN_<时间>.jpg` |
+| `transcript.md/.srt/.json` | 本地转写；JSON 片段为 `{start, end, text, lang, source, engine}` |
+| `ocr.md/.json` | 每个关键帧上的屏幕文字（`.md` 中省略重复的行） |
+| `timeline.md` | 按时间合并的画面、屏幕文字和语音 |
+| `audio/16k.wav` | 提取出的音频（drill `--asr` 会用到） |
+| `drill/<start>-<end>/` | drill 输出：`frames/`、`contact-sheets/`、`transcript.*`、`ocr.*`、`timeline.md`、`drill.json` |
 
 ## handoff.json
 
@@ -41,8 +40,8 @@ All times are **global** seconds of the original video.
 }
 ```
 
-- `attachments`: attach all of them. Video parts carry `segment: {id, start, end, offset_sec}`.
-- `text_context`: read the items with `"attach": true`; the others repeat content (navigation only).
-- `transcript_role`: `sole_source` (you cannot hear: proofread only with visible evidence),
-  `reference` (you can hear: what you hear wins), `none` (no speech transcribed).
-- Paths are relative to the folder holding `handoff.json`.
+- `attachments`：全部附带。视频分段带有 `segment: {id, start, end, offset_sec}`。
+- `text_context`：读取 `"attach": true` 的项；其他项的内容是重复的（只用于导航）。
+- `transcript_role`：`sole_source`（你听不到：只凭看得见的证据校对）、`reference`（你能听到：以你听到的为准）、
+  `none`（没有转写出语音）。
+- 路径相对于 `handoff.json` 所在的目录。

@@ -1,14 +1,14 @@
-name: Feature request
-description: An idea for vidroute
+name: 功能建议
+description: 关于 vidroute 的想法
 labels: [enhancement]
 body:
   - type: textarea
     id: problem
     attributes:
-      label: What are you trying to do?
+      label: 你想做什么？
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
-      label: What would help?
+      label: 什么能帮到你？

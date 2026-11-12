@@ -37,9 +37,9 @@ def decide(
     for g in nvidia:
         vram = g.get("vram_gb")
         if vram is None:
-            reasons.append(f"{g.get('name')}: VRAM unknown, treated as insufficient")
+            reasons.append(f"{g.get('name')}：显存未知，视为不足")
         elif vram < MIN_VRAM_CUDA_GB:
-            reasons.append(f"{g.get('name')}: {vram} GB VRAM < {MIN_VRAM_CUDA_GB} GB")
+            reasons.append(f"{g.get('name')}：显存 {vram} GB < {MIN_VRAM_CUDA_GB} GB")
         else:
             cuda_candidate = g
             break
@@ -48,34 +48,34 @@ def decide(
     vulkan_smoke = (smoke.get("vulkan") or {}).get("status")
 
     if cuda_candidate and cuda_smoke == "passed":
-        reasons.append(f"{cuda_candidate['name']} ({cuda_candidate['vram_gb']} GB) passed the CUDA smoke test")
+        reasons.append(f"{cuda_candidate['name']}（{cuda_candidate['vram_gb']} GB）通过了 CUDA 冒烟测试")
         return {"tier": "gpu-cuda", "reasons": reasons, "hints": hints, "gpu_candidate": "cuda"}
     if cuda_candidate:
         if cuda_smoke == "failed":
             reasons.append(
-                f"CUDA smoke test failed ({(smoke.get('cuda') or {}).get('reason', 'see state.json')}); using CPU"
+                f"CUDA 冒烟测试失败（{(smoke.get('cuda') or {}).get('reason', '见 state.json')}）；使用 CPU"
             )
         else:
             hints.append(
-                f"{cuda_candidate['name']} ({cuda_candidate['vram_gb']} GB) can be enabled: "
+                f"{cuda_candidate['name']}（{cuda_candidate['vram_gb']} GB）可以启用："
                 "vidroute install --model asr-faster-whisper-large-v3-turbo"
             )
     if vulkan_smoke == "passed":
-        reasons.append("Vulkan smoke test passed")
+        reasons.append("Vulkan 冒烟测试通过")
         return {"tier": "gpu-vulkan", "reasons": reasons, "hints": hints, "gpu_candidate": "vulkan"}
 
     if ram_gb is None:
-        reasons.append("RAM unknown: conservative cpu-lite")
+        reasons.append("内存未知：保守地使用 cpu-lite")
         tier = "cpu-lite"
     elif ram_gb < MIN_RAM_FULL_GB - RAM_TOLERANCE_GB:
-        reasons.append(f"{ram_gb} GB RAM < {MIN_RAM_FULL_GB} GB")
+        reasons.append(f"内存 {ram_gb} GB < {MIN_RAM_FULL_GB} GB")
         tier = "cpu-lite"
     elif cpu.get("x86") and cpu.get("avx2") is False:
-        reasons.append("x86 CPU without AVX2")
+        reasons.append("x86 CPU 不支持 AVX2")
         tier = "cpu-lite"
     else:
-        avx = "AVX2" if cpu.get("avx2") else ("ARM/NEON" if not cpu.get("x86") else "AVX2 unknown")
-        reasons.append(f"{ram_gb} GB RAM, {avx}")
+        avx = "AVX2" if cpu.get("avx2") else ("ARM/NEON" if not cpu.get("x86") else "AVX2 未知")
+        reasons.append(f"内存 {ram_gb} GB，{avx}")
         tier = "cpu-full"
     return {
         "tier": tier,

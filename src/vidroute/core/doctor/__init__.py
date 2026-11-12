@@ -72,7 +72,7 @@ def summarize_capabilities(
                 ready.append(m.id)
         entry: dict[str, Any] = {"ready": bool(ready), "models": ready}
         if cap == "vad" and ready == ["vad-energy"]:
-            entry["note"] = "energy-based fallback only; install vad-silero for real voice detection"
+            entry["note"] = "只有基于能量的回退；安装 vad-silero 才能真正检测人声"
         if not ready or entry.get("note"):
             entry["hint"] = f"vidroute install --capability {cap}"
         out[cap] = entry
@@ -92,7 +92,7 @@ def collect(offline: bool | None = None) -> dict[str, Any]:
 
     cpu = value("cpu", {"model": None, "avx2": None, "x86": None})
     memory = value("memory", {"total_gb": None, "available_gb": None})
-    ff = value("ffmpeg", {"found": False, "error": probe_errors.get("ffmpeg", "probe failed"),
+    ff = value("ffmpeg", {"found": False, "error": probe_errors.get("ffmpeg", "检测失败"),
                           "install_hint": ffmpeg.install_hint()})
     nvidia = value("nvidia", {"available": False, "gpus": [], "error": probe_errors.get("nvidia")})
     plat = value("platform_gpus", {"gpus": [], "error": probe_errors.get("platform_gpus")})
@@ -136,33 +136,33 @@ def collect(offline: bool | None = None) -> dict[str, Any]:
 def derive_warnings(data: dict[str, Any], ctx: Ctx) -> None:
     ff = data.get("ffmpeg") or {}
     if not ff.get("found"):
-        ctx.warn("ffmpeg_missing", f"ffmpeg/ffprobe not found ({ff.get('error')}).", ff.get("install_hint"))
+        ctx.warn("ffmpeg_missing", f"找不到 ffmpeg/ffprobe（{ff.get('error')}）。", ff.get("install_hint"))
     else:
         enc = ff.get("encoders") or {}
         if enc and not enc.get("libx264"):
-            ctx.warn("ffmpeg_no_libx264", "This ffmpeg build has no libx264; native-video transcoding will be limited.",
+            ctx.warn("ffmpeg_no_libx264", "这个 ffmpeg 构建没有 libx264；原生视频的转码会受限。",
                      ffmpeg.install_hint())
     for name, err in (data.get("probe_errors") or {}).items():
         if name.startswith("mirror:"):
             continue
-        ctx.warn("probe_failed", f"Probe '{name}' did not finish: {err}")
+        ctx.warn("probe_failed", f"检测项 '{name}' 未完成：{err}")
     for g in data.get("gpus") or []:
         if g.get("vram_source") == "cim-approx":
             ctx.warn("vram_approximate",
-                     f"{g['name']}: VRAM from Win32_VideoController is capped at 4 GB and only approximate.")
+                     f"{g['name']}：来自 Win32_VideoController 的显存上限为 4 GB，只是近似值。")
     for hint in data.get("upgrade_hints") or []:
         ctx.warn("gpu_upgrade_available", hint)
     for cap, info in (data.get("capabilities") or {}).items():
         if not info.get("ready"):
-            ctx.warn("capability_missing", f"No local {cap} engine is installed.", info.get("hint"))
+            ctx.warn("capability_missing", f"没有安装本地 {cap} 引擎。", info.get("hint"))
     net = data.get("network") or {}
     if net.get("checked") and net.get("online") is False:
-        ctx.warn("offline", "No download mirror is reachable; installs will fail until the network is back.")
+        ctx.warn("offline", "所有下载镜像都不可达；网络恢复之前安装都会失败。")
     for host in (data.get("integrations") or {}).get("hosts") or []:
         skill = host.get("skill") or {}
         if skill.get("managed") and (not skill.get("current") or skill.get("python_ok") is False):
-            ctx.warn("skill_outdated", f"{host['name']}: the vidroute skill in {skill['path']} is from vidroute "
-                                       f"{skill.get('version')} or points at a Python that is gone.",
+            ctx.warn("skill_outdated", f"{host['name']}：{skill['path']} 中的 vidroute 技能来自 vidroute "
+                                       f"{skill.get('version')}，或指向一个已不存在的 Python。",
                      "vidroute setup --no-install")
 
 
@@ -170,7 +170,7 @@ def run(refresh: bool = False, offline: bool | None = None, ctx: Ctx | None = No
     ctx = ctx or Ctx()
     data = None if refresh else state.cache_get(CACHE_KEY, CACHE_TTL)
     if data is None:
-        ctx.progress("doctor", None, None, "probing system")
+        ctx.progress("doctor", None, None, "正在检测系统")
         data = collect(offline)
         paths.ensure_dir(paths.home())
         state.cache_put(CACHE_KEY, data)

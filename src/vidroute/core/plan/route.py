@@ -1,4 +1,4 @@
-"""Layer 1 — delivery route: what to hand the LLM (brief §8).
+"""Layer 1 — delivery route: what to hand the LLM.
 
 Deterministic: effective capabilities (LLM ∩ host) give the candidate route;
 admission checks (privacy, limits after transcode/segmentation, token budget)
@@ -46,10 +46,10 @@ def native_plan(probe: dict[str, Any], limits: dict[str, Any], rules: dict[str, 
         if not with_audio and probe.get("has_audio"):
             # native-v: the model cannot hear, so do not ship the audio track (remux, no re-encode).
             return {"feasible": True, "transcode": {"mode": "copy", "drop_audio": True},
-                    "segments": [[0.0, round(duration, 3)]], "why": "fits the limits; audio track dropped",
+                    "segments": [[0.0, round(duration, 3)]], "why": "满足限额；已去掉音轨",
                     "per_file_mb": size_mb}
         return {"feasible": True, "transcode": None, "segments": [[0.0, round(duration, 3)]],
-                "why": "fits the limits as is", "per_file_mb": size_mb}
+                "why": "原样即满足限额", "per_file_mb": size_mb}
 
     audio_kbps = float(tc["audio_kbps"]) if with_audio and probe.get("has_audio") else 0.0
     min_audio = float(tc["min_audio_kbps"]) if audio_kbps else 0.0
@@ -61,16 +61,16 @@ def native_plan(probe: dict[str, Any], limits: dict[str, Any], rules: dict[str, 
     max_by_size = seconds_fitting(min_video + min_audio)
     per_file = min(max_s, max_by_size)
     if per_file < 30:
-        return {"feasible": False, "why": f"even at the lowest quality a file can hold only {per_file:.0f} s "
-                f"within {limits.get('max_file_mb')} MB"}
+        return {"feasible": False, "why": f"即使用最低质量，{limits.get('max_file_mb')} MB 内每个文件也只能容纳 "
+                f"{per_file:.0f} 秒"}
     if duration <= per_file:
         segments = [[0.0, round(duration, 3)]]
     else:
         step = per_file - overlap
         n = math.ceil((duration - overlap) / step)
         if n > max_files:
-            return {"feasible": False, "why": f"would need {n} segments (limit {max_files}): "
-                    f"{duration / 60:.0f} min video, {per_file / 60:.1f} min per request"}
+            return {"feasible": False, "why": f"需要 {n} 段（上限 {max_files}）："
+                    f"视频 {duration / 60:.0f} 分钟，每次请求 {per_file / 60:.1f} 分钟"}
         step = (duration - overlap) / n  # balance segment lengths
         segments = []
         for i in range(n):
@@ -95,7 +95,7 @@ def native_plan(probe: dict[str, Any], limits: dict[str, Any], rules: dict[str, 
     return {
         "feasible": True,
         "per_request_max_files": limits.get("max_files"),
-        "why": "transcode" + (f" + {len(segments)} segments" if len(segments) > 1 else "") + " to fit the limits",
+        "why": "转码" + (f" + 切成 {len(segments)} 段" if len(segments) > 1 else "") + "以满足限额",
         "segments": segments,
         "transcode": {
             "mode": "encode",
@@ -171,7 +171,7 @@ def audio_attachment_plan(probe: dict[str, Any], eff: dict[str, Any], rules: dic
     cfg = rules["delivery"]["audio_attachment"]
     lim = eff.get("audio_limits") or {}
     if not cfg.get("enabled"):
-        return {"enabled": False, "why": "disabled in rules"}
+        return {"enabled": False, "why": "规则中已禁用"}
     duration = float(probe["duration"] or 0)
     max_s = _inf(lim.get("max_seconds"))
     max_mb = _inf(lim.get("max_file_mb"))
@@ -180,11 +180,11 @@ def audio_attachment_plan(probe: dict[str, Any], eff: dict[str, Any], rules: dic
         if size_mb <= max_mb * 0.95:
             parts = max(1, math.ceil(duration / max_s)) if max_s != float("inf") else 1
             if parts > rules["delivery"]["max_segments"]:
-                return {"enabled": False, "why": f"audio would need {parts} parts"}
+                return {"enabled": False, "why": f"音频需要切成 {parts} 段"}
             return {"enabled": True, "format": "mp3", "sample_rate": cfg["sample_rate"], "kbps": kbps,
                     "parts": parts, "est_mb": round(size_mb, 2),
                     "est_tokens": int(float(lim.get("tokens_per_second") or 32) * duration)}
-    return {"enabled": False, "why": f"even {cfg['mp3_kbps_ladder'][-1]} kbps exceeds {lim.get('max_file_mb')} MB"}
+    return {"enabled": False, "why": f"即使 {cfg['mp3_kbps_ladder'][-1]} kbps 也超过 {lim.get('max_file_mb')} MB"}
 
 
 def transcript_tokens(probe: dict[str, Any], rules: dict[str, Any]) -> int:
@@ -221,24 +221,24 @@ def decide(
     if eff["video"]:
         order.append("native-av" if eff["audio_in_video"] else "native-v")
         reasons.append(
-            f"{llm['model']} accepts video{' with its audio track' if eff['audio_in_video'] else ' (cannot hear the audio)'}"
-            f" and host {host['id']} attaches video natively")
+            f"{llm['model']} 接受视频{'（含音轨）' if eff['audio_in_video'] else '（听不到音频）'}"
+            f"，且宿主 {host['id']} 能原生附带视频")
     else:
         for b in eff["blocked_by_host"]:
             if b["modality"] == "video":
-                reasons.append(f"{llm['model']} understands video, but {b['why']}")
+                reasons.append(f"{llm['model']} 能理解视频，但{b['why']}")
                 suggestions.append({
                     "route": "delegate",
-                    "why": f"The model can watch video but the host cannot attach it (host-limited, not model-limited).",
-                    "how": "Planned (D5): configure a video-model endpoint so vidroute calls it and returns text; "
-                           "or run the agent in a host that attaches video (e.g. gemini-cli, qwen-code).",
+                    "why": f"模型能看视频，但宿主附带不了（受宿主限制，而非模型限制）。",
+                    "how": "计划中（D5）：配置一个视频模型端点，由 vidroute 调用并返回文本；"
+                           "或在能附带视频的宿主中运行 Agent（例如 gemini-cli、qwen-code）。",
                 })
         if "video" not in llm["modalities_in"]:
-            reasons.append(f"{llm['model']} does not accept video input")
+            reasons.append(f"{llm['model']} 不接受视频输入")
     if eff["image"]:
         order.append("frames")
     else:
-        reasons.append(f"no image input ({'model' if 'image' not in llm['modalities_in'] else 'host'})")
+        reasons.append(f"不能输入图片（受{'模型' if 'image' not in llm['modalities_in'] else '宿主'}限制）")
     order.append("text")
 
     if forced and forced not in ("auto",):
@@ -246,8 +246,8 @@ def decide(
             from vidroute.core.errors import UsageError
 
             raise UsageError(
-                f"Route {forced!r} is not possible here (available: {', '.join(order)}).",
-                hint="Re-run plan with the right --host/--llm instead of forcing a route",
+                f"这里无法使用路线 {forced!r}（可用：{', '.join(order)}）。",
+                hint="请用正确的 --host/--llm 重新运行 plan，而不是强制指定路线",
             )
         idx = order.index(forced)
         for r in order[:idx]:
@@ -262,10 +262,10 @@ def decide(
     for r in order:
         if r.startswith("native"):
             if prefer == "privacy":
-                degraded.append({"route": r, "why": "--prefer privacy: the raw video stays local (only frames/text leave)"})
+                degraded.append({"route": r, "why": "--prefer privacy：原始视频留在本机（只交出帧/文本）"})
                 continue
             if not allow_raw:
-                degraded.append({"route": r, "why": "config allow_raw_video_handoff=false"})
+                degraded.append({"route": r, "why": "配置 allow_raw_video_handoff=false"})
                 continue
             npl = native_plan(probe, eff["video_limits"] or {}, rules, with_audio=(r == "native-av"))
             if not npl["feasible"]:
@@ -278,15 +278,15 @@ def decide(
             total = vt + (t_tokens if attach_t else 0) + overhead
             if total > budget:
                 if over_action == "degrade":
-                    degraded.append({"route": r, "why": f"~{total:,} input tokens > budget {budget:,} (--prefer cost)"})
+                    degraded.append({"route": r, "why": f"约 {total:,} 输入 token > 预算 {budget:,}（--prefer cost）"})
                     continue
-                confirm.append({"code": "over_budget", "message": f"~{total:,} input tokens exceed the budget of {budget:,}"})
+                confirm.append({"code": "over_budget", "message": f"约 {total:,} 输入 token，超出预算 {budget:,}"})
             if not known:
-                reasons.append("video token rate unknown for this model: estimate uses 300 tokens/s")
+                reasons.append("该模型的视频 token 速率未知：估算按 300 token/秒")
             native = {**npl, "est_video_tokens": vt, "transcript_attached": attach_t}
             confirm.append({"code": "raw_video_handoff",
-                            "message": "The full video will be handed to the LLM provider. Ask the user first; "
-                                       "prepare needs --accept-raw-video-handoff."})
+                            "message": "完整视频将交给 LLM 服务商。请先询问用户；"
+                                       "prepare 需要 --accept-raw-video-handoff。"})
             chosen, est = r, total
             break
         if r == "frames":
@@ -297,27 +297,27 @@ def decide(
                                                                               if audio_att.get("enabled") else 0)
             if total > budget:
                 if audio_att.get("enabled"):
-                    audio_att = {"enabled": False, "why": "dropped to stay within the token budget"}
+                    audio_att = {"enabled": False, "why": "为了不超出 token 预算而去掉"}
                     total = frames["est_tokens"] + t_tokens + ocr_tokens + overhead
                 if total > budget:
                     if over_action == "degrade":
-                        degraded.append({"route": r, "why": f"~{total:,} input tokens > budget {budget:,} (--prefer cost)"})
+                        degraded.append({"route": r, "why": f"约 {total:,} 输入 token > 预算 {budget:,}（--prefer cost）"})
                         continue
-                    confirm.append({"code": "over_budget", "message": f"~{total:,} input tokens exceed the budget of {budget:,}"})
+                    confirm.append({"code": "over_budget", "message": f"约 {total:,} 输入 token，超出预算 {budget:,}"})
             chosen, est = r, total
             break
         chosen, est = "text", t_tokens + ocr_tokens + overhead
         if est > budget:
-            confirm.append({"code": "over_budget", "message": f"~{est:,} input tokens exceed the budget of {budget:,}"})
+            confirm.append({"code": "over_budget", "message": f"约 {est:,} 输入 token，超出预算 {budget:,}"})
         break
 
     assert chosen is not None
     if chosen == "frames":
-        reasons.append(f"keyframes + contact sheets ({frames['contact_sheets']} sheet(s), up to {frames['max_frames']} frames)"
-                       + (" + audio track (the model can listen)" if audio_att.get("enabled") else "")
-                       + " + local transcript")
+        reasons.append(f"关键帧 + 拼图（{frames['contact_sheets']} 张拼图，最多 {frames['max_frames']} 帧）"
+                       + (" + 音轨（模型能听）" if audio_att.get("enabled") else "")
+                       + " + 本地转写")
     if chosen == "text":
-        reasons.append("text only: transcript/OCR timeline; picture information is limited")
+        reasons.append("只有文本：转写/OCR 时间线；画面信息有限")
     role = "none"
     attach_transcript = False
     if speech:

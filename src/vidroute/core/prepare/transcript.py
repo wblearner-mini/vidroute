@@ -81,7 +81,7 @@ def _transcribe(engine_id: str, manifest: Manifest, ctx: Ctx, pool: WorkerPool, 
     done = len(chunks) - len(todo)
     total = total_hint or len(chunks)
     if done:
-        ctx.progress("asr", done, total, f"resuming: {done} chunk(s) cached")
+        ctx.progress("asr", done, total, f"续跑：已缓存 {done} 个音频块")
     batch: list[list[float]] = []
     secs = 0.0
     for c in todo + [None]:  # type: ignore[list-item]
@@ -161,13 +161,13 @@ def build_transcript(
         return info
 
     if not probe.get("has_audio"):
-        return use_cues("no audio track")
+        return use_cues("没有音轨")
     if subtitles_only:
-        return use_cues("embedded subtitles only: the model hears the audio itself")
+        return use_cues("只用内嵌字幕：模型自己能听到音频")
 
     wav = layout.audio_wav
     if not wav.exists() or abs(media.wav_duration(wav) - duration) > 2.0:
-        ctx.progress("audio", None, None, "extracting 16 kHz audio")
+        ctx.progress("audio", None, None, "正在提取 16 kHz 音频")
         media.extract_wav(video, wav, ctx)
 
     # R2 + VAD
@@ -184,17 +184,17 @@ def build_transcript(
         cov = media.coverage(cues, speech)
         info["subtitle_coverage"] = round(cov, 3)
         if cov >= float(loc["embedded_subtitle_min_coverage"]) and not force_asr:
-            return use_cues(f"embedded subtitles cover {cov:.0%} of the detected speech: used instead of ASR (R1)")
-        info["notes"].append(f"embedded subtitles cover only {cov:.0%} of the speech: running ASR as well")
+            return use_cues(f"内嵌字幕覆盖了检测到的语音的 {cov:.0%}：用它代替 ASR（R1）")
+        info["notes"].append(f"内嵌字幕只覆盖了语音的 {cov:.0%}：同时运行 ASR")
 
     ratio = speech_seconds / max(duration, 1e-6)
     forced_blind = force_asr and speech_seconds < 0.5
     if forced_blind:  # the user insists: voice detection found nothing, so ASR hears the whole track
-        ctx.warn("forced_asr_no_speech", "--force-asr: voice detection found no speech, so the whole audio track is "
-                                         "transcribed; expect errors or invented text if there really is none.")
+        ctx.warn("forced_asr_no_speech", "--force-asr：人声检测没有发现语音，因此会转写整条音轨；"
+                                         "如果确实没有语音，结果可能有错误或凭空生成的文字。")
         speech = [[0.0, duration]]
     elif speech_seconds < 0.5 or (ratio < float(loc["speech_ratio_skip_asr"]) and not force_asr):
-        return use_cues(f"no speech detected (R2: {speech_seconds:.1f} s of speech, ratio {ratio:.3f})")
+        return use_cues(f"未检测到语音（R2：语音 {speech_seconds:.1f} 秒，占比 {ratio:.3f}）")
 
     chunks = make_chunks(speech, duration, max_len=float(loc["asr_chunk_max_seconds"]))
     turns = diarizer(wav) if diarizer else []
@@ -204,14 +204,14 @@ def build_transcript(
     if not candidates:
         hint = "vidroute install --capability asr"
         if cues:
-            ctx.warn("asr_missing", f"Subtitles cover only {cov:.0%} of the speech and no ASR engine is installed: "
-                                    "using the subtitles alone.", hint)
-            return use_cues("no ASR engine installed: subtitles only")
+            ctx.warn("asr_missing", f"字幕只覆盖了语音的 {cov:.0%}，且没有安装 ASR 引擎："
+                                    "只使用字幕。", hint)
+            return use_cues("未安装 ASR 引擎：只用字幕")
         if not required:
-            ctx.warn("asr_missing", "Speech was found, but no ASR engine is installed: no transcript.", hint)
-            info["notes"].append("speech found but no ASR engine installed")
+            ctx.warn("asr_missing", "发现了语音，但没有安装 ASR 引擎：没有转写。", hint)
+            info["notes"].append("发现了语音，但未安装 ASR 引擎")
             return info
-        raise NeedsInstall("No ASR engine is installed, so the speech cannot be transcribed.", hint=hint,
+        raise NeedsInstall("没有安装 ASR 引擎，无法转写语音。", hint=hint,
                            data={"needs": ["asr"]})
     engine_id = candidates[0]
 
@@ -229,12 +229,12 @@ def build_transcript(
         if detected:
             better = asr_candidates(detected, tier, rules, manifest)
             if better and better[0] != engine_id:
-                info["notes"].append(f"language '{detected}' detected: ASR {engine_id} -> {better[0]} (R3)")
+                info["notes"].append(f"检测到语言 '{detected}'：ASR {engine_id} -> {better[0]}（R3）")
                 engine_id, lang, candidates = better[0], detected, better
             elif not better:
                 ctx.warn("asr_language_unsupported",
-                         f"Detected language '{detected}' is not covered by an installed ASR engine; "
-                         "the transcript may be poor.", "vidroute install --model asr-whisper-small-int8")
+                         f"检测到的语言 '{detected}' 不在已安装 ASR 引擎的支持范围内；"
+                         "转写质量可能较差。", "vidroute install --model asr-whisper-small-int8")
 
     # Transcribe, falling back along the chain on failure (engine A -> B, large -> small).
     segments: list[dict[str, Any]] = []
@@ -249,7 +249,7 @@ def build_transcript(
             idx = candidates.index(engine_id) if engine_id in candidates else len(candidates)
             if idx + 1 >= len(candidates):
                 raise
-            ctx.warn("asr_engine_failed", f"{engine_id} failed ({exc.message[:120]}); trying {candidates[idx + 1]}.")
+            ctx.warn("asr_engine_failed", f"{engine_id} 失败（{exc.message[:120]}）；改试 {candidates[idx + 1]}。")
             engine_id = candidates[idx + 1]
 
     segments = [s for s in segments if s.get("text") and (s.get("lang") or "").lower() != "nospeech"]
@@ -260,8 +260,8 @@ def build_transcript(
     speakers = label_speakers(segments, turns)
     if turns:
         info["speakers"] = speakers
-        info["notes"].append(f"{speakers} speakers labelled" if speakers > 1 else
-                             "one speaker detected: no speaker labels")
+        info["notes"].append(f"标出了 {speakers} 位说话人" if speakers > 1 else
+                             "只检测到一位说话人：不加说话人标签")
     if cues:  # keep subtitle cues where ASR has nothing (partial coverage)
         segments = merge_sources(segments, cues)
     info.update(segments=segments, source="asr+embedded_subtitle" if cues else "asr", engine=engine_id,
@@ -325,7 +325,7 @@ def write_outputs(layout: Layout, info: dict[str, Any], role: str) -> list[Path]
     tj = layout.file("transcript.json")
     write_json_atomic(tj, {
         "role": role,
-        "note": "Local transcript: reference only, may contain recognition errors. Timestamps are global (seconds).",
+        "note": "本地转写：仅供参考，可能有识别错误。时间戳为全局时间（秒）。",
         "source": info.get("source"), "engine": info.get("engine"), "language": info.get("language"),
         "speakers": info.get("speakers"),
         "segments": [{k: s.get(k) for k in ("start", "end", "text", "lang", "source", "engine", "speaker")
@@ -337,20 +337,20 @@ def write_outputs(layout: Layout, info: dict[str, Any], role: str) -> list[Path]
     files.append(srt)
     md = layout.file("transcript.md")
     head = {
-        "sole_source": "This transcript is the ONLY record of what was said (the LLM cannot hear the audio). "
-                       "It is machine-generated: proofread names, terms and numbers against what is visible on screen.",
-        "reference": "Reference transcript with global timestamps; the LLM can hear the audio, which wins on conflicts.",
-    }.get(role, "Machine transcript (reference only).")
-    lines = ["# Transcript", "", f"> {head}", f"> source: {info.get('source')} · engine: {info.get('engine')} · "
-             f"language: {info.get('language') or 'unknown'}"]
+        "sole_source": "这份转写是说话内容的**唯一**记录（LLM 听不到音频）。"
+                       "它由机器生成：请对照屏幕上可见的内容校对人名、术语和数字。",
+        "reference": "带全局时间戳的参考转写；LLM 能听到音频，有冲突时以音频为准。",
+    }.get(role, "机器转写（仅供参考）。")
+    lines = ["# 转写", "", f"> {head}", f"> 来源：{info.get('source')} · 引擎：{info.get('engine')} · "
+             f"语言：{info.get('language') or '未知'}"]
     if (info.get("speakers") or 0) > 1:
-        lines.append("> Speaker 1, 2, ... are machine-made voice groups, in order of first appearance: they can be wrong "
-                     "and say nothing about who the person is.")
+        lines.append("> Speaker 1、2……是机器划分的声音分组，按首次出现的顺序编号：可能分错，"
+                     "也不说明这个人是谁。")
     lines.append("")
     for s in segs:
         lines.append(f"[{fmt_ts(s['start'])}–{fmt_ts(s['end'])}] {spoken(s)}")
     if not segs:
-        lines.append("_(no speech transcribed)_")
+        lines.append("_（没有转写出语音）_")
     md.write_text("\n".join(lines) + "\n", encoding="utf-8")
     files.append(md)
     return files

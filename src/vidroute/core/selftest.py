@@ -40,7 +40,7 @@ def make_clip(out: Path, wav: Path | None, font: str | None) -> Path:
              "-shortest", str(out)]
     res = proc.run(args, timeout=120)
     if not res.ok or not out.is_file():
-        raise RuntimeError(f"could not generate the test clip: {(res.stderr or '').strip()[-300:]}")
+        raise RuntimeError(f"无法生成测试样片：{(res.stderr or '').strip()[-300:]}")
     return out
 
 
@@ -56,8 +56,8 @@ def run(ctx: Ctx) -> dict[str, Any]:
 
     started = time.monotonic()
     if not ffmpeg.detect().found:
-        return {"status": "skipped", "reason": "ffmpeg/ffprobe are not installed", "checks": []}
-    ctx.progress("selftest", None, None, "generating a test clip")
+        return {"status": "skipped", "reason": "没有安装 ffmpeg/ffprobe", "checks": []}
+    ctx.progress("selftest", None, None, "正在生成测试样片")
     caps = doctor.run(refresh=True, offline=True)["capabilities"]
     work = paths.cache_dir() / "selftest"
     shutil.rmtree(work, ignore_errors=True)
@@ -68,7 +68,7 @@ def run(ctx: Ctx) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     try:
         clip = make_clip(work / "self-test.mp4", wav if speech else None, font)
-        ctx.progress("selftest", None, None, "running prepare on the test clip")
+        ctx.progress("selftest", None, None, "正在对测试样片运行 prepare")
         ocr = "on" if caps["ocr"]["ready"] and font is not None else "off"
         sub = Ctx(cancel_event=ctx.cancel_event)
         data = prepare_run(str(clip), llm="vidroute-selftest", host="unknown", task="summary", route="frames",
@@ -79,18 +79,18 @@ def run(ctx: Ctx) -> dict[str, Any]:
                 "seconds": round(time.monotonic() - started, 1)}
     root = Path(data["out_dir"])
     checks.append(_check("outputs", all((root / f).is_file() for f in ("SUMMARY.md", "ANALYSIS_GUIDE.md", "handoff.json")),
-                         "SUMMARY.md, ANALYSIS_GUIDE.md and handoff.json written"))
+                         "已写出 SUMMARY.md、ANALYSIS_GUIDE.md 和 handoff.json"))
     sheets = sorted((root / "contact-sheets").glob("*.jpg"))
-    checks.append(_check("keyframes", bool(sheets), f"{len(sheets)} contact sheet(s)"))
+    checks.append(_check("keyframes", bool(sheets), f"{len(sheets)} 张拼图"))
     if speech:
         segments = (read_json(root / "transcript.json", default={}) or {}).get("segments") or []
         heard = any(str(s.get("text") or "").strip() for s in segments)
-        checks.append(_check("speech", heard, f"{len(segments)} transcript segment(s) from the sample recording" if heard
-                             else "no speech recognized in the sample recording"))
+        checks.append(_check("speech", heard, f"从示例录音中转写出 {len(segments)} 个片段" if heard
+                             else "示例录音中没有识别出语音"))
     if ocr == "on":
         text = (root / "ocr.md").read_text(encoding="utf-8") if (root / "ocr.md").is_file() else ""
         seen = "SELF TEST" in text.upper()
-        checks.append(_check("ocr", seen, "on-screen text read back" if seen else "the slide text was not recognized"))
+        checks.append(_check("ocr", seen, "屏幕文字已读回" if seen else "没有识别出幻灯片文字"))
     return {
         "status": "passed" if all(c["ok"] for c in checks) else "failed",
         "checks": checks,

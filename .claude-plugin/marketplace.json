@@ -1,12 +1,12 @@
 {
   "name": "vidroute",
-  "description": "vidroute: give coding agents eyes and ears for local video.",
+  "description": "vidroute：让编程 Agent 能看、能听本地视频。",
   "owner": {"name": "wblearner-mini", "url": "https://github.com/wblearner-mini"},
   "plugins": [
     {
       "name": "vidroute",
       "source": "./",
-      "description": "See and hear local videos: route, prepare locally, analyse with global timestamps.",
+      "description": "看见、听见本地视频：选路、在本机准备、以全局时间戳分析。",
       "category": "productivity",
       "tags": ["video", "transcription", "ocr", "minutes"]
     }

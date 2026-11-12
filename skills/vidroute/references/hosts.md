@@ -1,29 +1,23 @@
-# Attaching vidroute outputs in your host
+# 在宿主中附带 vidroute 的输出
 
-`handoff.json` lists what to attach; this page says how. vidroute's host profiles
-(`vidroute host list --json`) hold the evidence and the date each behaviour was checked.
-If your host cannot attach something the plan assumed, do not force it: plan again with
-the right `--host` (or `vidroute host set <host> --attach-video no ...`).
+`handoff.json` 列出要附带什么；本页说明怎么附带。vidroute 的宿主档案（`vidroute host list --json`）中有每项行为的证据和核实日期。
+如果你的宿主附带不了计划所假设的内容，不要硬来：用正确的 `--host` 重新计划（或 `vidroute host set <host> --attach-video no ...`）。
 
-| host | images | audio | video | how |
+| 宿主 | 图片 | 音频 | 视频 | 方法 |
 |---|---|---|---|---|
-| Claude Code (`claude-code`) | yes | no | no | Read the `.jpg` files by absolute path; they reach the model as images. `.mp4`/`.mp3` are refused as binary, so plans for Claude Code use `frames` or `text`. |
-| Codex CLI (`codex-cli`) | yes | yes (wav/mp3/m4a ≤ 50 MB) | no | Local images and audio are sent as data URLs; audio only helps if your model accepts audio. |
-| Gemini CLI (`gemini-cli`) | yes | yes | yes (≤ 20 MB per file) | `@path/to/file` or the read-file tool returns the file inline, video with its audio. Attach segment files one by one, in order. |
-| Qwen Code (`qwen-code`) | yes | if the model declares it | if the model declares it | Video/audio go inline only when the configured model declares `modalities.video`/`audio`; the base64 payload must stay under 10 MB (≈ 7.4 MB file). |
-| opencode (`opencode`) | yes (PNG/JPEG/GIF/WebP) | no | no | Images and text only; attachments over 20 MiB are rejected. |
-| Cursor, Cline, Roo Code, Kilo Code | yes | no | no | Image attachments only (unverified, conservative). |
-| anything else | ? | ? | ? | Plan with `--host unknown` (image-only); use the MCP tool `read_outputs` if you cannot open images. |
+| Claude Code（`claude-code`） | 支持 | 不支持 | 不支持 | 用绝对路径读取 `.jpg` 文件，它们会作为图片交给模型。`.mp4`/`.mp3` 会被当作二进制文件拒绝，所以 Claude Code 的计划使用 `frames` 或 `text`。 |
+| Codex CLI（`codex-cli`） | 支持 | 支持（wav/mp3/m4a ≤ 50 MB） | 不支持 | 本地图片和音频以 data URL 发送；只有模型能接收音频时，音频才有用。 |
+| Gemini CLI（`gemini-cli`） | 支持 | 支持 | 支持（每个文件 ≤ 20 MB） | `@path/to/file` 或 read-file 工具会内联返回文件，视频连同音频。分段文件按顺序逐个附带。 |
+| Qwen Code（`qwen-code`） | 支持 | 模型声明时支持 | 模型声明时支持 | 只有所配置的模型声明了 `modalities.video`/`audio`，视频/音频才会内联发送；base64 内容必须小于 10 MB（文件约 7.4 MB）。 |
+| opencode（`opencode`） | 支持（PNG/JPEG/GIF/WebP） | 不支持 | 不支持 | 只支持图片和文本；超过 20 MiB 的附件会被拒绝。 |
+| Cursor、Cline、Roo Code、Kilo Code | 支持 | 不支持 | 不支持 | 只支持图片附件（未核实，保守估计）。 |
+| 其他宿主 | ? | ? | ? | 用 `--host unknown` 计划（只支持图片）；打不开图片时使用 MCP 工具 `read_outputs`。 |
 
-## Tips
+## 提示
 
-- **Contact sheets first.** Each tile is labelled with its global time; `contact-sheets/index.md`
-  maps tiles to frame files. Open a single frame from `frames/` only when a tile is too small.
-- **Segments.** For a split video, attach the parts in order. A time `t` inside part *k* is
-  `offset_sec(k) + t` in the whole video (`segments.json`); parts overlap by a few seconds, so report
-  an event seen in two parts once.
-- **Audio attachments** (`audio/attach/part-NN.mp3`) only exist when your model can listen and the
-  user agreed to hand the raw audio over.
-- **Budget.** `handoff.json` → `budget.est_input_tokens` estimates the cost of attaching everything
-  marked; if `over_budget` is true, ask the user before attaching it all, or start with the transcript
-  and the first contact sheets.
+- **先看拼图。** 每张小图都标有全局时间；`contact-sheets/index.md` 把小图对应到帧文件。只有小图太小时才打开 `frames/` 中的单帧。
+- **分段。** 对于被切分的视频，按顺序附带各部分。第 *k* 部分内的时间 `t`，在整个视频中是 `offset_sec(k) + t`（见 `segments.json`）；
+  各部分之间有几秒重叠，所以在两个部分都看到的事件只报告一次。
+- **音频附件**（`audio/attach/part-NN.mp3`）只在你的模型能听、且用户同意交出原始音频时才存在。
+- **预算。** `handoff.json` → `budget.est_input_tokens` 估算了附带所有标记内容的开销；如果 `over_budget` 为 true，全部附带前先询问用户，
+  或者先从转写和前几张拼图开始。

@@ -1,4 +1,4 @@
-"""Output directory layout (brief §9) and small helpers shared by prepare/drill.
+"""Output directory layout and small helpers shared by prepare/drill.
 
 <out>/<slug>/
   SUMMARY.md  ANALYSIS_GUIDE.md  handoff.json  plan.json  manifest.json  segments.json
@@ -65,18 +65,18 @@ def out_root(out: str | None) -> Path:
 def layout_for(video: Path, out: str | None) -> Layout:
     root = out_root(out) / paths.video_slug(video)
     if root.exists() and not root.is_dir():
-        raise UsageError(f"Output path exists and is not a directory: {root}")
+        raise UsageError(f"输出路径已存在且不是目录：{root}")
     try:
         return Layout(root).ensure()
     except OSError as exc:
-        raise UsageError(f"Cannot write to the output folder {root}: {exc.strerror or exc}. Choose another with --out.",
-                         code="output_not_writable", hint="vidroute config set out_root <a folder you can write to>") from exc
+        raise UsageError(f"无法写入输出目录 {root}：{exc.strerror or exc}。请用 --out 换一个目录。",
+                         code="output_not_writable", hint="vidroute config set out_root <一个你有写权限的目录>") from exc
 
 
 def reset_dir(path: Path, layout: Layout) -> Path:
     """Empty a deliverable sub-directory of this output (never anything outside it)."""
     if not paths.is_within(path, layout.root):
-        raise UsageError(f"Refusing to clear {path}: outside {layout.root}")
+        raise UsageError(f"拒绝清空 {path}：它在 {layout.root} 之外")
     if path.exists():
         shutil.rmtree(path)
     path.mkdir(parents=True, exist_ok=True)
@@ -86,7 +86,7 @@ def reset_dir(path: Path, layout: Layout) -> Path:
 def remove_dir(path: Path, layout: Layout) -> None:
     """Delete a stale deliverable sub-directory of this output (never anything outside it)."""
     if not paths.is_within(path, layout.root) or path == layout.root:
-        raise UsageError(f"Refusing to delete {path}: outside {layout.root}")
+        raise UsageError(f"拒绝删除 {path}：它在 {layout.root} 之外")
     if path.is_dir():
         shutil.rmtree(path)
 

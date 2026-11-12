@@ -31,7 +31,7 @@ PLAN_SCHEMA = "vidroute/plan/1"
 
 def _check(name: str, value: str, allowed: tuple[str, ...]) -> str:
     if value not in allowed:
-        raise UsageError(f"--{name} must be one of {', '.join(allowed)} (got {value!r})")
+        raise UsageError(f"--{name} 必须是 {', '.join(allowed)} 之一（实际为 {value!r}）")
     return value
 
 
@@ -77,12 +77,12 @@ def make_plan(
         else:
             ctx.warn("needs_install", f"{n['capability']}: {n['why']}", n["hint"])
     if decision["uploads_raw_video"]:
-        ctx.warn("raw_video_handoff", "This route hands the raw video to the LLM provider: ask the user first.",
+        ctx.warn("raw_video_handoff", "这条路线会把原始视频交给 LLM 服务商：请先询问用户。",
                  "vidroute prepare ... --accept-raw-video-handoff")
     if not info.get("has_audio"):
-        ctx.warn("no_audio", "The video has no audio track.")
+        ctx.warn("no_audio", "视频没有音轨。")
     elif float(info.get("speech_ratio") or 0) < rules["local"]["speech_ratio_skip_asr"]:
-        ctx.warn("no_speech", "No speech detected in the sampled audio.")
+        ctx.warn("no_speech", "在抽样的音频中没有检测到语音。")
     est_seconds = sum(s["est_seconds"] for s in steps)
     return {
         "schema": PLAN_SCHEMA,
@@ -116,12 +116,12 @@ def make_plan(
 def summarize(plan: dict[str, Any]) -> list[str]:
     """Short human explanation of a plan (also used in SUMMARY.md)."""
     d = plan["delivery"]
-    lines = [f"Route: {plan['route']}  (LLM {plan['llm']['model']} on host {plan['host']['id']}, tier {plan['local']['tier']})"]
+    lines = [f"路线：{plan['route']}  （LLM {plan['llm']['model']}，宿主 {plan['host']['id']}，档位 {plan['local']['tier']}）"]
     lines += [f"  - {r}" for r in d["reasons"]]
     for g in d["degraded_from"]:
-        lines.append(f"  - degraded from {g['route']}: {g['why']}")
+        lines.append(f"  - 由 {g['route']} 降级：{g['why']}")
     for s in d.get("suggestions") or []:
-        lines.append(f"  - suggestion ({s['route']}): {s['why']} {s['how']}")
-    lines.append(f"  - uploads raw video: {'YES' if plan['uploads_raw_video'] else 'no'}; "
-                 f"estimated input ~{plan['budget']['est_input_tokens']:,} tokens (budget {plan['budget']['budget_tokens']:,})")
+        lines.append(f"  - 建议（{s['route']}）：{s['why']} {s['how']}")
+    lines.append(f"  - 上传原始视频：{'是' if plan['uploads_raw_video'] else '否'}；"
+                 f"估计输入约 {plan['budget']['est_input_tokens']:,} token（预算 {plan['budget']['budget_tokens']:,}）")
     return lines

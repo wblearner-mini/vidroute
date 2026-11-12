@@ -39,7 +39,7 @@ def test_mainland_china_network_uses_mirrors_for_everything():
     assert network.uv_env(net) == {"UV_DEFAULT_INDEX": network.PYPI_MIRRORS[0],
                                    "UV_PYTHON_INSTALL_MIRROR": network.PYTHON_MIRRORS[0]}
     assert network.pip_args(net) == ["--index-url", network.PYPI_MIRRORS[0]]
-    assert "mainland China" in network.describe(net)
+    assert "中国大陆" in network.describe(net)
 
 
 def test_second_mirror_when_the_first_is_down():

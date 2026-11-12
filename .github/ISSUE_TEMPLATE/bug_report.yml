@@ -1,33 +1,32 @@
-name: Bug report
-description: Something does not work as documented
+name: Bug 报告
+description: 某个功能没有按文档工作
 labels: [bug]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks! Please never attach the video or anything private. For security issues use the
-        Security tab ("Report a vulnerability") instead.
+        谢谢！请不要附上视频或任何隐私内容。安全问题请改用 Security 页（"Report a vulnerability"）私下报告。
   - type: textarea
     id: what
     attributes:
-      label: What happened, and what did you expect?
+      label: 发生了什么？你期望的结果是什么？
     validations:
       required: true
   - type: textarea
     id: command
     attributes:
-      label: Command and output
-      description: The vidroute command you ran and its `--json` output (remove paths you consider private).
+      label: 命令与输出
+      description: 你运行的 vidroute 命令及其 `--json` 输出（请删掉你认为涉及隐私的路径）。
       render: shell
     validations:
       required: true
   - type: textarea
     id: doctor
     attributes:
-      label: "`vidroute doctor --json` output"
+      label: "`vidroute doctor --json` 的输出"
       render: json
   - type: input
     id: host
     attributes:
-      label: Agent host and LLM (if relevant)
+      label: Agent 宿主与 LLM（如相关）
       placeholder: claude-code + claude-opus-5-5

@@ -1,34 +1,32 @@
 # vidroute
 
-**Give coding agents eyes and ears for local video.** · [简体中文](README.zh-CN.md)
+**让编程 Agent 能"看"和"听"本地视频。**
 
-Most agent hosts (Claude Code, Codex CLI, opencode, Cursor, …) can hand their model images but not
-video — even when the model itself understands video. vidroute decides, deterministically and
-explainably, **what to hand the agent's LLM** for a local video, prepares it on your machine, and
-writes a reading guide so the answer comes with global timestamps and honest proofreading.
+大多数 Agent 宿主（Claude Code、Codex CLI、opencode、Cursor……）只能把图片交给模型，交不了视频——
+哪怕模型本身看得懂视频。vidroute 根据"**你用的大模型 × 你的宿主**"，确定性地、可解释地决定**该把什么交给
+Agent 的 LLM**，在本机准备好这些材料，并生成一份阅读指南，让最终回答带全局时间戳、按证据校对。
 
-| route | when | what the LLM gets | local transcript |
+| 路线 | 何时 | LLM 拿到什么 | 本地转写的角色 |
 |---|---|---|---|
-| **D1 `native-av`** | LLM ∩ host accept video *with* its audio | the video itself (transcoded / split to fit) | reference with timestamps |
-| **D2 `native-v`** | video accepted, but the model cannot hear | the video without audio | the only record of speech |
-| **D3 `frames`** | images only (the common case) | keyframes as labelled contact sheets (+ audio track if the model can listen) | the only record of speech |
-| **D4 `text`** | text only | a timeline of transcript + on-screen text | the only source |
-| D5 `delegate` | host blocks video, you configured a video-model endpoint | text from that endpoint | planned (v0.2) |
+| **D1 `native-av`** | LLM ∩ 宿主能接收**带音轨**的视频 | 视频本身（必要时转码/分段以满足限额） | 带时间戳的参考 |
+| **D2 `native-v`** | 能接收视频但听不到声音 | 去掉音轨的视频 | 唯一的语音来源 |
+| **D3 `frames`** | 只能接收图片（最常见） | 带时间标签的关键帧拼图（模型能听时另附音频） | 唯一的语音来源 |
+| **D4 `text`** | 只能接收文本 | 转写 + 屏幕文字的时间线 | 唯一来源 |
+| D5 `delegate` | 宿主附不了视频，但你配置了视频模型端点 | 由该端点返回的文本 | 计划中（v0.2） |
 
-Routing has two layers: **what your LLM and host can consume** picks the route (with admission
-checks for privacy, file limits after transcoding/splitting, and token budget), then **your
-hardware** decides how the local half runs (speech recognition, VAD, OCR, keyframes). Every
-degradation (`native → frames → text`) is recorded with its reason.
+路由分两层：先由**LLM 与宿主能消费什么**决定路线（并做准入检查：隐私、转码/分段后的文件限额、token 预算），
+再由**你的硬件**决定本地部分怎么跑（语音识别、VAD、OCR、关键帧）。每次降级（`native → frames → text`）
+都会记录原因。
 
-> **Status: pre-release (v0.1.0.dev0).** Feature-complete for the CLI, MCP server and Agent Skill;
-> see [PROGRESS.md](PROGRESS.md). Decisions and their evidence: [docs/DECISIONS.md](docs/DECISIONS.md).
+> **状态：预发布（v0.1.0.dev0）。** CLI、MCP 服务和 Agent Skill 已完整可用，
+> 所有选型及其证据见 [docs/DECISIONS.md](docs/DECISIONS.md)，版本变化见 [CHANGELOG.md](CHANGELOG.md)。
 
-## Install
+## 安装
 
-One command installs vidroute and walks you through the rest:
+一条命令装好 vidroute，剩下的由它引导完成：
 
 ```powershell
-# Windows (PowerShell)
+# Windows（PowerShell）
 irm https://raw.githubusercontent.com/wblearner-mini/vidroute/main/install.ps1 | iex
 ```
 
@@ -37,191 +35,174 @@ irm https://raw.githubusercontent.com/wblearner-mini/vidroute/main/install.ps1 |
 curl -LsSf https://raw.githubusercontent.com/wblearner-mini/vidroute/main/install.sh | sh
 ```
 
-The script fetches [uv](https://docs.astral.sh/uv/) (pinned and SHA-256-checked; uv brings its own
-Python), installs vidroute, then runs **`vidroute setup`**, which shows one plan and asks once:
+脚本会先取得 [uv](https://docs.astral.sh/uv/)（固定版本、校验 SHA-256；uv 自带 Python），安装 vidroute，
+然后运行 **`vidroute setup`**——给出**一份**计划，只问一次：
 
-- **ffmpeg** if it is missing (Windows: winget, or a pinned portable build when winget is unavailable;
-  Linux/macOS: the package-manager command to run);
-- **local models**: speech recognition, voice activity, on-screen text, speaker labels (~0.85 GB, CPU only);
-- **your agent hosts**: the vidroute skill for every host it finds — Claude Code, Codex CLI, Gemini CLI,
-  Qwen Code, opencode, Cursor, Cline, Roo Code, Kilo Code, OpenClaw (`--mcp` also registers the MCP server);
-- an end-to-end **self-test** on a generated clip.
+- 缺 **ffmpeg** 时补上（Windows：用 winget，没有 winget 时用固定版本的便携包；Linux/macOS：给出包管理器命令）；
+- **本地模型**：语音识别、人声检测、屏幕文字、说话人区分（约 0.85 GB，纯 CPU）；
+- **你的 Agent 宿主**：给找到的每个宿主装上 vidroute 技能——Claude Code、Codex CLI、Gemini CLI、Qwen Code、
+  opencode、Cursor、Cline、Roo Code、Kilo Code、OpenClaw（加 `--mcp` 还会注册 MCP 服务）；
+- 最后用生成的样片做一次端到端**自检**。
 
-In mainland China the mirrors are picked automatically when huggingface.co is unreachable (or force
-them: `--mirror cn`); every download stays hash-checked. You can also clone the repository and run `.\install.ps1 -Source .` or
-`sh install.sh --source .`.
+在中国大陆，检测到 huggingface.co 不通时会自动改用国内镜像（也可用 `--mirror cn` 强制），所有下载仍然逐一校验
+哈希。也可以克隆后运行 `.\install.ps1 -Source .` 或 `sh install.sh --source .`。
 
-**What the system must have:** only `curl` or `wget` (nothing on Windows): no git, Python or unzip. On Linux and macOS,
-install ffmpeg with the system package manager first; if it is missing, `setup` gives you the command before downloading
-anything.
+**系统前提：** 只需 `curl` 或 `wget`（Windows 无需额外工具），不需要预装 git、Python 或 unzip。Linux/macOS 上 ffmpeg
+要先用系统包管理器安装：缺它时 `setup` 会在下载任何东西之前就告诉你要运行的命令。
 
-**Let your agent do it.** Ask it: *"Set up vidroute for me, following
-https://github.com/wblearner-mini/vidroute/blob/main/docs/AGENT_SETUP.md"*. The agent installs uv and
-vidroute, shows you the plan, and runs it after your yes.
+**交给 Agent 来装。** 对它说：*"按照 https://github.com/wblearner-mini/vidroute/blob/main/docs/AGENT_SETUP.md
+帮我装好 vidroute"*。Agent 会装好 uv 和 vidroute，把计划拿给你看，你同意后再执行。
 
-**By hand:** `uv tool install https://github.com/wblearner-mini/vidroute/archive/refs/heads/main.tar.gz` (not on PyPI yet), then `vidroute setup`.
+**手动安装：** `uv tool install https://github.com/wblearner-mini/vidroute/archive/refs/heads/main.tar.gz`（尚未发布到 PyPI），然后 `vidroute setup`。
 
-Then ask your agent something like *"take minutes of D:\meetings\weekly.mp4"*, or use the CLI:
+之后直接对 Agent 说"把 D:\会议\周会.mp4 整理成会议纪要"即可，或者用命令行：
 
 ```bash
-vidroute run meeting.mp4 --llm claude-opus-5-5 --host claude-code --task minutes --out ./video-out
+vidroute run 会议.mp4 --llm claude-opus-5-5 --host claude-code --task minutes --out ./video-out
 ```
 
-and open `./video-out/<slug>/SUMMARY.md`. `vidroute doctor` shows what this machine can do and which
-agent hosts see the skill; `vidroute setup --remove` takes vidroute out of them again.
+然后打开 `./video-out/<slug>/SUMMARY.md`。`vidroute doctor` 显示本机能力以及哪些宿主已能看到技能；
+`vidroute setup --remove` 会把 vidroute 从这些宿主中撤下。
 
-## Use it from your agent
+## 在 Agent 里使用
 
-`vidroute setup` connects the hosts it finds (or the ones you name with `--host`). The skill goes into
-the fewest folders that reach them all — `~/.agents/skills` (Codex CLI, Gemini CLI, opencode, Cursor,
-Roo Code, Kilo Code, OpenClaw), `~/.claude/skills` (Claude Code), `~/.qwen/skills`, `~/.cline/skills` —
-and records which Python runs vidroute, so it works before PATH is refreshed. Folders and entries
-vidroute did not create are never overwritten.
+`vidroute setup` 会接入它找到的宿主（或你用 `--host` 指定的宿主）。技能只复制到能覆盖所有宿主的最少几个目录——
+`~/.agents/skills`（Codex CLI、Gemini CLI、opencode、Cursor、Roo Code、Kilo Code、OpenClaw）、
+`~/.claude/skills`（Claude Code）、`~/.qwen/skills`、`~/.cline/skills`——并记下运行 vidroute 的 Python，
+所以即使 PATH 还没刷新也能用。不是 vidroute 创建的目录和配置项，永远不会被覆盖。
 
-Other ways:
+其他方式：
 
-- **Claude Code plugin:** `/plugin install vidroute --marketplace wblearner-mini/vidroute`
-  (`vidroute setup` then skips Claude Code's skill folder).
-- **MCP** (stdio, standard-library server, no SDK needed): `vidroute setup --mcp`, or
-  `claude mcp add vidroute -- vidroute-mcp`, or in any MCP client config
-  `{"mcpServers": {"vidroute": {"command": "vidroute-mcp"}}}`.
-- **Copy the skill by hand:** the folder printed by `vidroute skill path`.
+- **Claude Code 插件：** `/plugin install vidroute --marketplace wblearner-mini/vidroute`
+  （装了插件后，`vidroute setup` 会跳过 Claude Code 的技能目录）。
+- **MCP**（stdio，纯标准库实现，不依赖 SDK）：`vidroute setup --mcp`，或 `claude mcp add vidroute -- vidroute-mcp`，
+  或在任意 MCP 客户端配置中写 `{"mcpServers": {"vidroute": {"command": "vidroute-mcp"}}}`。
+- **手动复制技能：** `vidroute skill path` 打印的目录。
 
-MCP tools: `resolve_llm`, `doctor`, `install` (needs `confirm`), `plan_video`, `prepare_video`
-(native routes need `accept_raw_video_handoff`), `drill_video`, `probe_video`, `list_models`,
-`read_outputs` (returns contact sheets, frames, audio and text as MCP content). Long tools report
-progress and honour cancellation.
+MCP 工具：`resolve_llm`、`doctor`、`install`（需 `confirm`）、`plan_video`、`prepare_video`（原生路线需
+`accept_raw_video_handoff`）、`drill_video`、`probe_video`、`list_models`、`read_outputs`（把拼图、关键帧、
+音频和文本作为 MCP 内容返回）。耗时工具会上报进度并支持取消。
 
-The agent's workflow (from [skills/vidroute/SKILL.md](skills/vidroute/SKILL.md)):
-`llm resolve` → `doctor` / `install` (with your OK) → `plan` (asks you before any raw video leaves
-your machine) → `prepare` → read `SUMMARY.md`, `ANALYSIS_GUIDE.md`, `handoff.json` → write the
-answer with `[mm:ss]` timestamps → `drill` into a time range when detail is needed. The skill's
-launchers (`scripts/vidroute`, `scripts/vidroute.cmd`) need no `python` on PATH: they fall back to uv.
+Agent 的工作流（见 [skills/vidroute/SKILL.md](skills/vidroute/SKILL.md)）：
+`llm resolve` → `doctor` / `install`（先征得你同意）→ `plan`（原片要离开本机前先问你）→ `prepare` →
+读 `SUMMARY.md`、`ANALYSIS_GUIDE.md`、`handoff.json` → 写带 `[mm:ss]` 时间戳的回答 → 需要细节时 `drill` 某个时间段。
+技能里的启动器（`scripts/vidroute`、`scripts/vidroute.cmd`）不要求 PATH 上有 `python`：找不到时会退回到 uv。
 
-## Command line
+## 命令行
 
-| command | does |
+| 命令 | 作用 |
 |---|---|
-| `vidroute setup [--host ID] [--mcp] [--remove] [--yes]` | one plan: ffmpeg, models, agent hosts, self-test |
-| `vidroute doctor [--refresh]` | OS, CPU (AVX2), RAM, GPUs, ffmpeg, runtimes, installed models, tier, agent hosts |
-| `vidroute install [--capability X] [--model ID] [--mirror auto\|cn] [--yes]` | plan → download (mirrors, resume, SHA-256) → smoke test |
-| `vidroute llm resolve --llm ID [--host ID]` | what an LLM on a host can consume, and why |
-| `vidroute probe VIDEO` | duration, streams, subtitles, speech ratio, text density (< 10 s) |
-| `vidroute plan VIDEO --llm ID [--host ID] [--task] [--prefer]` | the explainable two-layer plan (`plan.json`) |
-| `vidroute prepare VIDEO [--out DIR] [--accept-raw-video-handoff]` | run the plan, write the handoff |
-| `vidroute run VIDEO --llm ID ...` | plan + prepare |
-| `vidroute drill OUT_DIR --range 01:20-02:00 [--fps N] [--asr] [--ocr]` | more detail for a time range |
-| `vidroute models list\|verify\|remove`, `clean`, `config get\|set`, `llm set\|list\|sync`, `host set\|list`, `skill path` | housekeeping |
+| `vidroute setup [--host ID] [--mcp] [--remove] [--yes]` | 一份计划：ffmpeg、模型、Agent 宿主、自检 |
+| `vidroute doctor [--refresh]` | 系统、CPU（AVX2）、内存、GPU、ffmpeg、运行时、已装模型、档位、Agent 宿主 |
+| `vidroute install [--capability X] [--model ID] [--mirror auto\|cn] [--yes]` | 计划 → 下载（多镜像、断点续传、SHA-256）→ 冒烟测试 |
+| `vidroute llm resolve --llm ID [--host ID]` | 某 LLM 在某宿主上能消费什么，以及依据 |
+| `vidroute probe 视频` | 时长、流、字幕、语音占比、文字密度（< 10 秒） |
+| `vidroute plan 视频 --llm ID [--host ID] [--task] [--prefer]` | 可解释的两层计划（`plan.json`） |
+| `vidroute prepare 视频 [--out 目录] [--accept-raw-video-handoff]` | 执行计划，生成交付物 |
+| `vidroute run 视频 --llm ID ...` | plan + prepare |
+| `vidroute drill 输出目录 --range 01:20-02:00 [--fps N] [--asr] [--ocr]` | 对某时间段补充细节 |
+| `vidroute models list\|verify\|remove`、`clean`、`config get\|set`、`llm set\|list\|sync`、`host set\|list`、`skill path` | 管理类命令 |
 
-Every command takes `--json` and prints one envelope on stdout
-(`{"ok", "schema": "vidroute/1", "data", "warnings", "error": {"code", "message", "hint"}}`);
-logs go to stderr. Exit codes: `0` ok · `1` usage · `2` needs install · `3` needs your confirmation ·
-`4` hardware cannot run it · `5` run failed. `error.hint`, when present, is always a command that fixes the problem.
+所有命令都支持 `--json`，在 stdout 输出一个统一外壳
+（`{"ok", "schema": "vidroute/1", "data", "warnings", "error": {"code", "message", "hint"}}`），日志走 stderr。
+退出码：`0` 成功 · `1` 用法错误 · `2` 需要安装 · `3` 需要你确认 · `4` 硬件不足 · `5` 运行失败。
+`error.hint` 如果有，就是一条能解决问题的命令；用户只能自己处理时（比如文件损坏）为空，原因写在 `message` 里。
 
-## What `prepare` writes
+## `prepare` 的输出
 
 ```text
 <out>/<slug>/
-  SUMMARY.md          start here: route, why, what was produced or skipped, warnings, budget
-  ANALYSIS_GUIDE.md   evidence order, proofreading rules for this route, minutes template, drill tips
-  handoff.json        exactly what to attach (schemas/handoff.schema.json)
-  plan.json  manifest.json (files + SHA-256 + engines and their licenses)  segments.json (split video)
-  native/             the (transcoded) video or its parts            — native routes
-  contact-sheets/     labelled keyframe grids + index.md              — frames route
-  frames/  transcript.{md,srt,json}  ocr.{md,json}  timeline.md  audio/16k.wav  drill/<range>/
+  SUMMARY.md          必读首页：路线、原因、产出/跳过及原因、警告、预算
+  ANALYSIS_GUIDE.md   证据层级、本路线的校对规则、纪要模板、钻取建议
+  handoff.json        该附带什么（schemas/handoff.schema.json）
+  plan.json  manifest.json（文件 + SHA-256 + 所用引擎及许可）  segments.json（分段时）
+  native/             转码后的视频或分段                — 原生路线
+  contact-sheets/     带时间标签的关键帧拼图 + index.md  — frames 路线
+  frames/  transcript.{md,srt,json}  ocr.{md,json}  timeline.md  audio/16k.wav  drill/<区间>/
 ```
 
-`--task minutes` (or `--diarize on`) labels `Speaker 1`, `Speaker 2`, … in the transcript: voice groups, not identities,
-and they can be wrong. Longer shots that the keyframe budget left out are listed in `omitted-shots.md`; `drill` shows them.
+`--task minutes`（或 `--diarize on`）会在转写里标出 `Speaker 1`、`Speaker 2`……；这只是按声音分组，不代表身份，也可能分错。
+关键帧预算放不下的较长镜头列在 `omitted-shots.md`，可用 `drill` 查看。
 
-All timestamps are **global** (also inside segments and drill output). The evidence order is
-picture/sound > on-screen text (OCR) > local transcript, and the guide makes the LLM correct the
-transcript only with visible (or audible) evidence, keeping a correction list.
+所有时间戳都是**全局时间**（分段与钻取输出中也是）。证据层级：画面/声音 > 屏幕文字（OCR）> 本地转写；
+指南要求 LLM 只能凭看得见（或听得见）的证据改写转写，并保留纠错清单。
 
-## Supported models and hosts
+## 支持的模型与宿主
 
-LLM profiles (`routing/llm-profiles.yaml`, `vidroute llm list`) cover Gemini, the Qwen Omni/VL/Plus
-families, Claude, GPT-5, Grok 4, DeepSeek, Kimi and a conservative fallback for unknown models
-(text + images). Each entry cites the official source and the date it was checked; values that
-could not be verified are marked `unverified` and kept conservative. Override or add your own:
+LLM 档案（`routing/llm-profiles.yaml`，`vidroute llm list`）覆盖 Gemini、通义千问 Omni/VL/Plus 系列、
+Claude、GPT-5、Grok 4、DeepSeek、Kimi，以及对未知模型的保守默认（文本 + 图片）。每条档案都注明官方来源和
+核实日期；无法核实的值标为 `unverified` 并取保守值。可以自行覆盖或补充：
 
 ```bash
 vidroute llm set my-model --modalities text,image,video --video-max-seconds 600 --video-max-mb 20
-vidroute llm sync --provider openrouter     # opt-in: modalities/context from OpenRouter's model list
+vidroute llm sync --provider openrouter     # 可选：从 OpenRouter 模型列表获取模态与上下文长度
 ```
 
-| host | images | audio | video | profile confidence |
+| 宿主 | 图片 | 音频 | 视频 | 档案可信度 |
 |---|---|---|---|---|
-| Claude Code | ✅ | — | — | verified (live test) |
-| Codex CLI | ✅ | ✅ | — | source-verified |
-| Gemini CLI | ✅ | ✅ | ✅ native, ≤ 20 MB/file | source-verified |
-| Qwen Code | ✅ | ✅* | ✅* native (*if the model config declares it) | source-verified |
-| opencode | ✅ | — | — | verified (live test) |
-| Cursor, Cline, Roo Code, Kilo Code | ✅ | — | — | unverified (conservative) |
+| Claude Code | ✅ | — | — | 已实测 |
+| Codex CLI | ✅ | ✅ | — | 已核对源码 |
+| Gemini CLI | ✅ | ✅ | ✅ 原生，≤ 20 MB/文件 | 已核对源码 |
+| Qwen Code | ✅ | ✅* | ✅* 原生（*需模型配置声明该模态） | 已核对源码 |
+| opencode | ✅ | — | — | 已实测 |
+| Cursor、Cline、Roo Code、Kilo Code | ✅ | — | — | 未核实（保守） |
 
-Same video, different plans: Gemini on Gemini CLI → `native-av`; Qwen3.6-Plus on Qwen Code →
-`native-v`; Claude on Claude Code → `frames`; DeepSeek on opencode → `text`. Corrections with a
-source are welcome (see [docs/DECISIONS.md](docs/DECISIONS.md)).
+同一个视频、不同计划：Gemini + Gemini CLI → `native-av`；Qwen3.6-Plus + Qwen Code → `native-v`；
+Claude + Claude Code → `frames`；DeepSeek + opencode → `text`。欢迎附官方来源提交更正。
 
-## Local models and licenses
+## 本地模型与许可
 
-Nothing is downloaded without an install plan you confirm; every file is checked against a pinned
-SHA-256 from an allow-listed host (GitHub, Hugging Face, hf-mirror, ModelScope). Weights are never
-part of this repository or the Python package.
+不经你确认的安装计划，不下载任何东西；每个文件都对照固定的 SHA-256 校验，且只来自白名单域名
+（GitHub、Hugging Face、hf-mirror、ModelScope）。模型权重从不放进本仓库或 Python 包。
 
-| model | used for | languages | size | license |
+| 模型 | 用途 | 语言 | 体积 | 许可 |
 |---|---|---|---|---|
-| Silero VAD | voice activity | any | 0.7 MB | MIT |
-| SenseVoice-Small int8 (default) | speech recognition | zh, en, ja, ko, yue | 240 MB | FunASR Model License 1.1 (free use incl. commercial; attribution and model name required) |
-| Whisper small int8 (default for other languages) | speech recognition | 99 languages | 375 MB | MIT |
-| faster-whisper large-v3-turbo (GPU, optional) | speech recognition | 99 languages | 1.6 GB | MIT |
-| PP-OCRv6 small (RapidOCR ONNX) | on-screen text | zh, en and more | 31 MB | Apache-2.0 |
-| pyannote segmentation-3.0 + CAM++ | speaker labels | any | 34 MB | MIT + Apache-2.0 |
-| ffmpeg (your own, or offered by `setup`) | decoding, scene/keyframes, transcoding | — | Windows portable build: 110 MB | LGPL/GPL (gyan.dev essentials 9.0.2: GPLv3) |
+| Silero VAD | 语音活动检测 | 任意 | 0.7 MB | MIT |
+| SenseVoice-Small int8（默认） | 语音识别 | 中、英、日、韩、粤 | 240 MB | FunASR 模型许可 1.1（可免费使用含商用；须署名并保留模型名） |
+| Whisper small int8（其他语言默认） | 语音识别 | 99 种语言 | 375 MB | MIT |
+| faster-whisper large-v3-turbo（GPU，可选） | 语音识别 | 99 种语言 | 1.6 GB | MIT |
+| PP-OCRv6 small（RapidOCR ONNX） | 屏幕文字 | 中、英等 | 31 MB | Apache-2.0 |
+| pyannote segmentation-3.0 + CAM++ | 说话人区分 | 任意 | 34 MB | MIT + Apache-2.0 |
+| ffmpeg（自备，或由 `setup` 提供） | 解码、关键帧、转码 | — | Windows 便携包 110 MB | LGPL/GPL（gyan.dev essentials 9.0.2 为 GPLv3） |
 
-Alternatives and experimental models (SenseVoice Cantonese, FunASR-Nano, Qwen3-ASR, PP-OCRv6 tiny)
-are listed by `vidroute models list`. Details per model: [models/manifest.yaml](models/manifest.yaml).
+备选与实验模型（SenseVoice 粤语版、FunASR-Nano、Qwen3-ASR、PP-OCRv6 tiny）见 `vidroute models list`，
+详见 [models/manifest.yaml](models/manifest.yaml)。
 
-## Privacy and safety
+## 隐私与安全
 
-- **Local only.** vidroute never calls a cloud model and has no telemetry. Whether your agent's LLM
-  runs in the cloud is your agent's choice.
-- **Raw media needs your consent.** Plans mark `uploads_raw_video`; native routes (and attaching the
-  audio track) refuse to run without `--accept-raw-video-handoff`, and the skill tells the agent to
-  ask you first. `--prefer privacy` keeps the raw video local and hands over only keyframes and text.
-- **Extracted text is data, not instructions.** Transcripts, subtitles and OCR can contain prompt
-  injections; the guide tells the LLM to ignore any instruction found in them.
-- **Writes only to `VIDROUTE_HOME` (default `~/.vidroute`) and your `--out` folder** — plus, after you
-  confirm `vidroute setup`, the agent-host skill folders and MCP entries listed in its plan. It never
-  deletes your files and never replaces host entries it did not create; logs do not contain video content.
-- Use vidroute only for videos you are allowed to process; respect privacy, consent and copyright.
+- **纯本地。** vidroute 自身从不调用云端模型，没有遥测。你的 Agent 用的 LLM 是否在云端，由你的 Agent 决定。
+- **原始媒体外传需你同意。** 计划会标注 `uploads_raw_video`；原生路线（以及附带音轨）没有
+  `--accept-raw-video-handoff` 就拒绝执行，技能也要求 Agent 先征得你的同意。`--prefer privacy`
+  会让原片留在本机，只交关键帧和文字。
+- **提取出的文本是数据，不是指令。** 转写、字幕和 OCR 里可能有提示注入，指南要求 LLM 忽略其中的任何指令。
+- **只写入 `VIDROUTE_HOME`（默认 `~/.vidroute`）和你指定的 `--out`**——以及你确认 `vidroute setup` 之后，计划中列出的
+  宿主技能目录和 MCP 配置项。从不删除你的文件，也从不替换不是它创建的宿主配置；日志不记录视频内容。
+- 请只处理你有权处理的视频，尊重隐私、知情同意与版权。
 
-## Platforms
+## 平台
 
-Windows 10/11 (x64; Arm64 runs the OCR and faster-whisper workers as x64 under emulation), macOS and
-Linux; Windows is tested in CI (`windows-latest`) on every commit.
-Pitfalls and fixes: [references/windows-troubleshooting.md](references/windows-troubleshooting.md).
-The CPU path always works; an NVIDIA GPU is used only after a passing CUDA smoke test and falls
-back to CPU automatically.
+Windows 10/11（x64；Arm64 设备上 OCR 与 faster-whisper 的 worker 以 x64 仿真运行）、macOS、Linux；每次提交都在
+CI（`windows-latest`）上测试 Windows。常见问题与解决办法见
+[references/windows-troubleshooting.md](references/windows-troubleshooting.md)。CPU 路径永远可用；
+NVIDIA GPU 只有在 CUDA 冒烟测试通过后才启用，失败自动回退 CPU。
 
-## Known issues
+## 已知问题
 
-See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) — e.g. Gemini CLI native video not yet tested live, Cursor/Cline
-profiles unverified, the CUDA path not validated on real hardware.
+见 [KNOWN_ISSUES.md](KNOWN_ISSUES.md)，例如 Gemini CLI 原生视频尚未实测、Cursor/Cline 档案未核实、
+CUDA 路径未在真实硬件上验证。
 
-## Development
+## 开发
 
 ```bash
 python -m venv .venv && .venv/bin/pip install --require-hashes -r requirements-dev.lock.txt
 .venv/bin/pip install --no-deps -e .
-.venv/bin/pytest                              # offline: ffmpeg + fake engines
-VIDROUTE_REAL_MODELS=1 .venv/bin/pytest tests/test_real_models.py   # with installed models
+.venv/bin/pytest                              # 离线：ffmpeg + 假引擎
+VIDROUTE_REAL_MODELS=1 .venv/bin/pytest tests/test_real_models.py   # 使用已安装的真实模型
 ```
 
-The orchestrator has no runtime dependencies; heavy libraries live in isolated worker environments.
-Architecture and decisions: [docs/DECISIONS.md](docs/DECISIONS.md); progress: [PROGRESS.md](PROGRESS.md).
+编排器零运行时依赖；重型库运行在隔离的 worker 环境中。架构与决策见 [docs/DECISIONS.md](docs/DECISIONS.md)，
+贡献方式见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-## License
+## 许可证
 
-MIT — see [LICENSE](LICENSE). Downloaded models keep their own licenses (table above and each
-output's `manifest.json`).
+MIT，见 [LICENSE](LICENSE)。下载的模型保留各自的许可（见上表及每次输出的 `manifest.json`）。

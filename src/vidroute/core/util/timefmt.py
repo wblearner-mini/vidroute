@@ -42,7 +42,7 @@ def parse_ts(text: str) -> float:
     raw = text.strip()
     m = _TS.match(raw)
     if not m:
-        raise UsageError(f"Invalid timestamp {text!r}; use SS, MM:SS or HH:MM:SS")
+        raise UsageError(f"无效的时间戳 {text!r}；请使用 SS、MM:SS 或 HH:MM:SS")
     a, b, c = m.groups()
     parts = [p for p in (a, b) if p is not None]
     seconds = float(c)
@@ -56,9 +56,9 @@ def parse_ts(text: str) -> float:
 def parse_range(text: str) -> tuple[float, float]:
     """Parse ``START-END`` (e.g. ``01:30-02:45`` or ``90-165``)."""
     if "-" not in text:
-        raise UsageError(f"Invalid range {text!r}; use START-END, e.g. 01:30-02:45")
+        raise UsageError(f"无效的区间 {text!r}；请使用 开始-结束，例如 01:30-02:45")
     start_s, end_s = text.split("-", 1)
     start, end = parse_ts(start_s), parse_ts(end_s)
     if end <= start:
-        raise UsageError(f"Invalid range {text!r}: END must be after START")
+        raise UsageError(f"无效的区间 {text!r}：结束时间必须晚于开始时间")
     return start, end

@@ -51,7 +51,7 @@ def get_engine(model_id: str, manifest: Manifest | None = None) -> Engine:
     if cls is None:
         from vidroute.core.errors import NeedsInstall
 
-        raise NeedsInstall(f"Engine {model.engine!r} for {model_id} is not available in this version.",
+        raise NeedsInstall(f"此版本中没有 {model_id} 所需的引擎 {model.engine!r}。",
                            code="engine_unavailable", hint="vidroute models list")
     return cls(model, manifest)
 

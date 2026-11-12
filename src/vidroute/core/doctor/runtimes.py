@@ -35,7 +35,7 @@ def uv_info(timeout: float = 5.0) -> dict[str, Any]:
     exe = find_uv()
     if exe is None:
         return {"found": False, "path": None, "version": None,
-                "note": f"vidroute can install uv=={UV_VERSION} into {paths.runtimes_dir() / 'uv'} during `vidroute install`."}
+                "note": f"`vidroute install` 时，vidroute 可以把 uv=={UV_VERSION} 安装到 {paths.runtimes_dir() / 'uv'}。"}
     res = proc.run([exe, "--version"], timeout=timeout)
     version = None
     m = re.search(r"uv (\d+\.\d+\.\d+)", res.stdout)
@@ -61,10 +61,10 @@ def env_status(group: EnvGroup, check_import: bool = True, timeout: float = 5.0)
         out["import_ok"] = res.ok
         if not res.ok:
             if res.timed_out:
-                out["import_error"] = "timed out"
+                out["import_error"] = "超时"
             else:
                 lines = (res.stderr or "").strip().splitlines()
-                out["import_error"] = (lines[-1] if lines else "import failed")[:300]
+                out["import_error"] = (lines[-1] if lines else "导入失败")[:300]
     return out
 
 

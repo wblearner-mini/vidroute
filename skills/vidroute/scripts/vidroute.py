@@ -28,7 +28,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 MIN_PYTHON = (3, 10)
-INSTALL_HINT = "uv tool install https://github.com/wblearner-mini/vidroute/archive/refs/heads/main.tar.gz   (then: vidroute setup)"
+INSTALL_HINT = "uv tool install https://github.com/wblearner-mini/vidroute/archive/refs/heads/main.tar.gz   （然后：vidroute setup）"
 # Python puts this script's folder first on sys.path; since the script is called vidroute.py it would
 # shadow the vidroute package on `import vidroute`.
 sys.path[:] = [p for p in sys.path if Path(p or ".").resolve() != HERE]
@@ -93,9 +93,9 @@ def main() -> int:
     if exe:
         return subprocess.call([exe, *args])
     if not new_enough:
-        return _fail("python_too_old", f"vidroute needs Python {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+, this is "
-                     f"{sys.version.split()[0]}.", INSTALL_HINT, 2)
-    return _fail("needs_install", "vidroute is not installed.", INSTALL_HINT, 2)
+        return _fail("python_too_old", f"vidroute 需要 Python {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+，当前是 "
+                     f"{sys.version.split()[0]}。", INSTALL_HINT, 2)
+    return _fail("needs_install", "vidroute 尚未安装。", INSTALL_HINT, 2)
 
 
 if __name__ == "__main__":

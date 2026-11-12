@@ -44,11 +44,11 @@ def _open(out_dir: str | Path) -> tuple[Layout, dict[str, Any], Path]:
     root = Path(out_dir).expanduser().resolve()
     plan = read_json(root / "plan.json")
     if not isinstance(plan, dict) or plan.get("schema") != PLAN_SCHEMA:
-        raise UsageError(f"{root} is not a vidroute output folder (no plan.json)",
-                         hint="vidroute prepare <video> --out <dir>, then drill <dir>/<slug>")
+        raise UsageError(f"{root} 不是 vidroute 输出目录（没有 plan.json）",
+                         hint="vidroute prepare <视频> --out <目录>，然后 drill <目录>/<slug>")
     video = Path(plan["request"]["video"])
     if not video.is_file():
-        raise NotFoundError(f"The video of this output folder is gone: {video}")
+        raise NotFoundError(f"这个输出目录对应的视频已不存在：{video}")
     return Layout(root), plan, video
 
 
@@ -58,7 +58,7 @@ def _ranged_transcript(video: Path, main: Layout, sub: Layout, plan: dict[str, A
     loc = rules["local"]
     info = run_probe(video, ctx)
     if not info.get("has_audio"):
-        return {"segments": [], "note": "no audio track"}
+        return {"segments": [], "note": "没有音轨"}
     wav = main.audio_wav
     if not wav.exists() or abs(media.wav_duration(wav) - float(info["duration"] or 0)) > 2.0:
         media.extract_wav(video, wav, ctx)
@@ -66,13 +66,13 @@ def _ranged_transcript(video: Path, main: Layout, sub: Layout, plan: dict[str, A
         plan["request"].get("language") or "auto"
     candidates = asr_candidates(language, plan["local"]["tier"], rules, manifest)
     if not candidates:
-        raise NeedsInstall("No ASR engine is installed.", hint="vidroute install --capability asr")
+        raise NeedsInstall("没有安装 ASR 引擎。", hint="vidroute install --capability asr")
     vad_id = first_installed(loc["vad_chain"], manifest) or "vad-energy"
     speech = get_engine(vad_id, manifest).detect(ctx, pool, wav, windows=[[start, end]],
                                                  max_speech=float(loc["asr_chunk_max_seconds"]))
     speech = [[max(s, start), min(e, end)] for s, e in speech if e > start and s < end]
     if not speech:
-        return {"segments": [], "note": f"no speech between {fmt_ts(start)} and {fmt_ts(end)}"}
+        return {"segments": [], "note": f"{fmt_ts(start)} 到 {fmt_ts(end)} 之间没有语音"}
     chunks = [c for c in tr.make_chunks(speech, end, max_len=float(loc["asr_chunk_max_seconds"])) if c[0] >= start - 0.5]
     lang = None if language == "auto" else language
     segs = tr._transcribe(candidates[0], manifest, ctx, pool, sub, wav, chunks, lang)
@@ -85,7 +85,7 @@ def drill(out_dir: str | Path, range_text: str, fps: float | None = None, asr: b
           max_frames: int | None = None, ctx: Ctx | None = None) -> dict[str, Any]:
     ctx = ctx or Ctx()
     main, plan, video = _open(out_dir)
-    with exclusive(main.work / "lock", ctx, f"{main.root.name} is being prepared by another vidroute run"):
+    with exclusive(main.work / "lock", ctx, f"另一个 vidroute 进程正在准备 {main.root.name}"):
         return _drill(main, plan, video, range_text, fps, asr, ocr, max_frames, ctx)
 
 
@@ -96,12 +96,12 @@ def _drill(main: Layout, plan: dict[str, Any], video: Path, range_text: str, fps
     duration = float(info["duration"] or 0)
     start, end = parse_range(range_text)
     if start >= duration:
-        raise UsageError(f"The range starts after the end of the video ({fmt_ts(duration)})")
+        raise UsageError(f"区间的开始时间晚于视频结尾（{fmt_ts(duration)}）")
     end = min(end, duration)
     if fps is not None and not (0 < fps <= 10):
-        raise UsageError("--fps must be between 0 and 10")
+        raise UsageError("--fps 必须在 0 到 10 之间")
     if max_frames is not None and max_frames < 1:
-        raise UsageError("--max-frames must be at least 1")
+        raise UsageError("--max-frames 至少为 1")
     name = f"{fmt_compact(start)}-{fmt_compact(end)}" + (f"-{fps:g}fps" if fps else "")
     sub = Layout(reset_dir(main.root / "drill" / name, main)).ensure()
     lim = (plan.get("effective") or {}).get("image_limits") or {}
@@ -143,7 +143,7 @@ def _drill(main: Layout, plan: dict[str, Any], video: Path, range_text: str, fps
             manifest = load_manifest()
             ocr_id = first_installed(rules["local"]["ocr_chain"], manifest)
             if ocr_id is None:
-                raise NeedsInstall("No OCR engine is installed.", hint="vidroute install --capability ocr")
+                raise NeedsInstall("没有安装 OCR 引擎。", hint="vidroute install --capability ocr")
             ocr_results = ocr_mod.run_ocr(frames, sub, ocr_id, manifest, ctx, pool)
             ocr_mod.write_outputs(sub, ocr_results, _label(ocr_id))
     if not segments:  # fall back to the main transcript for this range, so the timeline still has speech
@@ -159,7 +159,7 @@ def _drill(main: Layout, plan: dict[str, Any], video: Path, range_text: str, fps
         return main.rel(p)
 
     attachments = [{"type": "image", "path": rel(sub.sheets / s["file"]),
-                    "note": f"{len(s['frames'])} frames {fmt_ts(s['start'])}–{fmt_ts(s['end'])}, labelled with global time"}
+                    "note": f"{len(s['frames'])} 帧，{fmt_ts(s['start'])}–{fmt_ts(s['end'])}，标有全局时间"}
                    for s in sheets]
     text_context = [{"type": t, "path": rel(sub.file(f)), "attach": True}
                     for t, f in (("transcript", "transcript.md"), ("ocr", "ocr.md")) if sub.file(f).exists()]
@@ -173,7 +173,7 @@ def _drill(main: Layout, plan: dict[str, Any], video: Path, range_text: str, fps
         "attachments": attachments,
         "text_context": text_context,
         "transcript": {k: t_info.get(k) for k in ("engine", "language", "note")} if asr else None,
-        "note": "All times are global. Paths are relative to the main output folder.",
+        "note": "所有时间均为全局时间。路径相对于主输出目录。",
     }
     write_json_atomic(sub.file("drill.json"), result)
     return {**result, "out_dir": str(main.root), "drill_dir": str(sub.root)}

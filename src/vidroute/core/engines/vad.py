@@ -40,10 +40,10 @@ class SileroVad(Engine):
             if sample.exists():
                 segs = self.detect(ctx, pool, sample)
                 ok = len(segs) >= 1
-                return {"status": "passed" if ok else "failed", "detail": f"{len(segs)} speech segment(s) in test speech"}
+                return {"status": "passed" if ok else "failed", "detail": f"测试语音中有 {len(segs)} 个语音片段"}
             silence = write_wav(Path(tmp) / "silence.wav", 2.0)
             segs = self.detect(ctx, pool, silence)
-            return {"status": "passed" if not segs else "failed", "detail": "ran on 2 s of silence"}
+            return {"status": "passed" if not segs else "failed", "detail": "在 2 秒静音上运行"}
 
 
 _SILENCE_START = re.compile(r"silence_start:\s*(-?[\d.]+)")

@@ -58,9 +58,9 @@ def load_plan(path: str | Path, video: Path) -> dict[str, Any]:
     p = Path(path).expanduser()
     data = read_json(p)
     if not isinstance(data, dict) or data.get("schema") != PLAN_SCHEMA:
-        raise UsageError(f"{p} is not a vidroute plan (schema {PLAN_SCHEMA})", hint="vidroute plan <video> --llm <id> --out <dir>")
+        raise UsageError(f"{p} 不是 vidroute 计划（schema {PLAN_SCHEMA}）", hint="vidroute plan <video> --llm <id> --out <dir>")
     if not _same_file(data["request"]["video"], video):
-        raise UsageError(f"{p} was made for {data['request']['video']}, not {video}",
+        raise UsageError(f"{p} 是为 {data['request']['video']} 生成的，不是 {video}",
                          hint=f'vidroute plan "{video}" --llm <id>')
     return data
 
@@ -73,8 +73,8 @@ def _plan_for(video: Path, layout: Layout, plan_path: str | None, route: str, re
     elif not replan and kw.get("llm") is None and kw.get("host") is None and layout.file("plan.json").exists():
         try:
             data, source = load_plan(layout.file("plan.json"), video), "out_dir"
-            ctx.warn("plan_reused", f"Using the plan in {layout.root} (LLM {data['request']['llm']}, task "
-                                    f"{data['request']['task']}); pass --llm to plan again.")
+            ctx.warn("plan_reused", f"使用 {layout.root} 中的计划（LLM {data['request']['llm']}，任务 "
+                                    f"{data['request']['task']}）；传入 --llm 可重新计划。")
         except UsageError:
             data = None
     if data is not None and route in ("auto", data["route"]):
@@ -114,12 +114,12 @@ def prepare(
     started = time.monotonic()
     path = Path(video).expanduser()
     if not path.exists():
-        raise NotFoundError(f"Video not found: {path}")
+        raise NotFoundError(f"找不到视频：{path}")
     if not path.is_file():
-        raise UsageError(f"Not a file: {path}")
+        raise UsageError(f"不是文件：{path}")
     path = path.resolve()
     if route not in ROUTES:
-        raise UsageError(f"--route must be one of {', '.join(ROUTES)} (got {route!r})")
+        raise UsageError(f"--route 必须是 {', '.join(ROUTES)} 之一（实际为 {route!r}）")
     if plan and not out:  # a plan written by `plan --out DIR` lives in DIR/<slug>/: keep the outputs next to it
         plan_dir = Path(plan).expanduser().resolve().parent
         if plan_dir.name == paths.video_slug(path):
@@ -130,7 +130,7 @@ def prepare(
           "audio_in_video": audio_in_video, "ocr": ocr, "force_asr": force_asr, "diarize": diarize}
     failed = False
     try:
-        with exclusive(layout.work / "lock", ctx, f"{layout.root.name} is being prepared by another vidroute run"):
+        with exclusive(layout.work / "lock", ctx, f"另一个 vidroute 进程正在准备 {layout.root.name}"):
             try:
                 return _prepare_in(path, layout, plan, route, replan, kw, accept_raw_video_handoff, started, ctx)
             except BaseException:
@@ -161,8 +161,8 @@ def _prepare_in(path: Path, layout: Layout, plan: str | None, route: str, replan
     chosen = the_plan["route"]
     if chosen.startswith("native") and not accept_raw_video_handoff:
         raise NeedsConfirmation(
-            f"Route {chosen} hands the raw video to the LLM provider ({the_plan['llm']['model']}). "
-            "Tell the user and ask for consent first.",
+            f"路线 {chosen} 会把原始视频交给 LLM 服务商（{the_plan['llm']['model']}）。"
+            "请先告知用户并征得同意。",
             code="raw_video_handoff",
             hint=f'vidroute prepare "{path}" --out "{layout.root.parent}" --accept-raw-video-handoff',
             data={"route": chosen, "plan_path": str(plan_path), "uploads_raw_video": True,
@@ -173,13 +173,13 @@ def _prepare_in(path: Path, layout: Layout, plan: str | None, route: str, replan
             result = _prepare_native(path, layout, the_plan, ctx)
         except native.DoesNotFit as exc:
             # Fall back along the chain (native -> frames): plan again with the route forced, keep the reason.
-            ctx.warn("native_does_not_fit", f"{exc.message}: falling back to keyframes + transcript.")
+            ctx.warn("native_does_not_fit", f"{exc.message}：改用关键帧 + 转写。")
             req = the_plan["request"]
             the_plan = make_plan(path, req["llm"], req["host"], req["task"], req["prefer"], req["language"],
                                  req.get("modalities"), req.get("audio_in_video"), req.get("ocr", "auto"), "frames",
                                  bool(req.get("force_asr")), ctx, diarize=req.get("diarize", "auto"))
             the_plan["delivery"]["degraded_from"] = [
-                {"route": chosen, "why": f"prepared files exceed the limit: {exc.message}"}] + [
+                {"route": chosen, "why": f"准备好的文件超出限额：{exc.message}"}] + [
                 g for g in the_plan["delivery"]["degraded_from"] if g["route"] != chosen]
             the_plan["route_changed_by_prepare"] = True
             write_json_atomic(plan_path, the_plan)
@@ -192,7 +192,7 @@ def _prepare_in(path: Path, layout: Layout, plan: str | None, route: str, replan
         layout.file("segments.json").unlink(missing_ok=True)
         result = _prepare_local(path, layout, the_plan, accept_raw_video_handoff, ctx)
     else:
-        raise UsageError(f"Route {chosen!r} cannot be prepared locally.")
+        raise UsageError(f"路线 {chosen!r} 无法在本地准备。")
     result.update(plan_path=str(plan_path), plan_source=source, elapsed_seconds=round(time.monotonic() - started, 1))
     return result
 
@@ -204,8 +204,8 @@ def _warn_broken_models(ctx: Ctx) -> None:
     for model in load_manifest().models.values():
         if model.builtin or not (model.model_dir / MARKER).exists() or model.installed_status()["installed"]:
             continue
-        ctx.warn("model_damaged", f"Model {model.id} is damaged (files missing or the wrong size): vidroute will not "
-                                  "use it, and results may come from a fallback engine.",
+        ctx.warn("model_damaged", f"模型 {model.id} 已损坏（文件缺失或大小不对）：vidroute 不会使用它，"
+                                  "结果可能来自备用引擎。",
                  f"vidroute install --model {model.id} --force --yes")
 
 
@@ -255,7 +255,7 @@ def _transcript(video: Path, layout: Layout, plan: dict[str, Any], info: dict[st
             except VidrouteError as exc:
                 if exc.code == "cancelled":
                     raise
-                ctx.warn("diarize_failed", f"Speaker labels were skipped: {exc.message[:160]}")
+                ctx.warn("diarize_failed", f"已跳过说话人标签：{exc.message[:160]}")
                 return []
     fp = fingerprint("transcript", PIPELINE_VERSION, layout.root.name, language, force_asr, role_if_any, asr_allowed,
                      diarizer is not None,
@@ -270,7 +270,7 @@ def _transcript(video: Path, layout: Layout, plan: dict[str, Any], info: dict[st
     else:
         if (asr_allowed and required and not info.get("text_subtitles") and info.get("has_audio")
                 and not asr_candidates(language, tier, rules, manifest)):
-            raise NeedsInstall("No ASR engine is installed, so the speech cannot be transcribed.",
+            raise NeedsInstall("没有安装 ASR 引擎，无法转写语音。",
                                hint="vidroute install --capability asr", data={"needs": ["asr"]})
         tinfo = tr.build_transcript(video, layout, info, rules, manifest, tier, language, force_asr, ctx, pool,
                                     required=required, subtitles_only=not asr_allowed, diarizer=diarizer)
@@ -287,16 +287,16 @@ def _transcript(video: Path, layout: Layout, plan: dict[str, Any], info: dict[st
     if tinfo.get("engine") and not str(tinfo["engine"]).startswith("subtitle:"):
         outcome["engines"]["asr"] = str(tinfo["engine"]).removeprefix("fake-")
     if segs:
-        speech = f", {fmt_ts(tinfo['speech_seconds'])} of speech" if tinfo.get("speech_seconds") else ""
-        detail = (f"{len(segs)} segments from {tinfo['source']} ({tinfo['engine']}), language "
-                  f"{tinfo.get('language') or 'unknown'}{speech}")
+        speech = f"，语音 {fmt_ts(tinfo['speech_seconds'])}" if tinfo.get("speech_seconds") else ""
+        detail = (f"{len(segs)} 个片段，来自 {tinfo['source']}（{tinfo['engine']}），语言 "
+                  f"{tinfo.get('language') or '未知'}{speech}")
         _step(outcome, "transcript", status, detail + "".join(f"; {n}" for n in tinfo.get("notes", [])))
     else:
-        reason = "; ".join(tinfo.get("notes") or []) or "no speech"
+        reason = "；".join(tinfo.get("notes") or []) or "没有语音"
         outcome["transcript_skip_reason"] = reason
         _step(outcome, "transcript", "skipped", reason)
     for d in tinfo.get("degraded_from") or []:
-        outcome["notes"].append(f"ASR {d['engine']} failed: {d['why'][:120]}")
+        outcome["notes"].append(f"ASR {d['engine']} 失败：{d['why'][:120]}")
     return segs
 
 
@@ -327,19 +327,19 @@ def _keyframes(video: Path, layout: Layout, plan: dict[str, Any], info: dict[str
     frames, stats = kf.select(cands, size, rules, target, 0.0, duration)
     grab = kf.grab_all(video, frames, layout.frames, thumbs, ocr_dir, rules, src, ctx)
     if grab["failed"]:
-        ctx.warn("frames_failed", f"{len(grab['failed'])} keyframe(s) could not be extracted.")
+        ctx.warn("frames_failed", f"有 {len(grab['failed'])} 张关键帧无法提取。")
     frames = [k for k in frames if k.file]
     if not frames:
-        raise RunFailed("No keyframes could be extracted from the video.", code="no_frames")
-    detail = (f"{len(frames)} frames (budget {target}) from {stats['unique_shots']} distinct shots"
-              + (f", {stats['repeats_folded']} repeats folded" if stats["repeats_folded"] else "")
-              + f"; {meta['candidates']} candidates ({meta['method']})")
+        raise RunFailed("无法从视频中提取任何关键帧。", code="no_frames")
+    detail = (f"{len(frames)} 帧（预算 {target}），来自 {stats['unique_shots']} 个不同镜头"
+              + (f"，合并了 {stats['repeats_folded']} 次重复" if stats["repeats_folded"] else "")
+              + f"；{meta['candidates']} 个候选（{meta['method']}）")
     if not grab["labels"] and want_thumbs:
-        detail += "; tiles unlabelled (ffmpeg drawtext unavailable)"
-        ctx.warn("no_tile_labels", "ffmpeg cannot draw text here: contact-sheet tiles carry no timestamps "
-                                   "(see contact-sheets/index.md).")
+        detail += "；小图没有标签（ffmpeg drawtext 不可用）"
+        ctx.warn("no_tile_labels", "这里的 ffmpeg 无法绘制文字：拼图小图上没有时间戳"
+                                   "（见 contact-sheets/index.md）。")
     if stats["omitted"]:
-        detail += f"; {len(stats['omitted'])} longer shots left out (omitted-shots.md)"
+        detail += f"；漏掉了 {len(stats['omitted'])} 个较长镜头（omitted-shots.md）"
     _report_omitted(layout, stats["omitted"], target, ctx)
     write_json_atomic(work, {"meta": meta, "stats": stats, "grab": grab, "detail": detail,
                              "frames": [asdict(k) for k in frames]})
@@ -356,14 +356,14 @@ def _report_omitted(layout: Layout, omitted: list[list[float]], target: int, ctx
         return
     start, end = omitted[0]
     drill = f'vidroute drill "{layout.root}" --range {fmt_ts(start)}-{fmt_ts(end)} --ocr'
-    lines = ["# Shots without a keyframe", "",
-             f"The budget of {target} frames left out these {len(omitted)} shots, each on screen for several seconds. "
-             "The keyframes do NOT show them. Before you claim anything about these spans, or if the question "
-             "concerns them, look with:", "", f"    {drill}", ""]
+    lines = ["# 没有关键帧的镜头", "",
+             f"{target} 帧的预算漏掉了下面 {len(omitted)} 个镜头，每个都在屏幕上停留了好几秒。"
+             "关键帧中**没有**它们。在对这些时间段下任何结论之前，或者问题涉及它们时，"
+             "请用下面的命令查看：", "", f"    {drill}", ""]
     lines += [f"- {fmt_ts(s)}–{fmt_ts(e)}" for s, e in omitted]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    ctx.warn("frames_omitted", f"{len(omitted)} shots that stayed on screen have no keyframe (budget {target} frames); "
-                               "the frames do not show everything: see omitted-shots.md.", drill)
+    ctx.warn("frames_omitted", f"有 {len(omitted)} 个在屏幕上停留过的镜头没有关键帧（预算 {target} 帧）；"
+                               "这些帧并没有涵盖全部内容：见 omitted-shots.md。", drill)
 
 
 def _sheets(layout: Layout, frames: list[kf.Keyframe], rules: dict[str, Any], state: StepState, kf_fp: str,
@@ -378,7 +378,7 @@ def _sheets(layout: Layout, frames: list[kf.Keyframe], rules: dict[str, Any], st
     labels = bool(state.get("keyframes").get("labels", True))
     kf.write_index(frames, sheets, layout.sheets / "index.md", labels)
     cs = rules["frames"]["contact_sheet"]
-    detail = f"{len(sheets)} sheet(s) of up to {cs['cols']}x{cs['rows']} tiles"
+    detail = f"{len(sheets)} 张拼图，每张最多 {cs['cols']}x{cs['rows']} 格"
     state.mark("sheets", fp, sheets=sheets, detail=detail)
     _step(outcome, "contact_sheets", "done", detail)
     return sheets
@@ -390,16 +390,16 @@ def _ocr(layout: Layout, plan: dict[str, Any], frames: list[kf.Keyframe], rules:
     if step.get("status") not in ("planned", "needs_install"):
         for name in ("ocr.json", "ocr.md"):
             layout.file(name).unlink(missing_ok=True)
-        _step(outcome, "ocr", "skipped", step.get("reason") or "not planned")
+        _step(outcome, "ocr", "skipped", step.get("reason") or "未计划")
         return []
     engine_id = step.get("engine") if step.get("engine") and installed(step["engine"], manifest) else \
         first_installed(rules["local"]["ocr_chain"], manifest)
     if engine_id is None:
         for name in ("ocr.json", "ocr.md"):
             layout.file(name).unlink(missing_ok=True)
-        ctx.warn("ocr_missing", "On-screen text would help, but no OCR engine is installed.",
+        ctx.warn("ocr_missing", "屏幕文字会有帮助，但没有安装 OCR 引擎。",
                  "vidroute install --capability ocr")
-        _step(outcome, "ocr", "skipped", "no OCR engine installed (optional): vidroute install --capability ocr")
+        _step(outcome, "ocr", "skipped", "未安装 OCR 引擎（可选）：vidroute install --capability ocr")
         return []
     fp = fingerprint("ocr", kf_fp, engine_id)
     if state.done("ocr", fp) and _files_exist(layout, ["ocr.json", "ocr.md"]):
@@ -412,7 +412,7 @@ def _ocr(layout: Layout, plan: dict[str, Any], frames: list[kf.Keyframe], rules:
         status = "done"
     outcome["engines"]["ocr"] = engine_id
     n_lines = sum(len(r["lines"]) for r in results)
-    _step(outcome, "ocr", status, f"{len(results)} frames, {n_lines} text lines ({_label(engine_id)})")
+    _step(outcome, "ocr", status, f"{len(results)} 帧，{n_lines} 行文字（{_label(engine_id)}）")
     return results
 
 
@@ -422,10 +422,10 @@ def _audio_parts(video: Path, layout: Layout, plan: dict[str, Any], info: dict[s
     if not aa.get("enabled"):
         return []
     if not accepted:
-        ctx.warn("audio_not_attached", "The model could listen to the audio track, but attaching it hands the raw "
-                                       "audio to the LLM provider: ask the user first.",
-                 "re-run prepare with --accept-raw-video-handoff to include the audio")
-        _step(outcome, "audio_attachment", "skipped", "needs the user's consent (--accept-raw-video-handoff)")
+        ctx.warn("audio_not_attached", "模型能听音轨，但附带音轨会把原始音频交给 LLM 服务商："
+                                       "请先询问用户。",
+                 "加 --accept-raw-video-handoff 重新运行 prepare 即可附带音频")
+        _step(outcome, "audio_attachment", "skipped", "需要用户同意（--accept-raw-video-handoff）")
         return []
     duration = float(info["duration"] or 0)
     n = max(1, int(aa.get("parts") or 1))
@@ -443,7 +443,7 @@ def _audio_parts(video: Path, layout: Layout, plan: dict[str, Any], info: dict[s
         parts.append({"id": i + 1, "file": layout.rel(p), "start": round(start, 3), "end": round(end, 3),
                       "kbps": aa["kbps"], "est_tokens": int(rate * (end - start))})
         ctx.progress("audio_attachment", i + 1, n)
-    _step(outcome, "audio_attachment", "done", f"{n} part(s), {aa['kbps']} kbps mono")
+    _step(outcome, "audio_attachment", "done", f"{n} 段，{aa['kbps']} kbps 单声道")
     return parts
 
 
@@ -482,14 +482,14 @@ def _prepare_local(video: Path, layout: Layout, plan: dict[str, Any], accepted: 
                 outcome["sheets"] = timed("contact_sheets", _sheets, layout, frames, rules, state, kf_fp, ctx, outcome)
             else:
                 remove_dir(layout.sheets, layout)
-                _step(outcome, "contact_sheets", "skipped", "text route: pictures are not attached")
+                _step(outcome, "contact_sheets", "skipped", "text 路线：不附带画面")
             ocr_results = timed("ocr", _ocr, layout, plan, frames, rules, manifest, state, kf_fp, ctx, pool, outcome)
         else:
             for stale in (layout.frames, layout.sheets):
                 remove_dir(stale, layout)
             for name in ("ocr.json", "ocr.md"):
                 layout.file(name).unlink(missing_ok=True)
-            _step(outcome, "keyframes", "skipped", "no video stream")
+            _step(outcome, "keyframes", "skipped", "没有视频流")
         remove_dir(layout.root / "audio" / "attach", layout)
         if route == "frames":
             outcome["audio_parts"] = timed("audio_attachment", _audio_parts, video, layout, plan, info, rules,
@@ -502,7 +502,7 @@ def _prepare_local(video: Path, layout: Layout, plan: dict[str, Any], accepted: 
     text = timeline.render(secs, str(info.get("name")), route, outcome["transcript_role"],
                            _label(ocr_id) if ocr_id else None, outcome["sheets"])
     layout.file("timeline.md").write_text(text, encoding="utf-8")
-    _step(outcome, "timeline", "done", f"{sum(1 for s in secs if s.frame or s.said)} sections")
+    _step(outcome, "timeline", "done", f"{sum(1 for s in secs if s.frame or s.said)} 个时间段")
     return _finish(layout, plan, outcome, manifest, ctx)
 
 
@@ -550,7 +550,7 @@ def _prepare_native(video: Path, layout: Layout, plan: dict[str, Any], ctx: Ctx)
     outcome["native_parts"] = [{**p, "est_tokens": t} for p, t in zip(nat["parts"], tokens)]
     outcome["includes_audio"] = nat["includes_audio"]
     _step(outcome, "native_video", "done", f"{nat['method']}: {native.describe(nat['parts'])}"
-          + ("" if nat["includes_audio"] else "; no audio track in the attachment"))
+          + ("" if nat["includes_audio"] else "；附件中没有音轨"))
     asr_step = _plan_step(plan, "asr")
     role = "reference" if route == "native-av" else "sole_source"
     segments: list[dict[str, Any]] = []
@@ -564,7 +564,7 @@ def _prepare_native(video: Path, layout: Layout, plan: dict[str, Any], ctx: Ctx)
     else:
         for name in ("transcript.json", "transcript.srt", "transcript.md"):
             layout.file(name).unlink(missing_ok=True)
-        reason = asr_step.get("reason") or "not needed"
+        reason = asr_step.get("reason") or "不需要"
         outcome["transcript_skip_reason"] = reason
         _step(outcome, "transcript", "skipped", reason)
     outcome["transcript_role"] = role if segments else "none"

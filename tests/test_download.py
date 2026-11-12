@@ -167,7 +167,7 @@ def test_url_outside_allowlist_is_skipped(tmp_path):
     d = Downloader(["github.com"], retries=1, part_dir=tmp_path / "p")
     with pytest.raises(RunFailed) as exc:
         d.fetch(["https://example.org/file.bin"], tmp_path / "x", SHA, 10)
-    assert "domain not allowed" in str(exc.value.data["errors"])
+    assert "域名不在白名单中" in str(exc.value.data["errors"])
 
 
 def test_existing_verified_file_is_not_downloaded(server, tmp_path):

@@ -89,15 +89,15 @@ def _plan_skill(root: str, served: list[str], force: bool) -> dict[str, Any]:
     if st.get("foreign"):
         if force:
             return {**item, "action": "replace",
-                    "reason": "a vidroute folder vidroute did not create is there; it is renamed to vidroute.bak-*"}
+                    "reason": "那里有一个不是 vidroute 创建的 vidroute 目录；会改名为 vidroute.bak-*"}
         return {**item, "action": "skip",
-                "reason": "a vidroute folder vidroute did not create is already there (rerun with --force to put it "
-                          "aside and install the current skill)"}
+                "reason": "那里已有一个不是 vidroute 创建的 vidroute 目录（加 --force 重新运行，"
+                          "可把它挪到一边并安装当前技能）"}
     if st["ours"] and st["current"]:
-        return {**item, "action": "keep", "reason": f"up to date (vidroute {st.get('version')})"}
+        return {**item, "action": "keep", "reason": f"已是最新（vidroute {st.get('version')}）"}
     if st["ours"]:
-        return {**item, "action": "update", "reason": f"installed by vidroute {st.get('version')}; refreshing"}
-    return {**item, "action": "create", "reason": "skill folder for " + ", ".join(served)}
+        return {**item, "action": "update", "reason": f"由 vidroute {st.get('version')} 安装；正在更新"}
+    return {**item, "action": "create", "reason": "供以下宿主使用的技能目录：" + "、".join(served)}
 
 
 def _plan_mcp(host: hostmod.Host, cmd: list[str], record: dict[str, Any] | None, force: bool,
@@ -105,22 +105,22 @@ def _plan_mcp(host: hostmod.Host, cmd: list[str], record: dict[str, Any] | None,
     item: dict[str, Any] = {"kind": "mcp", "host": host.id, "method": host.mcp, "command": cmd}
     if host.mcp is None:
         return {**item, "action": "unsupported",
-                "reason": f"{host.name}: no supported way to register MCP servers; the skill covers it"}
+                "reason": f"{host.name}：没有受支持的方式注册 MCP 服务；技能已能覆盖"}
     if host.mcp in mcpmod.CLI_TARGETS:
         exe = mcpmod.cli_exe(host.mcp, which)
         if exe is None:
-            return {**item, "action": "manual", "reason": f"`{mcpmod.CLI_TARGETS[host.mcp]['exe']}` is not on PATH",
+            return {**item, "action": "manual", "reason": f"PATH 上没有 `{mcpmod.CLI_TARGETS[host.mcp]['exe']}`",
                     "manual": mcpmod.snippet(host.mcp, cmd)}
         item["target"] = f"{exe} ({mcpmod.CLI_TARGETS[host.mcp]['where']})"
         exists = mcpmod.cli_has_server(host.mcp, exe)
         if not exists:
-            return {**item, "action": "add", "reason": "register the vidroute MCP server"}
+            return {**item, "action": "add", "reason": "注册 vidroute MCP 服务"}
         if record is None:
             return {**item, "action": "update" if force else "skip",
-                    "reason": "an MCP server named vidroute is already configured (not by vidroute)"}
+                    "reason": "已经配置了一个名为 vidroute 的 MCP 服务（不是 vidroute 配置的）"}
         if record.get("command") == cmd:
-            return {**item, "action": "keep", "reason": "already registered by vidroute"}
-        return {**item, "action": "update", "reason": "registered by vidroute with an older command"}
+            return {**item, "action": "keep", "reason": "已由 vidroute 注册"}
+        return {**item, "action": "update", "reason": "由 vidroute 用旧命令注册"}
     st = mcpmod.json_state(host.mcp)
     item["target"] = st["file"]
     if not st["editable"]:
@@ -128,12 +128,12 @@ def _plan_mcp(host: hostmod.Host, cmd: list[str], record: dict[str, Any] | None,
     want = mcpmod.JSON_TARGETS[host.mcp][2](cmd)
     entry = st["entry"]
     if entry is None:
-        return {**item, "action": "add", "reason": "add the vidroute MCP server"}
+        return {**item, "action": "add", "reason": "添加 vidroute MCP 服务"}
     if entry == want:
-        return {**item, "action": "keep", "reason": "already registered"}
+        return {**item, "action": "keep", "reason": "已注册"}
     if (record is not None and entry == record.get("entry")) or force:
-        return {**item, "action": "update", "reason": "replace the vidroute entry with the current command"}
-    return {**item, "action": "skip", "reason": "a vidroute entry configured by hand is already there"}
+        return {**item, "action": "update", "reason": "用当前命令替换 vidroute 配置项"}
+    return {**item, "action": "skip", "reason": "那里已有一个手动配置的 vidroute 配置项"}
 
 
 def plan(requested: list[str] | None = None, skill: bool = True, mcp: bool = False, force: bool = False,
@@ -146,13 +146,13 @@ def plan(requested: list[str] | None = None, skill: bool = True, mcp: bool = Fal
         roots = choose_roots(host_ids, skip=("claude-code",) if plugin else ())
         items += [_plan_skill(root, served, force) for root, served in roots.items()]
         if plugin:
-            notes.append("Claude Code: the vidroute plugin is installed and already provides the skill.")
+            notes.append("Claude Code：已安装 vidroute 插件，插件已经提供了技能。")
     if mcp:
         cmd = mcpmod.server_command()
         records = _records()["mcp"]
         items += [_plan_mcp(hostmod.BY_ID[hid], cmd, records.get(hid), force, which) for hid in host_ids]
     if not host_ids and mode == "auto":
-        notes.append("No agent host was found on this machine; name one with --host (for example --host claude-code).")
+        notes.append("本机没有找到 Agent 宿主；请用 --host 指定一个（例如 --host claude-code）。")
     return {
         "hosts": [{"id": hid, "name": hostmod.BY_ID[hid].name, "reload": hostmod.BY_ID[hid].reload} for hid in host_ids],
         "mode": mode,
@@ -167,7 +167,7 @@ def _apply_mcp(item: dict[str, Any], rec: dict[str, Any]) -> dict[str, Any]:
     if method in mcpmod.CLI_TARGETS:
         exe = mcpmod.cli_exe(method)
         if exe is None:
-            return {**item, "status": "failed", "detail": "command not found", "manual": mcpmod.snippet(method, cmd)}
+            return {**item, "status": "failed", "detail": "找不到命令", "manual": mcpmod.snippet(method, cmd)}
         if item["action"] == "update":
             mcpmod.cli_remove(method, exe)
         res = mcpmod.cli_add(method, exe, cmd)
@@ -209,7 +209,7 @@ def apply(the_plan: dict[str, Any], ctx: Ctx) -> dict[str, Any]:
     _save(rec)
     failed = [r for r in results if r.get("status") == "failed"]
     for r in failed:
-        ctx.warn("integration_failed", f"Could not connect {r.get('host') or r.get('path')}: {r.get('detail')}",
+        ctx.warn("integration_failed", f"无法接入 {r.get('host') or r.get('path')}：{r.get('detail')}",
                  r.get("manual"))
     touched = {h for r in results if r.get("status") in ("created", "updated", "registered")
                for h in (r.get("hosts") or [r.get("host")])}
@@ -234,13 +234,13 @@ def plan_remove(requested: list[str] | None = None) -> dict[str, Any]:
             continue
         if skills.read_marker(target) is not None:
             items.append({"kind": "skill", "path": str(target), "hosts": served, "action": "remove",
-                          "reason": "skill folder created by vidroute"})
+                          "reason": "由 vidroute 创建的技能目录"})
             seen.add(str(target))
     for path, info in rec["skills"].items():
         if path not in seen and (only is None or set(info.get("hosts") or []) & only) and Path(path).exists():
             if skills.read_marker(Path(path)) is not None:
                 items.append({"kind": "skill", "path": path, "hosts": info.get("hosts") or [], "action": "remove",
-                              "reason": "skill folder created by vidroute"})
+                              "reason": "由 vidroute 创建的技能目录"})
     for host, info in rec["mcp"].items():
         if only is not None and host not in only:
             continue
@@ -249,13 +249,13 @@ def plan_remove(requested: list[str] | None = None) -> dict[str, Any]:
         if info.get("method") in mcpmod.JSON_TARGETS:
             st = mcpmod.json_state(info["method"])
             if st["entry"] is None:
-                items.append({**item, "action": "gone", "reason": "entry already removed"})
+                items.append({**item, "action": "gone", "reason": "配置项已被移除"})
             elif st["entry"] != info.get("entry"):
-                items.append({**item, "action": "skip", "reason": "the vidroute entry was changed by hand; left as is"})
+                items.append({**item, "action": "skip", "reason": "vidroute 配置项被手动改过；保持原样"})
             else:
-                items.append({**item, "action": "remove", "reason": "MCP entry added by vidroute"})
+                items.append({**item, "action": "remove", "reason": "由 vidroute 添加的 MCP 配置项"})
         else:
-            items.append({**item, "action": "remove", "reason": "MCP server registered by vidroute"})
+            items.append({**item, "action": "remove", "reason": "由 vidroute 注册的 MCP 服务"})
     return {"items": items, "changes": sum(1 for i in items if i["action"] == "remove")}
 
 
@@ -286,7 +286,7 @@ def remove(the_plan: dict[str, Any], ctx: Ctx) -> dict[str, Any]:
     _save(rec)
     for r in results:
         if r.get("status") == "failed":
-            ctx.warn("integration_remove_failed", f"Could not remove the vidroute MCP server from {r['host']}.")
+            ctx.warn("integration_remove_failed", f"无法从 {r['host']} 移除 vidroute MCP 服务。")
     return {"results": results, "ok": all(r.get("status") != "failed" for r in results)}
 
 

@@ -54,7 +54,7 @@ JSON_TARGETS: dict[str, tuple[Callable[[], Path], str, Callable[[list[str]], dic
 }
 
 CLI_TARGETS: dict[str, dict[str, Any]] = {
-    "claude-cli": {"exe": "claude", "where": "user scope", "add": ["mcp", "add", "--scope", "user", SERVER, "--"],
+    "claude-cli": {"exe": "claude", "where": "用户级", "add": ["mcp", "add", "--scope", "user", SERVER, "--"],
                    "remove": ["mcp", "remove", "--scope", "user", SERVER], "get": ["mcp", "get", SERVER]},
     "codex-cli": {"exe": "codex", "where": "~/.codex/config.toml", "add": ["mcp", "add", SERVER, "--"],
                   "remove": ["mcp", "remove", SERVER], "get": ["mcp", "get", SERVER]},
@@ -67,7 +67,7 @@ def snippet(method: str, cmd: list[str]) -> str:
         t = CLI_TARGETS[method]
         return " ".join([t["exe"], *t["add"], *(_quote(c) for c in cmd)])
     path, key, build = JSON_TARGETS[method]
-    return f"add to {path} under \"{key}\": " + json.dumps({SERVER: build(cmd)}, ensure_ascii=False)
+    return f"在 {path} 的 \"{key}\" 下添加：" + json.dumps({SERVER: build(cmd)}, ensure_ascii=False)
 
 
 def _quote(arg: str) -> str:
@@ -84,9 +84,9 @@ def _load(path: Path) -> tuple[dict[str, Any] | None, str | None]:
     try:
         data = json.loads(path.read_text(encoding="utf-8") or "{}")
     except (OSError, ValueError) as exc:
-        return None, f"{path} is not plain JSON ({type(exc).__name__}); vidroute does not rewrite it"
+        return None, f"{path} 不是纯 JSON（{type(exc).__name__}）；vidroute 不会改写它"
     if not isinstance(data, dict):
-        return None, f"{path} does not hold a JSON object"
+        return None, f"{path} 中不是 JSON 对象"
     return data, None
 
 
@@ -118,7 +118,7 @@ def json_state(method: str) -> dict[str, Any]:
     servers = data.get(key)
     entry = servers.get(SERVER) if isinstance(servers, dict) else None
     if servers is not None and not isinstance(servers, dict):
-        return {"file": str(path), "editable": False, "problem": f"{key} in {path} is not an object", "entry": None}
+        return {"file": str(path), "editable": False, "problem": f"{path} 中的 {key} 不是对象", "entry": None}
     return {"file": str(path), "editable": True, "problem": None, "entry": entry}
 
 

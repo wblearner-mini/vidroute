@@ -197,7 +197,7 @@ class Manifest:
         except KeyError:
             from vidroute.core.errors import NotFoundError
 
-            raise NotFoundError(f"Unknown model id {model_id!r}", hint="vidroute models list") from None
+            raise NotFoundError(f"未知的模型 id {model_id!r}", hint="vidroute models list") from None
 
     def by_capability(self, capability: str) -> list[ModelEntry]:
         return [m for m in self.models.values() if m.capability == capability]
@@ -209,7 +209,7 @@ class Manifest:
 
 def _req(obj: dict[str, Any], key: str, where: str) -> Any:
     if key not in obj:
-        raise DataFileError(f"{where}: missing required field {key!r}")
+        raise DataFileError(f"{where}：缺少必需字段 {key!r}")
     return obj[key]
 
 
@@ -250,7 +250,7 @@ def _sources(raw: list[dict[str, Any]] | None) -> tuple[Source, ...]:
 
 def parse_manifest(raw: Any, source: str = "manifest.yaml") -> Manifest:
     if not isinstance(raw, dict) or raw.get("schema") != "vidroute/manifest/1":
-        raise DataFileError(f"{source}: expected schema 'vidroute/manifest/1'")
+        raise DataFileError(f"{source}：应为 schema 'vidroute/manifest/1'")
     groups: dict[str, EnvGroup] = {}
     for name, g in (raw.get("env_groups") or {}).items():
         where = f"{source}: env_groups.{name}"
@@ -270,13 +270,13 @@ def parse_manifest(raw: Any, source: str = "manifest.yaml") -> Manifest:
         mid = _req(m, "id", f"{source}: models[]")
         where = f"{source}: model {mid}"
         if mid in models:
-            raise DataFileError(f"{where}: duplicate id")
+            raise DataFileError(f"{where}：id 重复")
         cap = _req(m, "capability", where)
         if cap not in CAPABILITIES:
-            raise DataFileError(f"{where}: unknown capability {cap!r}")
+            raise DataFileError(f"{where}：未知能力 {cap!r}")
         env_group = m.get("env_group")
         if env_group is not None and env_group not in groups:
-            raise DataFileError(f"{where}: unknown env_group {env_group!r}")
+            raise DataFileError(f"{where}：未知 env_group {env_group!r}")
         lic = _req(m, "license", where)
         models[mid] = ModelEntry(
             id=mid,

@@ -34,7 +34,7 @@ while [ $# -gt 0 ]; do
     --yes|-y) yes=1; shift ;;
     --no-setup) setup=0; shift ;;
     -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
-    *) die "unknown option: $1" ;;
+    *) die "未知选项：$1" ;;
   esac
 done
 
@@ -55,7 +55,7 @@ case "$(uname -s)-$(uname -m)" in
     tarball=uv-aarch64-apple-darwin.tar.gz; tar_sha=e0b1d4743ce64c55d9f0f4a444afa6b81125680070ee04e853fcd0f6c1ebf8f1
     wheel=packages/26/44/5a8733dd1b2e8d6f9cffd1ff6428a3e11dcc7e146a7657e32cfb8d9fb4a4/uv-0.13.4-py3-none-macosx_11_0_arm64.whl
     wheel_sha=95f4eb2b991b53b50ec2b18ab612fca8ba1e7a75a47af0331fb8bcd21da3eb03 ;;
-  *) die "unsupported platform $(uname -s) $(uname -m); install uv yourself, then: uv tool install $source_spec" ;;
+  *) die "不支持的平台 $(uname -s) $(uname -m)；请自行安装 uv，然后运行：uv tool install $source_spec" ;;
 esac
 
 # Install command for a system package, for error messages.
@@ -66,12 +66,12 @@ pkg_hint() {
       printf '%s\n' "${sudo:+$sudo }$pm $*"; return 0
     fi
   done
-  if command -v brew >/dev/null 2>&1; then printf 'brew install %s\n' "$*"; else printf 'install %s with your package manager\n' "$*"; fi
+  if command -v brew >/dev/null 2>&1; then printf 'brew install %s\n' "$*"; else printf '用你的包管理器安装 %s\n' "$*"; fi
 }
 
 # Everything this script needs from the system, checked before any download.
 command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 \
-  || die "this script needs curl or wget to download uv. Install one, then run it again: $(pkg_hint curl ca-certificates)"
+  || die "这个脚本需要 curl 或 wget 来下载 uv。请安装其中一个，然后重新运行：$(pkg_hint curl ca-certificates)"
 
 # A stalled transfer must fail and move on to the next source instead of hanging without output:
 # below 10 KB/s for 20 seconds counts as stalled, however large the file.
@@ -91,7 +91,7 @@ sha256_of() {
   else shasum -a 256 "$1" | cut -d' ' -f1; fi
 }
 verified() {  # url sha file
-  fetch "$1" "$3" && [ "$(sha256_of "$3")" = "$2" ] || { say "  $1: download failed, stalled or SHA-256 mismatch"; return 1; }
+  fetch "$1" "$3" && [ "$(sha256_of "$3")" = "$2" ] || { say "  $1：下载失败、卡住或 SHA-256 不匹配"; return 1; }
 }
 
 # A wheel is a zip. Extract one member with whatever is here: unzip, python3, or (nothing else on a fresh
@@ -144,24 +144,24 @@ install_uv() {  # china_first
   for src in $order; do
     case $src in
       github)
-        say "downloading uv $UV_VERSION from $github"
+        say "正在从 $github 下载 uv $UV_VERSION"
         if verified "$github" "$tar_sha" "$tmp/uv.tar.gz" && tar -xzf "$tmp/uv.tar.gz" -C "$tmp" \
             && "$tmp/${tarball%.tar.gz}/uv" --version >/dev/null 2>&1; then
           cp "$tmp/${tarball%.tar.gz}/uv" "$tmp/${tarball%.tar.gz}/uvx" "$dest/"; break; fi ;;
       pypi|aliyun)
         base=https://files.pythonhosted.org; [ "$src" = aliyun ] && base=https://mirrors.aliyun.com/pypi
-        say "downloading uv $UV_VERSION from $base"
+        say "正在从 $base 下载 uv $UV_VERSION"
         if verified "$base/$wheel" "$wheel_sha" "$tmp/uv.whl"; then
           if zip_member "$tmp/uv.whl" "uv-$UV_VERSION.data/scripts/uv" "$tmp/uv" && chmod +x "$tmp/uv" \
               && "$tmp/uv" --version >/dev/null 2>&1; then
             cp "$tmp/uv" "$dest/uv"; break
           fi
-          say "  could not unpack the uv wheel from $base; trying the next source"
+          say "  无法解开来自 $base 的 uv wheel；尝试下一个来源"
         fi ;;
     esac
   done
   rm -rf "$tmp"
-  [ -f "$dest/uv" ] || die "could not get uv from any source (see the lines above). If every download failed, check the network and CA certificates ($(pkg_hint ca-certificates)); or install uv yourself (https://docs.astral.sh/uv/) and run this script again"
+  [ -f "$dest/uv" ] || die "无法从任何来源获取 uv（见上面几行）。如果所有下载都失败了，请检查网络和 CA 证书（$(pkg_hint ca-certificates)）；或自行安装 uv（https://docs.astral.sh/uv/）后重新运行这个脚本"
   chmod +x "$dest/uv"
   [ ! -f "$dest/uvx" ] || chmod +x "$dest/uvx"
   printf '%s\n' "$dest/uv"
@@ -171,7 +171,7 @@ install_uv() {  # china_first
 china=0
 [ "$mirror" = cn ] && china=1
 if [ "$china" = 0 ] && ! reachable https://huggingface.co/ && reachable https://www.modelscope.cn/; then
-  china=1; say "huggingface.co is unreachable: using mirrors in mainland China (all downloads stay hash-checked)"
+  china=1; say "huggingface.co 不通：使用中国大陆镜像（所有下载仍会校验哈希）"
 fi
 if [ "$china" = 1 ]; then
   export UV_DEFAULT_INDEX="${UV_DEFAULT_INDEX:-$PYPI_MIRROR}"
@@ -179,22 +179,22 @@ if [ "$china" = 1 ]; then
 fi
 
 # 2. uv
-if uv=$(find_uv); then say "using uv at $uv"; else uv=$(install_uv "$china"); fi
+if uv=$(find_uv); then say "使用 $uv 处的 uv"; else uv=$(install_uv "$china"); fi
 
 # 3. vidroute
 case $source_spec in
   *://*) ;;
   *) [ -e "$source_spec" ] && source_spec=$(cd "$source_spec" && pwd) ;;
 esac
-say "installing vidroute from $source_spec"
+say "正在从 $source_spec 安装 vidroute"
 "$uv" tool install --force --reinstall "$source_spec"
 bin=$("$uv" tool dir --bin)
 "$uv" tool update-shell >/dev/null 2>&1 || true
 PATH="$bin:$PATH"
-say "vidroute installed: $bin/vidroute"
+say "vidroute 已安装：$bin/vidroute"
 
 # 4. setup
-if [ "$setup" = 0 ]; then say "next: vidroute setup   (open a new shell first so PATH includes $bin)"; exit 0; fi
+if [ "$setup" = 0 ]; then say "下一步：vidroute setup   （请先打开一个新的 shell，让 PATH 包含 $bin）"; exit 0; fi
 set -- setup
 for h in $hosts; do set -- "$@" --host "$h"; done
 [ "$china" = 1 ] && set -- "$@" --mirror cn
@@ -205,5 +205,5 @@ if [ -t 1 ] && [ ! -t 0 ] && [ -r /dev/tty ]; then
 else
   "$bin/vidroute" "$@" || code=$?
 fi
-[ "$code" = 0 ] && say "done. Open a new shell to use 'vidroute' directly; restart your agent tools to load the skill."
+[ "$code" = 0 ] && say "完成。打开新的 shell 即可直接使用 'vidroute'；重启你的 Agent 工具以加载技能。"
 exit "$code"

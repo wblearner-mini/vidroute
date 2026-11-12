@@ -47,7 +47,7 @@ def test_cli_setup_and_remove_round_trip(user_home, monkeypatch, capsys):
     out = json.loads(capsys.readouterr().out)["data"]
     assert out["results"][0]["status"] == "removed" and not (user_home / ".agents" / "skills" / "vidroute").exists()
     assert cli.main(["setup", "--remove"]) == 0  # nothing left: plain message, no prompt
-    assert "has not added anything" in capsys.readouterr().out
+    assert "还没有向任何 Agent 宿主添加内容" in capsys.readouterr().out
 
 
 def test_missing_ffmpeg_after_setup_is_reported_with_the_fix(user_home, monkeypatch):

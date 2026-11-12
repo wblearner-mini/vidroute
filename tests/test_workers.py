@@ -83,7 +83,7 @@ def test_worker_crash_is_detected(fake_env):
     with WorkerClient(fake_env, "test") as w:
         with pytest.raises(WorkerError) as exc:
             w.call("die")
-        assert "exited unexpectedly" in exc.value.message
+        assert "意外退出" in exc.value.message
 
 
 def test_cancellation_kills_worker(fake_env):
@@ -101,7 +101,7 @@ def test_call_timeout(fake_env):
     with WorkerClient(fake_env, "test") as w:
         with pytest.raises(WorkerError) as exc:
             w.call("slow", timeout=0.5)
-        assert "timed out" in exc.value.message
+        assert "超时" in exc.value.message
 
 
 def test_missing_env_needs_install(tmp_path):

@@ -31,7 +31,7 @@ def extract_wav(video: Path, out: Path, ctx: Ctx, start: float | None = None, en
     res = proc.run(args, timeout=timeout)
     if not res.ok:
         tmp.unlink(missing_ok=True)
-        raise RunFailed(f"Audio extraction failed: {(res.stderr or 'timed out').strip()[-300:]}", code="ffmpeg_failed")
+        raise RunFailed(f"提取音频失败：{(res.stderr or '超时').strip()[-300:]}", code="ffmpeg_failed")
     tmp.replace(out)
     return out
 
@@ -54,7 +54,7 @@ def encode_audio(video: Path, out_stem: Path, ctx: Ctx, start: float, end: float
     res = proc.run(args, timeout=max(600.0, (end - start) * 0.5))
     if not res.ok:
         tmp.unlink(missing_ok=True)
-        raise RunFailed(f"Audio encoding failed: {(res.stderr or 'timed out').strip()[-300:]}", code="ffmpeg_failed")
+        raise RunFailed(f"编码音频失败：{(res.stderr or '超时').strip()[-300:]}", code="ffmpeg_failed")
     tmp.replace(out)
     return out
 
@@ -101,7 +101,7 @@ def extract_subtitles(video: Path, sub_index: int, out_srt: Path) -> list[dict[s
     res = proc.run([info.ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(video),
                     "-map", f"0:s:{sub_index}", "-c:s", "srt", str(out_srt)], timeout=600)
     if not res.ok or not out_srt.exists():
-        raise RunFailed(f"Could not extract subtitle track {sub_index}: {(res.stderr or '').strip()[-200:]}",
+        raise RunFailed(f"无法提取字幕轨 {sub_index}：{(res.stderr or '').strip()[-200:]}",
                         code="subtitle_failed")
     return parse_srt(out_srt.read_text(encoding="utf-8", errors="replace"))
 

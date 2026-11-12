@@ -1,6 +1,6 @@
 """Two-layer routing: table-driven over LLM profile x host profile x video features x prefer x task.
 
-Acceptance (brief Phase 3): D1–D4 and every degradation are covered; the same
+Acceptance: D1–D4 and every degradation are covered; the same
 video gets different, explainable plans under different LLM/host profiles.
 """
 
@@ -101,7 +101,7 @@ def test_native_always_requires_handoff_consent():
 def test_host_limited_gives_delegate_suggestion():
     d = decide("gemini-3.8-flash", "claude-code")
     assert d["suggestions"] and d["suggestions"][0]["route"] == "delegate"
-    assert any("limited by the host, not the model" in r for r in d["reasons"])
+    assert any("受宿主限制，而非模型限制" in r for r in d["reasons"])
     assert not decide("claude-opus-5-5", "claude-code")["suggestions"]
 
 

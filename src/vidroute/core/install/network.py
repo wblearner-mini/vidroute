@@ -63,7 +63,7 @@ def resolve(mirror: str = "auto", need_packages: bool = True, need_python: bool 
     up: dict[str, bool] = {}
     if mirror == "cn":
         out["region"] = "cn"
-        out["reasons"].append("--mirror cn: mirrors in mainland China")
+        out["reasons"].append("--mirror cn：使用中国大陆镜像")
     elif mirror == "auto" and (want_index or want_python or want_models) and not config.get("offline"):
         urls = dict(CN_SIGNALS)
         if want_index:
@@ -73,8 +73,8 @@ def resolve(mirror: str = "auto", need_packages: bool = True, need_python: bool 
         up = _probe_all(urls, probe)
         if not up.get("huggingface") and (up.get("hf-mirror") or up.get("modelscope")):
             out["region"] = "cn"
-            out["reasons"].append("huggingface.co is unreachable while hf-mirror.com/ModelScope answer: "
-                                  "using mirrors in mainland China")
+            out["reasons"].append("huggingface.co 不通，而 hf-mirror.com/ModelScope 有响应："
+                                  "使用中国大陆镜像")
 
     def pick(mirrors: tuple[str, ...], prefix: str) -> str | None:
         if not up:  # forced, nothing probed
@@ -83,18 +83,18 @@ def resolve(mirror: str = "auto", need_packages: bool = True, need_python: bool 
 
     if user_index is not None:
         out["pypi_index"] = None if user_index == "official" else user_index
-        out["reasons"].append(f"package index from {index_src}")
+        out["reasons"].append(f"软件包索引来自 {index_src}")
     elif want_index and (out["region"] == "cn" or (up and not up.get("pypi"))):
         out["pypi_index"] = pick(PYPI_MIRRORS, "pypi")
         if out["region"] != "cn" and out["pypi_index"]:
-            out["reasons"].append("pypi.org is unreachable: using a PyPI mirror")
+            out["reasons"].append("pypi.org 不通：使用 PyPI 镜像")
     if user_python is not None:
         out["python_mirror"] = None if user_python == "official" else user_python
-        out["reasons"].append(f"Python runtime mirror from {python_src}")
+        out["reasons"].append(f"Python 运行时镜像来自 {python_src}")
     elif want_python and (out["region"] == "cn" or (up and not up.get("python"))):
         out["python_mirror"] = pick(PYTHON_MIRRORS, "python")
         if out["region"] != "cn" and out["python_mirror"]:
-            out["reasons"].append("releases.astral.sh is unreachable: using a Python runtime mirror")
+            out["reasons"].append("releases.astral.sh 不通：使用 Python 运行时镜像")
     if want_models and out["region"] == "cn":
         out["model_mirror"] = "cn"
     out["user_index"] = user_index is not None
@@ -125,12 +125,12 @@ def describe(net: dict[str, Any] | None) -> str | None:
         return None
     parts = []
     if net.get("pypi_index"):
-        parts.append(f"packages from {net['pypi_index']}")
+        parts.append(f"软件包来自 {net['pypi_index']}")
     if net.get("python_mirror"):
-        parts.append(f"Python from {net['python_mirror']}")
+        parts.append(f"Python 来自 {net['python_mirror']}")
     if net.get("model_mirror") == "cn":
-        parts.append("models from ModelScope / hf-mirror.com first")
+        parts.append("模型优先来自 ModelScope / hf-mirror.com")
     elif net.get("model_mirror") not in (None, "auto"):
-        parts.append(f"models from {net['model_mirror']} first")
-    why = f" ({'; '.join(net['reasons'])})" if net.get("reasons") else ""
-    return "network: " + ", ".join(parts) + why
+        parts.append(f"模型优先来自 {net['model_mirror']}")
+    why = f"（{'；'.join(net['reasons'])}）" if net.get("reasons") else ""
+    return "网络：" + "，".join(parts) + why

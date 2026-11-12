@@ -91,7 +91,7 @@ def encode(video: Path, out: Path, start: float, end: float, tc: dict[str, Any],
     res = proc.run(args, timeout=max(600.0, (end - start) * 3))
     if not res.ok or not tmp.exists():
         tmp.unlink(missing_ok=True)
-        raise RunFailed(f"Transcoding failed: {(res.stderr or 'timed out').strip()[-300:]}", code="ffmpeg_failed")
+        raise RunFailed(f"转码失败：{(res.stderr or '超时').strip()[-300:]}", code="ffmpeg_failed")
     tmp.replace(out)
     return out
 
@@ -106,7 +106,7 @@ def remux(video: Path, out: Path, drop_audio: bool, ctx: Ctx) -> Path:
     res = proc.run(args, timeout=1800)
     if not res.ok or not tmp.exists():
         tmp.unlink(missing_ok=True)
-        raise RunFailed(f"Remux failed: {(res.stderr or 'timed out').strip()[-300:]}", code="ffmpeg_failed")
+        raise RunFailed(f"重新封装失败：{(res.stderr or '超时').strip()[-300:]}", code="ffmpeg_failed")
     tmp.replace(out)
     return out
 
@@ -129,7 +129,7 @@ def produce(video: Path, layout: Layout, plan: dict[str, Any], info: dict[str, A
         shutil.copy2(video, dst)
         parts.append({"id": 1, "path": dst, "start": 0.0, "end": duration})
     elif tc.get("mode") == "copy":
-        method = "remux without audio" if tc.get("drop_audio") else "remux"
+        method = "去掉音频后重新封装" if tc.get("drop_audio") else "重新封装"
         dst = remux(video, out_dir / "video.mp4", bool(tc.get("drop_audio")), ctx)
         parts.append({"id": 1, "path": dst, "start": 0.0, "end": duration})
     else:
@@ -145,15 +145,15 @@ def produce(video: Path, layout: Layout, plan: dict[str, Any], info: dict[str, A
                 if not limit or size <= float(limit) * FIT_MARGIN:
                     break
                 if attempt == MAX_PASSES or not tc.get("video_kbps"):
-                    raise DoesNotFit(f"{name} is {size:.1f} MB after {attempt} pass(es); the limit is {limit} MB")
+                    raise DoesNotFit(f"{name} 经过 {attempt} 遍后为 {size:.1f} MB；限额为 {limit} MB")
                 scale *= float(limit) * 0.9 / size
-                ctx.progress("transcode", i, len(segs), f"{name}: {size:.1f} MB > {limit} MB, re-encoding smaller")
+                ctx.progress("transcode", i, len(segs), f"{name}：{size:.1f} MB > {limit} MB，正在重新编码以缩小")
             parts.append({"id": i, "path": dst, "start": float(s), "end": float(e), "passes": attempt})
             ctx.progress("transcode", i, len(segs))
     for p in parts:
         size = _mb(p["path"])
         if limit and size > float(limit) * FIT_MARGIN:
-            raise DoesNotFit(f"{p['path'].name} is {size:.1f} MB; the limit is {limit} MB")
+            raise DoesNotFit(f"{p['path'].name} 为 {size:.1f} MB；限额为 {limit} MB")
         p.update(file=layout.rel(p["path"]), mb=round(size, 2), bytes=p["path"].stat().st_size)
     data = {
         "schema": SEGMENTS_SCHEMA,
@@ -162,8 +162,8 @@ def produce(video: Path, layout: Layout, plan: dict[str, Any], info: dict[str, A
         "method": method,
         "max_file_mb": limit,
         "overlap_seconds": overlap if len(parts) > 1 else 0.0,
-        "note": "Times inside a part start at 0. Global time = offset_sec + time in the part. Neighbouring parts "
-                "overlap; report each event once, with its global time.",
+        "note": "每段内的时间从 0 开始。全局时间 = offset_sec + 段内时间。相邻分段"
+                "有重叠；每个事件只报告一次，并使用全局时间。",
         "segments": [{"id": p["id"], "file": p["file"], "start": round(p["start"], 3), "end": round(p["end"], 3),
                       "offset_sec": round(p["start"], 3), "duration": round(p["end"] - p["start"], 3),
                       "mb": p["mb"]} for p in parts],
@@ -178,7 +178,7 @@ def describe(parts: list[dict[str, Any]]) -> str:
         p = parts[0]
         return f"{p['file']} ({p['mb']} MB, {fmt_ts(p['end'] - p['start'])})"
     total = sum(p["mb"] for p in parts)
-    return f"{len(parts)} parts, {total:.1f} MB in total, largest {max(p['mb'] for p in parts)} MB"
+    return f"{len(parts)} 段，共 {total:.1f} MB，最大 {max(p['mb'] for p in parts)} MB"
 
 
 def video_tokens_per_part(plan: dict[str, Any], parts: list[dict[str, Any]]) -> list[int]:

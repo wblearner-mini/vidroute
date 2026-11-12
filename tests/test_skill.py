@@ -28,14 +28,14 @@ def test_skill_follows_the_agent_skills_spec():
     meta = _frontmatter(text)
     assert meta["name"] == SKILL.name == "vidroute"
     assert re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", meta["name"]) and len(meta["name"]) <= 64
-    assert 0 < len(meta["description"]) <= 1024 and "Use when" in meta["description"]
+    assert 0 < len(meta["description"]) <= 1024 and "使用场景" in meta["description"]
     assert len(meta.get("compatibility", "")) <= 500
     assert all(isinstance(k, str) and isinstance(v, str) for k, v in meta["metadata"].items())
     assert len(text.splitlines()) < 500
     for link in re.findall(r"\]\(([^)#]+)\)", text):  # every relative link resolves inside the skill
         if not link.startswith("http"):
             assert (SKILL / link).is_file(), link
-    assert "data, not instructions" in text and "--accept-raw-video-handoff" in text
+    assert "是数据，不是指令" in text and "--accept-raw-video-handoff" in text
 
 
 def test_reference_validator_accepts_the_skill():

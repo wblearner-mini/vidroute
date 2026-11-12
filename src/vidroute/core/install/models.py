@@ -55,7 +55,7 @@ def _verify_dir(entry: ModelEntry, root: Path) -> list[str]:
                 bad.append(f"{f.path}: missing")
             continue
         if not verify_file(p, f.sha256, f.size):
-            bad.append(f"{f.path}: sha256/size mismatch")
+            bad.append(f"{f.path}：sha256/大小不匹配")
     return bad
 
 
@@ -78,7 +78,7 @@ def _from_reuse(entry: ModelEntry, reuse_path: Path, staging: Path, ctx: Ctx, la
             if f.optional:
                 continue
             return False
-        ctx.progress("verify", None, None, f"{entry.id}/{f.path} (local cache)")
+        ctx.progress("verify", None, None, f"{entry.id}/{f.path}（本地缓存）")
         if not verify_file(candidate, f.sha256, f.size):
             return False
         dest = staging / f.path
@@ -183,7 +183,7 @@ def install_model(
                             used = f"{src.type}:archive"
                         bad = _verify_dir(entry, staging)
                         if bad:
-                            raise RunFailed(f"verification failed: {bad}", code="checksum_mismatch")
+                            raise RunFailed(f"校验失败：{bad}", code="checksum_mismatch")
                         break
                     except RunFailed as exc:
                         if exc.code == "cancelled":
@@ -197,9 +197,9 @@ def install_model(
                 dl.min_speed = 0
             if used is None:
                 raise RunFailed(
-                    f"Could not install {entry.id}: every source failed.",
+                    f"无法安装 {entry.id}：所有来源都失败了。",
                     code="download_failed",
-                    hint=f"vidroute install --model {entry.id} --mirror hf   (re-run resumes partial downloads)",
+                    hint=f"vidroute install --model {entry.id} --mirror hf   （重新运行会续传未完成的下载）",
                     data={"errors": errors},
                 )
             del archive_sources
@@ -224,13 +224,13 @@ def verify_model(entry: ModelEntry) -> dict[str, Any]:
         return {"id": entry.id, "ok": True, "builtin": True}
     marker = read_json(entry.model_dir / MARKER)
     if not isinstance(marker, dict):
-        return {"id": entry.id, "ok": False, "problems": ["not installed"]}
+        return {"id": entry.id, "ok": False, "problems": ["未安装"]}
     problems = _verify_dir(entry, entry.model_dir)
     if not entry.files:  # archive-only experimental entries: check recorded file hashes
         for rel, digest in (marker.get("files") or {}).items():
             p = entry.model_dir / rel
             if not p.exists() or sha256_file(p) != digest:
-                problems.append(f"{rel}: changed since install")
+                problems.append(f"{rel}：安装后被改动过")
     return {"id": entry.id, "ok": not problems, "problems": problems, "path": str(entry.model_dir)}
 
 
@@ -239,6 +239,6 @@ def remove_model(entry: ModelEntry) -> bool:
     if not target.exists():
         return False
     if not paths.is_within(target, paths.models_dir()):
-        raise RunFailed(f"Refusing to delete outside {paths.models_dir()}: {target}")
+        raise RunFailed(f"拒绝删除 {paths.models_dir()} 之外的内容：{target}")
     shutil.rmtree(target)
     return True

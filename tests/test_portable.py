@@ -159,7 +159,7 @@ def test_windows_on_arm_uses_x64_python_where_wheels_require_it(monkeypatch, iso
     (pydir / "cpython-3.12.15-windows-x86_64-none").mkdir()
     assert planner._python_runtime_present("cpython-3.12-windows-x86_64-none")
     item = planner._python_item("cpython-3.12-windows-x86_64-none")
-    assert (item["id"], item["version"]) == ("python-3.12-x86_64", "3.12") and "emulated" in item["note"]
+    assert (item["id"], item["version"]) == ("python-3.12-x86_64", "3.12") and "仿真" in item["note"]
 
 
 def test_x64_windows_keeps_the_plain_request(monkeypatch):

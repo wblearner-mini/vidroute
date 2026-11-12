@@ -1,37 +1,33 @@
-# Contributing LLM and host profiles
+# 贡献 LLM 与宿主档案
 
-Routing is only as good as the profiles in `routing/llm-profiles.yaml` and
-`routing/host-profiles.yaml`. Corrections are very welcome — with evidence.
+路由的好坏取决于 `routing/llm-profiles.yaml` 和 `routing/host-profiles.yaml` 中的档案。非常欢迎更正——请附证据。
 
-## Rules
+## 规则
 
-1. **Official source required.** Every changed value needs a URL to the provider's or host's own
-   documentation, API reference, model card or source code (a specific file and version for code).
-   Blog posts, forum answers and third-party tables are not enough on their own.
-2. **Check date required.** Set `verified_at: YYYY-MM-DD` to the day you checked the source.
-3. **Cannot verify? Mark it.** Use `unverified: true` and conservative values (fewer images, shorter
-   video, smaller files). vidroute treats unverified profiles cautiously and warns the user.
-4. **Limits are per request, as the host sends them.** For base64/inline uploads give the documented
-   payload limit; vidroute converts it to a raw-file limit (`inline_is_base64`).
-5. **Hosts:** describe what the agent can actually attach (`can_attach_image/video/audio`,
-   `video_delivery`, `video_includes_audio`, `max_attachment_mb`) and set `confidence`:
-   `verified` (you tested it live), `source-verified` (you read the code), `docs-only`, `unverified`.
-   Put what you observed in `notes`.
+1. **必须有官方来源。** 每个改动的值都要附上服务商或宿主自己的文档、API 参考、模型卡或源码链接
+   （源码要指明具体文件和版本）。博客文章、论坛回答和第三方汇总表单独都不够。
+2. **必须有核实日期。** 把 `verified_at: YYYY-MM-DD` 设为你查看来源的那一天。
+3. **无法核实？请标注。** 使用 `unverified: true` 并取保守值（更少的图片、更短的视频、更小的文件）。
+   vidroute 会谨慎对待未核实的档案，并提醒用户。
+4. **限额按宿主实际发送的单次请求计算。** 对于 base64/内联上传，填写文档中的请求体限额；vidroute 会把它换算成
+   原始文件限额（`inline_is_base64`）。
+5. **宿主：** 描述 Agent 实际能附带什么（`can_attach_image/video/audio`、`video_delivery`、`video_includes_audio`、
+   `max_attachment_mb`），并设置 `confidence`：`verified`（你实测过）、`source-verified`（你读过代码）、
+   `docs-only`、`unverified`。把你观察到的情况写进 `notes`。
 
-## Workflow
+## 流程
 
 ```bash
-# try your change without editing the bundled file
+# 不改内置文件，先试一下你的改动
 vidroute llm set my-model --modalities text,image,video --video-max-seconds 600 --video-max-mb 20
 vidroute llm resolve --llm my-model --host gemini-cli --json
 vidroute plan some-video.mp4 --llm my-model --host gemini-cli --json
 ```
 
-Then edit the YAML, run `pytest tests/test_data_files.py tests/test_routing.py` (schema validation,
-PyYAML parity, routing table), and open a pull request with the **profile correction** template.
-Add a routing test case when the change alters a route.
+然后编辑 YAML，运行 `pytest tests/test_data_files.py tests/test_routing.py`（schema 校验、与 PyYAML 解析结果一致、
+路由表），再用 **profile correction** 模板提交 pull request。如果改动会改变路线，请补一条路由测试用例。
 
-## Matching
+## 匹配方式
 
-Entries are matched by glob on the normalized model id (`claude-*`, `qwen3.8-flash*`), most specific
-first; `*` is the conservative fallback and must stay last. Aliases cover alternative spellings.
+档案按规范化后的模型 id 做通配匹配（`claude-*`、`qwen3.8-flash*`），越具体越优先；`*` 是保守的兜底，必须放在最后。
+别名（aliases）用来覆盖其他写法。

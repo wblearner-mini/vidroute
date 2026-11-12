@@ -85,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
     with ThreadPoolExecutor(max_workers=8) as pool:
         results = dict(zip(table, pool.map(lambda n: pypi_license(n, table[n][0]), table)))
     bad = []
-    print("| package | version | license | used in |")
+    print("| 包 | 版本 | 许可 | 用于 |")
     print("|---|---|---|---|")
     for name in sorted(table):
         ver, used = table[name]

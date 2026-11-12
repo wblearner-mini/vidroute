@@ -57,7 +57,7 @@ def parse_nvidia_smi(text: str, with_compute_cap: bool) -> list[dict[str, Any]]:
 def nvidia_gpus(timeout: float = TIMEOUT) -> dict[str, Any]:
     exe = _nvidia_smi_path()
     if exe is None:
-        return {"available": False, "gpus": [], "error": "nvidia-smi not found"}
+        return {"available": False, "gpus": [], "error": "找不到 nvidia-smi"}
     base = ["--format=csv,noheader,nounits"]
     res = proc.run([exe, "--query-gpu=name,memory.total,driver_version,compute_cap", *base], timeout=timeout)
     with_cc = True
@@ -66,7 +66,7 @@ def nvidia_gpus(timeout: float = TIMEOUT) -> dict[str, Any]:
         res = proc.run([exe, "--query-gpu=name,memory.total,driver_version", *base], timeout=timeout)
         with_cc = False
     if res.timed_out:
-        return {"available": False, "gpus": [], "error": f"nvidia-smi timed out after {timeout:.0f}s"}
+        return {"available": False, "gpus": [], "error": f"nvidia-smi 在 {timeout:.0f} 秒后超时"}
     if not res.ok:
         return {"available": False, "gpus": [], "error": (res.stderr or res.stdout).strip()[:300]}
     gpus = parse_nvidia_smi(res.stdout, with_cc)
@@ -121,18 +121,18 @@ def parse_cim_json(text: str) -> list[dict[str, Any]]:
 def windows_video_controllers(timeout: float = TIMEOUT) -> dict[str, Any]:
     ps = proc.which("powershell") or proc.which("pwsh")
     if ps is None:
-        return {"gpus": [], "error": "PowerShell not found"}
+        return {"gpus": [], "error": "找不到 PowerShell"}
     cmd = (
         "Get-CimInstance Win32_VideoController | "
         "Select-Object Name,AdapterRAM,DriverVersion,PNPDeviceID | ConvertTo-Json -Compress"
     )
     res = proc.run([ps, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", cmd], timeout=timeout)
     if not res.ok:
-        return {"gpus": [], "error": ("timed out" if res.timed_out else (res.stderr or "").strip()[:300])}
+        return {"gpus": [], "error": ("超时" if res.timed_out else (res.stderr or "").strip()[:300])}
     try:
         return {"gpus": parse_cim_json(res.stdout), "error": None}
     except ValueError as exc:
-        return {"gpus": [], "error": f"unparseable CIM output: {exc}"}
+        return {"gpus": [], "error": f"无法解析的 CIM 输出：{exc}"}
 
 
 def linux_drm_gpus(root: Path = Path("/sys/class/drm")) -> dict[str, Any]:
@@ -181,7 +181,7 @@ def platform_gpus(timeout: float = TIMEOUT) -> dict[str, Any]:
         return linux_drm_gpus()
     if system == "Darwin":
         if platform.machine() == "arm64":
-            return {"gpus": [{"vendor": "apple", "name": "Apple GPU (unified memory)", "vram_gb": None,
+            return {"gpus": [{"vendor": "apple", "name": "Apple GPU（统一内存）", "vram_gb": None,
                               "vram_source": "unknown", "driver": None}], "error": None}
         return {"gpus": [], "error": None}
     return {"gpus": [], "error": None}

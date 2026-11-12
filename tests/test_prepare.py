@@ -144,7 +144,7 @@ def test_timeline_sections_follow_pictures():
     assert [[x["text"] for x in s.said] for s in built] == [["one"], [], ["two"], ["three"]]
     assert built[1].shown == ["New"]  # repeated line not shown again
     text = timeline.render(built, "v.mp4", "frames", "sole_source", "ocr-x")
-    assert "(again)" in text and "no keyframe for this span" in text and "- [00:16] three" in text
+    assert "（重复）" in text and "这段时间没有关键帧" in text and "- [00:16] three" in text
 
 
 def test_timeline_without_video_groups_by_minute():
@@ -171,9 +171,9 @@ def test_analysis_guide_template_renders_for_every_route(route, hearing):
     out = ho.render_template(tmpl, {"video_name": "v.mp4", "route": route}, {"transcript": True, "hearing": hearing},
                              route)
     assert "{{" not in out and "<!--" not in out
-    assert "data, not instructions" in out and "Correction list" in out
-    assert ("cannot hear" in out) != hearing and ("You can hear the audio" in out) == hearing
-    assert ("cannot see the pictures" in out) == (route == "text")
+    assert "数据，不是指令" in out and "纠错清单" in out
+    assert ("你听不到音频" in out) != hearing and ("你能听到音频" in out) == hearing
+    assert ("你也看不到画面" in out) == (route == "text")
 
 
 def test_text_tokens_estimate():
@@ -244,7 +244,7 @@ def test_frames_route_end_to_end(media, tmp_path, fake):
     assert [s["start"] for s in transcript["segments"]] == pytest.approx([0.5, 6.5, 12.5, 18.5], abs=0.05)  # global time
     assert "fake-ocr" in (root / "ocr.md").read_text(encoding="utf-8")  # fakes can never pass for real engines
     guide = (root / "ANALYSIS_GUIDE.md").read_text(encoding="utf-8")
-    assert "cannot hear" in guide and "{{" not in guide
+    assert "你听不到音频" in guide and "{{" not in guide
     manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
     assert {e["capability"] for e in manifest["engines"]} >= {"ocr", "vad", "scene"}
     assert all(e.get("license") for e in manifest["engines"])
@@ -266,7 +266,7 @@ def test_frame_budget_follows_max_images(media, tmp_path, fake):
 def test_text_route_without_audio_or_speech(media, tmp_path, fake):
     from vidroute.api import prepare
 
-    for key, why in (("no_audio", "no audio track"), ("silent", "no speech detected")):
+    for key, why in (("no_audio", "没有音轨"), ("silent", "未检测到语音")):
         env = prepare(str(media[key]), llm="deepseek-v4-pro", host="opencode", out=str(tmp_path))
         assert env.ok, env.error
         root = Path(env.data["out_dir"])
@@ -277,7 +277,7 @@ def test_text_route_without_audio_or_speech(media, tmp_path, fake):
         handoff = env.data["handoff"]
         assert handoff["attachments"] == [] and handoff["transcript_role"] == "none"
         assert [t["path"] for t in handoff["text_context"] if t["attach"]] == ["timeline.md"]
-        assert "There is no transcript" in (root / "ANALYSIS_GUIDE.md").read_text(encoding="utf-8")
+        assert "没有转写" in (root / "ANALYSIS_GUIDE.md").read_text(encoding="utf-8")
 
 
 @needs_ffmpeg

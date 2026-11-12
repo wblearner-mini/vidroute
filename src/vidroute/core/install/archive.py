@@ -31,7 +31,7 @@ def _safe_rel(name: str, strip_prefix: str) -> PurePosixPath | None:
         return None
     rel = PurePosixPath(name)
     if rel.is_absolute() or name.startswith("/") or ":" in rel.parts[0] or any(p in ("..", "") for p in rel.parts):
-        raise UnsafeArchive(f"Refusing unsafe archive member path: {name!r}")
+        raise UnsafeArchive(f"拒绝不安全的压缩包成员路径：{name!r}")
     return rel
 
 
@@ -60,7 +60,7 @@ def extract(
                 if rel is None or (wanted is not None and str(rel) not in wanted):
                     continue
                 if (info.external_attr >> 16) & 0o170000 == 0o120000:
-                    raise UnsafeArchive(f"Refusing symlink in archive: {info.filename!r}")
+                    raise UnsafeArchive(f"拒绝压缩包中的符号链接：{info.filename!r}")
                 target = dest.joinpath(*rel.parts)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 with zf.open(info) as src, target.open("wb") as out:
@@ -75,17 +75,17 @@ def extract(
                 if rel is None or (wanted is not None and str(rel) not in wanted):
                     continue
                 if not member.isfile():
-                    raise UnsafeArchive(f"Refusing non-regular archive member: {member.name!r}")
+                    raise UnsafeArchive(f"拒绝非普通文件的压缩包成员：{member.name!r}")
                 target = dest.joinpath(*rel.parts)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 src = tf.extractfile(member)
                 if src is None:
-                    raise UnsafeArchive(f"Unreadable archive member: {member.name!r}")
+                    raise UnsafeArchive(f"无法读取的压缩包成员：{member.name!r}")
                 with src, target.open("wb") as out:
                     shutil.copyfileobj(src, out, 1024 * 1024)
                 written.append(str(rel))
     if required is not None:
         missing = required - set(written)
         if missing:
-            raise RunFailed(f"Archive {archive.name} is missing expected files: {sorted(missing)}", code="archive_incomplete")
+            raise RunFailed(f"压缩包 {archive.name} 缺少预期的文件：{sorted(missing)}", code="archive_incomplete")
     return written

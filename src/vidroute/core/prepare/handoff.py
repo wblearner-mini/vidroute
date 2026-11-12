@@ -21,11 +21,11 @@ HANDOFF_SCHEMA = "vidroute/handoff/1"
 MANIFEST_SCHEMA = "vidroute/output-manifest/1"
 
 ROUTE_LABELS = {
-    "native-av": "the video itself, with its audio track, is attached",
-    "native-v": "the video is attached without audio; the local transcript is the only record of speech",
-    "frames": "keyframes (as contact sheets) + local transcript, + on-screen text when useful",
-    "text": "text only: local transcript and on-screen text, merged by time",
-    "delegate": "a video-capable model is called on your behalf and returns text",
+    "native-av": "附带视频本身（含音轨）",
+    "native-v": "附带不含音频的视频；本地转写是唯一的语音记录",
+    "frames": "关键帧（拼图形式）+ 本地转写，必要时附屏幕文字",
+    "text": "只有文本：按时间合并的本地转写和屏幕文字",
+    "delegate": "代你调用一个能看视频的模型，并返回文本",
 }
 
 _CJK = re.compile(r"[぀-ヿ㐀-䶿一-鿿가-힯豈-﫿]")
@@ -77,18 +77,18 @@ def build_handoff(layout: Layout, plan: dict[str, Any], outcome: dict[str, Any],
         size = _jpeg_size(p) or (1600, 700)
         est = image_tokens(size[0], size[1], lim)
         attachments.append({"type": "image", "path": layout.rel(p), "bytes": p.stat().st_size, "est_tokens": est,
-                            "note": f"contact sheet {sheet['file']}: {len(sheet['frames'])} keyframes "
-                                    f"{fmt_ts(sheet['start'])}–{fmt_ts(sheet['end'])}, tiles labelled with global time"})
+                            "note": f"拼图 {sheet['file']}：{len(sheet['frames'])} 张关键帧，"
+                                    f"{fmt_ts(sheet['start'])}–{fmt_ts(sheet['end'])}，小图标有全局时间"})
         images += 1
         tokens += est
     video_seconds = 0.0
     parts = outcome.get("native_parts") or []
     for part in parts:
         span = f"{fmt_ts(part['start'])}–{fmt_ts(part['end'])}"
-        note = (f"the video ({'with' if outcome.get('includes_audio') else 'without'} audio), global {span}"
+        note = (f"视频（{'含' if outcome.get('includes_audio') else '不含'}音频），全局 {span}"
                 if len(parts) == 1 else
-                f"part {part['id']}/{len(parts)}: global {span}; add {fmt_ts(part['start'])} to times inside "
-                f"this part (see segments.json)")
+                f"第 {part['id']}/{len(parts)} 部分：全局 {span}；本部分内的时间加上 {fmt_ts(part['start'])} "
+                f"即为全局时间（见 segments.json）")
         attachments.append({"type": "video", "path": part["file"], "bytes": part["bytes"],
                             "est_tokens": part.get("est_tokens", 0), "note": note,
                             "segment": {"id": part["id"], "start": part["start"], "end": part["end"],
@@ -100,7 +100,7 @@ def build_handoff(layout: Layout, plan: dict[str, Any], outcome: dict[str, Any],
         p = layout.root / part["file"]
         attachments.append({"type": "audio", "path": layout.rel(p), "bytes": p.stat().st_size,
                             "est_tokens": part.get("est_tokens", 0),
-                            "note": f"audio track ({part['kbps']} kbps mono), global {fmt_ts(part['start'])}–"
+                            "note": f"音轨（{part['kbps']} kbps 单声道），全局 {fmt_ts(part['start'])}–"
                                     f"{fmt_ts(part['end'])}",
                             "segment": {"id": part["id"], "start": part["start"], "end": part["end"],
                                         "offset_sec": part["start"]}})
@@ -119,13 +119,13 @@ def build_handoff(layout: Layout, plan: dict[str, Any], outcome: dict[str, Any],
         if has_tl:
             text_context.append({"type": "timeline", "path": "timeline.md",
                                  "role": "sole_source" if role == "sole_source" else "reference", "attach": True,
-                                 "note": "transcript and on-screen text merged by time (read this one)"})
+                                 "note": "按时间合并的转写和屏幕文字（读这个）"})
         if has_t:
             text_context.append({"type": "transcript", "path": "transcript.md", "role": role if role != "none"
-                                 else "reference", "attach": not has_tl, "note": "same speech as in timeline.md"})
+                                 else "reference", "attach": not has_tl, "note": "与 timeline.md 中的语音相同"})
         if has_o:
             text_context.append({"type": "ocr", "path": "ocr.md", "role": "reference", "attach": False,
-                                 "note": "same on-screen text as in timeline.md"})
+                                 "note": "与 timeline.md 中的屏幕文字相同"})
     else:
         if has_t:
             text_context.append({"type": "transcript", "path": "transcript.md",
@@ -134,10 +134,10 @@ def build_handoff(layout: Layout, plan: dict[str, Any], outcome: dict[str, Any],
             text_context.append({"type": "ocr", "path": "ocr.md", "role": "reference", "attach": True})
         if has_tl:
             text_context.append({"type": "timeline", "path": "timeline.md", "role": "navigation", "attach": False,
-                                 "note": "aligns pictures, on-screen text and speech; read when you need to cross-check"})
+                                 "note": "对齐画面、屏幕文字和语音；需要交叉核对时阅读"})
         if outcome.get("sheets"):
             text_context.append({"type": "contact_sheet_index", "path": "contact-sheets/index.md",
-                                 "role": "navigation", "attach": False, "note": "tile -> time -> frame file"})
+                                 "role": "navigation", "attach": False, "note": "小图 -> 时间 -> 帧文件"})
     for item in text_context:
         item["est_tokens"] = _file_tokens(layout.root / item["path"])
         if item["attach"]:
@@ -214,37 +214,37 @@ def render_template(text: str, values: dict[str, str], flags: dict[str, bool], r
     return re.sub(r"\n{3,}", "\n\n", text).strip() + "\n"
 
 
-def reading_order(route: str, layout: Layout, outcome: dict[str, Any], guide_note: str = "this guide") -> list[str]:
-    steps = [f"`ANALYSIS_GUIDE.md` ({guide_note})"]
+def reading_order(route: str, layout: Layout, outcome: dict[str, Any], guide_note: str = "本指南") -> list[str]:
+    steps = [f"`ANALYSIS_GUIDE.md`（{guide_note}）"]
     sheets = outcome.get("sheets") or []
     role = outcome.get("transcript_role", "none")
-    t_role = {"sole_source": "the only record of speech", "reference": "reference for what you hear"}.get(role, "")
+    t_role = {"sole_source": "唯一的语音记录", "reference": "你所听到内容的参考"}.get(role, "")
     if route.startswith("native"):
         parts = outcome.get("native_parts") or []
         if len(parts) == 1:
-            steps.append(f"the video `{parts[0]['file']}`")
+            steps.append(f"视频 `{parts[0]['file']}`")
         elif parts:
-            steps.append(f"the video parts `{parts[0]['file']}` … `{parts[-1]['file']}` ({len(parts)} parts, "
-                         "in order; `segments.json` maps their times to global time)")
+            steps.append(f"视频分段 `{parts[0]['file']}` … `{parts[-1]['file']}`（共 {len(parts)} 段，"
+                         "按顺序；`segments.json` 把其中的时间换算为全局时间）")
         if layout.file("transcript.md").exists():
-            steps.append("`transcript.md`" + (f" — {t_role}" if t_role else "")
-                         + ("" if outcome.get("transcript_attach") else " (only if you need exact wording)"))
+            steps.append("`transcript.md`" + (f"——{t_role}" if t_role else "")
+                         + ("" if outcome.get("transcript_attach") else "（仅在需要确切措辞时）"))
     elif route == "text":
         if layout.file("timeline.md").exists():
-            steps.append("`timeline.md` — transcript and on-screen text merged by time")
+            steps.append("`timeline.md`——按时间合并的转写和屏幕文字")
     else:
         if sheets:
-            steps.append(f"the contact sheets `contact-sheets/{sheets[0]['file']}`"
+            steps.append(f"拼图 `contact-sheets/{sheets[0]['file']}`"
                          + (f" … `{sheets[-1]['file']}`" if len(sheets) > 1 else "")
-                         + f" ({len(sheets)} image(s); index: `contact-sheets/index.md`)")
+                         + f"（共 {len(sheets)} 张；索引：`contact-sheets/index.md`）")
         for part in outcome.get("audio_parts") or []:
-            steps.append(f"the audio `{part['file']}`")
+            steps.append(f"音频 `{part['file']}`")
         if layout.file("transcript.md").exists():
-            steps.append("`transcript.md`" + (f" — {t_role}" if t_role else ""))
+            steps.append("`transcript.md`" + (f"——{t_role}" if t_role else ""))
         if layout.file("ocr.md").exists():
-            steps.append("`ocr.md` — on-screen text")
+            steps.append("`ocr.md`——屏幕文字")
         if layout.file("timeline.md").exists():
-            steps.append("`timeline.md` when you need to line up pictures and speech (optional)")
+            steps.append("需要对齐画面和语音时读 `timeline.md`（可选）")
     return steps
 
 
@@ -256,24 +256,24 @@ def write_guide(layout: Layout, plan: dict[str, Any], outcome: dict[str, Any]) -
              "hearing": hears,
              "frames": bool(outcome.get("frames")), "sheets": bool(outcome.get("sheets")),
              "audio_attachment": bool(outcome.get("audio_parts"))}
-    evidence = {"frames": " (keyframes, contact sheets, `ocr.md`)",
-                "text": " (`ocr.md` and the **On screen** lines of `timeline.md`)",
-                "native-v": " (in the video itself)"}.get(route, "")
+    evidence = {"frames": "（关键帧、拼图、`ocr.md`）",
+                "text": "（`ocr.md` 以及 `timeline.md` 中的**屏幕文字**行）",
+                "native-v": "（视频本身之中）"}.get(route, "")
     order = reading_order(route, layout, outcome)
-    privacy = ("- The raw video was handed to the LLM provider with the user's consent; do not copy it elsewhere."
+    privacy = ("- 原始视频已在用户同意后交给 LLM 服务商；不要把它复制到别处。"
                if route.startswith("native") else
-               "- The raw video stayed on this machine; only the files listed in `handoff.json` are attached.")
+               "- 原始视频留在本机；只附带 `handoff.json` 中列出的文件。")
     values = {
         "video_name": str(plan["video"].get("name") or ""),
         "route": route,
         "route_label": ROUTE_LABELS.get(route, route),
         "duration": fmt_ts(float(plan["video"].get("duration") or 0)),
-        "can_hear": " and hear" if hears else "",
-        "hearing_source": " (it is in the video)" if route == "native-av" else " (attached as a separate audio file)",
-        "can_hear_short": " or the audio" if hears else "",
+        "can_hear": "、听到" if hears else "",
+        "hearing_source": "（音频在视频中）" if route == "native-av" else "（以单独的音频文件附带）",
+        "can_hear_short": "或音频" if hears else "",
         "evidence_sources": evidence,
-        "no_transcript_reason": outcome.get("transcript_skip_reason") or "no speech was transcribed",
-        "reading_order": "Reading order:\n\n" + "\n".join(f"{i}. {s}" for i, s in enumerate(order, 1)) + "\n",
+        "no_transcript_reason": outcome.get("transcript_skip_reason") or "没有转写出语音",
+        "reading_order": "阅读顺序：\n\n" + "\n".join(f"{i}. {s}" for i, s in enumerate(order, 1)) + "\n",
         "drill_cmd": drill_cmd(layout, float(plan["video"].get("duration") or 0)),
         "privacy_note": privacy,
     }
@@ -290,38 +290,38 @@ def write_summary(layout: Layout, plan: dict[str, Any], outcome: dict[str, Any],
     route = outcome["route"]
     video = plan["video"]
     lines = [f"# vidroute — {video.get('name')}", "",
-             f"**Route: `{route}`** — {ROUTE_LABELS.get(route, route)}.", "",
-             f"- LLM `{plan['llm']['model']}` on host `{plan['host']['id']}` · local tier `{plan['local']['tier']}` · "
-             f"task `{plan['request']['task']}`",
-             f"- Video: {fmt_ts(float(video.get('duration') or 0))}, "
-             + ("no audio track" if not video.get("has_audio") else f"speech ratio ~{video.get('speech_ratio')}")
-             + f", text density {video.get('text_density')}",
-             f"- **Uploads raw video: {'YES' if handoff['uploads_raw_video'] else 'no'}** · uploads raw audio: "
-             f"{'yes' if handoff['uploads_raw_audio'] else 'no'}", ""]
-    lines += ["## Why this route", ""]
+             f"**路线：`{route}`**——{ROUTE_LABELS.get(route, route)}。", "",
+             f"- LLM `{plan['llm']['model']}`，宿主 `{plan['host']['id']}` · 本地档位 `{plan['local']['tier']}` · "
+             f"任务 `{plan['request']['task']}`",
+             f"- 视频：{fmt_ts(float(video.get('duration') or 0))}，"
+             + ("无音轨" if not video.get("has_audio") else f"语音占比约 {video.get('speech_ratio')}")
+             + f"，文字密度 {video.get('text_density')}",
+             f"- **上传原始视频：{'是' if handoff['uploads_raw_video'] else '否'}** · 上传原始音频："
+             f"{'是' if handoff['uploads_raw_audio'] else '否'}", ""]
+    lines += ["## 为什么选这条路线", ""]
     lines += [f"- {r}" for r in handoff["reasons"]]
     for g in handoff["degraded_from"]:
-        lines.append(f"- degraded from `{g['route']}`: {g['why']}")
+        lines.append(f"- 由 `{g['route']}` 降级：{g['why']}")
     for s in plan["delivery"].get("suggestions") or []:
-        lines.append(f"- suggestion: {s['why']} {s['how']}")
-    lines += ["", "## Read in this order", ""]
-    lines += [f"{i}. {s}" for i, s in enumerate(reading_order(route, layout, outcome, "rules for this route"), 1)]
-    lines += ["", "Attach only what `handoff.json` marks for attaching; open single frames from `frames/` or drill "
-              "into a time range when you need detail:", "", f"    {handoff['drill']}", ""]
-    lines += ["## Outputs", "", "| step | status | details |", "|---|---|---|"]
+        lines.append(f"- 建议：{s['why']} {s['how']}")
+    lines += ["", "## 按此顺序阅读", ""]
+    lines += [f"{i}. {s}" for i, s in enumerate(reading_order(route, layout, outcome, "本路线的规则"), 1)]
+    lines += ["", "只附带 `handoff.json` 标记为需要附带的内容；需要细节时打开 `frames/` 中的单帧，"
+              "或钻取某个时间段：", "", f"    {handoff['drill']}", ""]
+    lines += ["## 输出", "", "| 步骤 | 状态 | 详情 |", "|---|---|---|"]
     for st in outcome["steps"]:
         lines.append(f"| {st['id']} | {st['status']} | {st['detail']} |")
     b = handoff["budget"]
-    lines += ["", "## Budget", "",
-              f"~{b['est_input_tokens']:,} input tokens if you attach what is marked "
-              f"({b['images']} image(s)) — budget {b['budget_tokens']:,}"
-              + (" — **over budget: ask the user before attaching everything**" if b["over_budget"] else "") + "."]
+    lines += ["", "## 预算", "",
+              f"附带所有标记内容约需 {b['est_input_tokens']:,} 输入 token"
+              f"（{b['images']} 张图片）——预算 {b['budget_tokens']:,}"
+              + ("——**超出预算：全部附带前先询问用户**" if b["over_budget"] else "") + "。"]
     for n in handoff["needs_confirmation"]:
-        lines.append(f"- needs confirmation: {n['message']}")
+        lines.append(f"- 需要确认：{n['message']}")
     if warnings:
-        lines += ["", "## Warnings", ""]
-        lines += [f"- {w['message']}" + (f" (try: `{w['hint']}`)" if w.get("hint") else "") for w in warnings]
-    lines += ["", "---", f"vidroute {__version__} · {handoff['created_at']} · all timestamps are global video time."]
+        lines += ["", "## 警告", ""]
+        lines += [f"- {w['message']}" + (f"（可尝试：`{w['hint']}`）" if w.get("hint") else "") for w in warnings]
+    lines += ["", "---", f"vidroute {__version__} · {handoff['created_at']} · 所有时间戳均为视频的全局时间。"]
     path = layout.file("SUMMARY.md")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
@@ -359,8 +359,8 @@ def write_manifest(layout: Layout, plan: dict[str, Any], outcome: dict[str, Any]
         "tools": {"ffmpeg": info.version if info.found else None},
         "timings_seconds": outcome.get("timings") or {},
         "files": files,
-        "notice": "Local models are used under their own licenses (see engines[].license and THIRD_PARTY_LICENSES.md). "
-                  "Machine outputs (transcript, OCR) may contain errors.",
+        "notice": "本地模型按各自的许可使用（见 engines[].license 和 THIRD_PARTY_LICENSES.md）。"
+                  "机器输出（转写、OCR）可能有错误。",
     }
     path = layout.file("manifest.json")
     write_json_atomic(path, data)

@@ -55,9 +55,9 @@ def test_native_av_fits_as_is(media, tmp_path):
     seg = json.loads((root / "segments.json").read_text(encoding="utf-8"))
     assert [s["offset_sec"] for s in seg["segments"]] == [0.0] and seg["includes_audio"]
     summary = (root / "SUMMARY.md").read_text(encoding="utf-8")
-    assert "Uploads raw video: YES" in summary
+    assert "上传原始视频：是" in summary
     guide = (root / "ANALYSIS_GUIDE.md").read_text(encoding="utf-8")
-    assert "You can hear the audio" in guide and "cannot hear" not in guide
+    assert "你能听到音频" in guide and "你听不到音频" not in guide
     assert not (root / "frames").exists() and not (root / "contact-sheets").exists()
 
 
@@ -118,7 +118,7 @@ def test_prepare_falls_back_to_frames_when_files_do_not_fit(media, tmp_path, mon
     root = Path(env.data["out_dir"])
     h = env.data["handoff"]
     assert h["route"] == "frames" and not h["uploads_raw_video"]
-    assert h["degraded_from"][0]["route"] == "native-av" and "exceed" in h["degraded_from"][0]["why"]
+    assert h["degraded_from"][0]["route"] == "native-av" and "超出限额" in h["degraded_from"][0]["why"]
     assert any(w["code"] == "native_does_not_fit" for w in env.warnings)
     assert not (root / "native").exists() and not (root / "segments.json").exists()
     assert json.loads((root / "plan.json").read_text(encoding="utf-8"))["route"] == "frames"
@@ -170,4 +170,4 @@ def test_frames_with_audio_track_needs_the_same_consent(media, tmp_path):
     assert h["uploads_raw_audio"] and not h["uploads_raw_video"] and h["transcript_role"] == "reference"
     assert _streams(Path(env.data["out_dir"]) / audio[0]["path"]) == ["audio"]
     guide = (Path(env.data["out_dir"]) / "ANALYSIS_GUIDE.md").read_text(encoding="utf-8")
-    assert "You can hear the audio** (attached as a separate audio file)" in guide and "cannot hear" not in guide
+    assert "你能听到音频**（以单独的音频文件附带）" in guide and "你听不到音频" not in guide

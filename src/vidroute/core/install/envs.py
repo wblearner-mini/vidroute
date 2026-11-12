@@ -83,16 +83,16 @@ def _run_uv(args: list[str], ctx: Ctx, what: str, timeout: float = UV_TIMEOUT,
             net: dict[str, Any] | None = None) -> proc.Result:
     uv = find_uv()
     if uv is None:
-        raise NeedsInstall("uv is required to create worker environments.", code="uv_missing",
-                           hint="vidroute install  (it offers to install uv into $VIDROUTE_HOME)")
+        raise NeedsInstall("创建 worker 环境需要 uv。", code="uv_missing",
+                           hint="vidroute install  （它会提议把 uv 安装到 $VIDROUTE_HOME）")
     ctx.check_cancelled()
     res = proc.run([uv, *args], timeout=timeout, env=uv_env(net))
     if not res.ok:
         tail = "\n".join((res.stderr or res.stdout).strip().splitlines()[-12:])
-        raise RunFailed(f"{what} failed:\n{tail}" if tail else f"{what} failed (timed out)", code="env_failed",
-                        hint="vidroute install --yes  (run it again: finished parts are kept; if PyPI is slow or "
-                             "blocked, add --mirror cn, set UV_DEFAULT_INDEX to a PyPI mirror or HTTPS_PROXY to your "
-                             "proxy)")
+        raise RunFailed(f"{what} 失败：\n{tail}" if tail else f"{what} 失败（超时）", code="env_failed",
+                        hint="vidroute install --yes  （重新运行即可：已完成的部分会保留；如果 PyPI 很慢或不通，"
+                             "请加 --mirror cn，或把 UV_DEFAULT_INDEX 设为 PyPI 镜像，或把 HTTPS_PROXY 设为你的"
+                             "代理）")
     return res
 
 
@@ -103,7 +103,7 @@ def bootstrap_uv(ctx: Ctx, net: dict[str, Any] | None = None) -> Path:
         return existing
     target = paths.runtimes_dir() / "uv"
     lock = data_file("envs/uv.lock.txt")
-    ctx.progress("uv", None, None, f"installing uv=={UV_VERSION} into {target}")
+    ctx.progress("uv", None, None, f"正在把 uv=={UV_VERSION} 安装到 {target}")
     res = proc.run(
         [sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "--no-input",
          "--require-hashes", "--only-binary", ":all:", *network.pip_args(net), "--target", str(target), "-r", str(lock)],
@@ -112,9 +112,9 @@ def bootstrap_uv(ctx: Ctx, net: dict[str, Any] | None = None) -> Path:
     uv = find_uv()
     if not res.ok or uv is None:
         raise NeedsInstall(
-            "Could not install uv automatically (pip unavailable or offline).",
+            "无法自动安装 uv（没有 pip 或处于离线状态）。",
             code="uv_missing",
-            hint="pipx install uv   (or: winget install astral-sh.uv / brew install uv)",
+            hint="pipx install uv   （或：winget install astral-sh.uv / brew install uv）",
             data={"pip_error": (res.stderr or "").strip()[-600:]},
         )
     return uv
@@ -131,12 +131,12 @@ def create_env(group: EnvGroup, ctx: Ctx, variant: str = "cpu", force: bool = Fa
     ctx.progress("env", None, None, f"{group.name}: installing Python {request} (uv-managed)")
     _run_uv(["python", "install", request, "--no-registry", "--install-dir", str(paths.runtimes_dir() / "python")],
             ctx, f"Installing Python {request}", net=net)
-    ctx.progress("env", None, None, f"{group.name}: creating environment")
+    ctx.progress("env", None, None, f"{group.name}：正在创建环境")
     _run_uv(["venv", "--python", request, "--managed-python", "--no-project", str(group.path)], ctx,
-            f"Creating environment {group.name}", net=net)
-    ctx.progress("env", None, None, f"{group.name}: installing locked packages ({lock.name})")
+            f"创建环境 {group.name}", net=net)
+    ctx.progress("env", None, None, f"{group.name}：正在安装锁定的软件包（{lock.name}）")
     _run_uv(["pip", "install", "--python", str(group.python_exe), "--require-hashes", "--no-build",
-             "-r", str(lock)], ctx, f"Installing packages for {group.name}", net=net)
+             "-r", str(lock)], ctx, f"为 {group.name} 安装软件包", net=net)
     check = proc.run([group.python_exe, "-I", "-c", group.import_check], timeout=120)
     version = proc.run([group.python_exe, "-I", "-c", "import platform; print(platform.python_version())"], timeout=60)
     record = {
@@ -152,11 +152,11 @@ def create_env(group: EnvGroup, ctx: Ctx, variant: str = "cpu", force: bool = Fa
     state.save(data)
     if not check.ok:
         raise RunFailed(
-            f"Environment {group.name} was created but `{group.import_check}` failed: "
+            f"环境 {group.name} 已创建，但 `{group.import_check}` 失败："
             f"{(check.stderr or '').strip().splitlines()[-1:] or ['?']}",
             code="env_import_failed",
-            hint=f"vidroute install --yes  (run your install command again: the broken {group.name} "
-                 "environment is rebuilt)",
+            hint=f"vidroute install --yes  （重新运行你的安装命令：损坏的 {group.name} "
+                 "环境会被重建）",
         )
     return {"group": group.name, "status": "created", "path": str(group.path), **record}
 

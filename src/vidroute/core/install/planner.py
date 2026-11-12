@@ -4,7 +4,7 @@ The same plan backs every entry point (CLI prompt, ``--dry-run``, MCP
 ``needs_setup``, a future desktop wizard). Nothing is downloaded until the user
 confirms it.
 
-Profiles (§3.1):
+Profiles:
   * ``lite`` — the base package: Silero VAD + SenseVoice-Small (D3/D4 ready).
   * ``auto`` — base package, plus Whisper small when the system language is not
     covered by SenseVoice (zh/en/ja/ko/yue).
@@ -67,7 +67,7 @@ def default_for(cap: str, tier: str, manifest: Manifest) -> list[str]:
         return []  # built in (ffmpeg)
     if cap == "diarize":
         return ["diarize-pyannote-campplus"]
-    raise UsageError(f"Unknown capability {cap!r}; use asr, vad, ocr, scene or diarize")
+    raise UsageError(f"未知能力 {cap!r}；请使用 asr、vad、ocr、scene 或 diarize")
 
 
 def _python_runtime_present(request: str) -> bool:
@@ -83,11 +83,11 @@ def _python_runtime_present(request: str) -> bool:
 
 
 def _python_item(request: str) -> dict[str, Any]:
-    note = "uv-managed, not added to PATH or registry"
+    note = "由 uv 管理，不加入 PATH 或注册表"
     version, arch = request, None
     if request.startswith("cpython-"):  # cpython-<version>-<os>-<arch>-<libc>
         _, version, _os, arch, _libc = request.split("-")
-        note += f"; {arch} build (runs emulated on Windows on Arm)"
+        note += f"；{arch} 构建（在 Windows on Arm 上仿真运行）"
     return {"kind": "python", "id": f"python-{version}" + (f"-{arch}" if arch else ""), "version": version,
             "request": request, "size_mb": PYTHON_RUNTIME_MB, "path": str(paths.runtimes_dir() / "python"),
             "note": note}
@@ -102,7 +102,7 @@ def _portable_item(entry: Any, why: str) -> dict[str, Any]:
             "size_mb": entry.size_mb, "disk_mb": entry.disk_mb, "path": str(entry.path),
             "license": {"spdx": entry.license.spdx, "name": entry.license.name, "url": entry.license.url,
                         "notes": entry.license.notes},
-            "note": f"{why}; portable build into VIDROUTE_HOME, not added to PATH"}
+            "note": f"{why}；便携包放入 VIDROUTE_HOME，不加入 PATH"}
 
 
 def _ffmpeg_item(manifest: Manifest) -> dict[str, Any] | None:
@@ -114,15 +114,15 @@ def _ffmpeg_item(manifest: Manifest) -> dict[str, Any] | None:
     entry = portable.for_platform(manifest)
     winget = platform.system() == "Windows" and proc.which("winget") is not None
     if entry is not None and (prefer == "portable" or (prefer == "auto" and not winget)):
-        return _portable_item(entry, "ffmpeg_source=portable" if prefer == "portable" else "winget is not available")
+        return _portable_item(entry, "ffmpeg_source=portable" if prefer == "portable" else "没有 winget")
     if winget and prefer != "portable":
         item: dict[str, Any] = {"kind": "ffmpeg", "action": "run_with_yes", "command": WINGET_FFMPEG,
-                                "note": "Runs only with --yes; installs FFmpeg for this user via winget (Gyan.FFmpeg)."}
+                                "note": "只在 --yes 时运行；通过 winget（Gyan.FFmpeg）为当前用户安装 FFmpeg。"}
         if entry is not None:
-            item["fallback"] = _portable_item(entry, "used only if winget fails")
+            item["fallback"] = _portable_item(entry, "仅在 winget 失败时使用")
         return item
     return {"kind": "ffmpeg", "action": "manual", "command": ffmpeg.install_hint(),
-            "note": "vidroute does not install system packages itself; run the command, then re-run install."}
+            "note": "vidroute 不会自己安装系统软件包；请运行该命令，然后重新运行 install。"}
 
 
 def plan_install(
@@ -137,7 +137,7 @@ def plan_install(
 ) -> dict[str, Any]:
     manifest = manifest or load_manifest()
     if profile not in PROFILES:
-        raise UsageError(f"--profile must be one of {', '.join(PROFILES)}")
+        raise UsageError(f"--profile 必须是 {', '.join(PROFILES)} 之一")
     if doctor_data is None:
         from vidroute.core import doctor
 
@@ -153,20 +153,20 @@ def plan_install(
     selected: dict[str, str] = {}
     for mid in explicit:
         manifest.model(mid)
-        selected[mid] = "requested with --model"
+        selected[mid] = "通过 --model 指定"
     for cap in capabilities or []:
         for mid in default_for(cap, tier, manifest):
-            selected.setdefault(mid, f"default {cap} engine for tier {tier}")
+            selected.setdefault(mid, f"{tier} 档位的默认 {cap} 引擎")
     if not explicit and not capabilities:
         for mid in BASE:
-            selected[mid] = "base package (makes D3/D4 work out of the box)"
+            selected[mid] = "基础包（让 D3/D4 开箱即用）"
         if profile in ("auto", "full") and lang_base and lang_base not in SENSEVOICE_LANGS:
-            selected["asr-whisper-small-int8"] = f"system language '{lang}' is not covered by SenseVoice"
+            selected["asr-whisper-small-int8"] = f"SenseVoice 不支持系统语言 '{lang}'"
         if profile == "full":
-            selected.setdefault("asr-whisper-small-int8", "full profile: multilingual ASR")
-            selected.setdefault(default_for("ocr", tier, manifest)[0], "full profile: OCR for slides/screens")
+            selected.setdefault("asr-whisper-small-int8", "full 套餐：多语种 ASR")
+            selected.setdefault(default_for("ocr", tier, manifest)[0], "full 套餐：用于幻灯片/屏幕的 OCR")
             if cuda_candidate:
-                selected["asr-faster-whisper-large-v3-turbo"] = "full profile: NVIDIA GPU found (smoke-tested before use)"
+                selected["asr-faster-whisper-large-v3-turbo"] = "full 套餐：发现 NVIDIA GPU（使用前会做冒烟测试）"
 
     skipped: list[dict[str, Any]] = []
     models: list[ModelEntry] = []
@@ -174,15 +174,15 @@ def plan_install(
         entry = manifest.model(mid)
         problem = None
         if entry.builtin:
-            problem = "built in (uses ffmpeg), nothing to install"
+            problem = "内置（使用 ffmpeg），无需安装"
         elif entry.status == "experimental" and mid not in explicit:
-            problem = "experimental; install explicitly with --model"
+            problem = "实验性；请用 --model 明确安装"
         elif entry.requires_gpu == "cuda" and not cuda_candidate:
-            problem = "needs an NVIDIA GPU with >= 4 GB VRAM"
+            problem = "需要显存 >= 4 GB 的 NVIDIA GPU"
         elif entry.min_ram_gb and ram and ram < entry.min_ram_gb:
-            problem = f"needs {entry.min_ram_gb} GB RAM, this machine has {ram} GB"
-        if problem and mid in explicit and "built in" not in problem and "experimental" not in problem:
-            raise InsufficientHardware(f"Cannot install {mid}: {problem}.", hint="vidroute doctor --refresh")
+            problem = f"需要 {entry.min_ram_gb} GB 内存，本机只有 {ram} GB"
+        if problem and mid in explicit and "内置" not in problem and "实验性" not in problem:
+            raise InsufficientHardware(f"无法安装 {mid}：{problem}。", hint="vidroute doctor --refresh")
         if problem:
             skipped.append({"id": mid, "reason": problem})
             continue
@@ -204,7 +204,7 @@ def plan_install(
     for name, variant in groups.items():
         group = manifest.env_groups[name]
         if not force and envmod.env_ready(group, variant):
-            skipped.append({"id": f"env:{name}", "reason": "already installed"})
+            skipped.append({"id": f"env:{name}", "reason": "已安装"})
             continue
         size = group.approx_size_mb_cuda if variant == "cuda" and group.approx_size_mb_cuda else group.approx_size_mb
         env_items.append({"kind": "env", "id": name, "variant": variant, "python": group.python,
@@ -214,7 +214,7 @@ def plan_install(
     if env_items:
         if find_uv() is None:
             items.append({"kind": "uv", "id": "uv", "version": UV_VERSION, "size_mb": UV_MB,
-                          "path": str(paths.runtimes_dir() / "uv"), "note": "pinned + hash-checked from PyPI"})
+                          "path": str(paths.runtimes_dir() / "uv"), "note": "从 PyPI 获取，固定版本 + 校验哈希"})
         for req in sorted({i["python_request"] for i in env_items}):
             if not _python_runtime_present(req):
                 items.append(_python_item(req))
@@ -225,7 +225,7 @@ def plan_install(
     for entry in models:
         st = entry.installed_status()
         if st["installed"] and not force:
-            skipped.append({"id": entry.id, "reason": "already installed"})
+            skipped.append({"id": entry.id, "reason": "已安装"})
             continue
         needs_acceptance = entry.license.needs_acceptance and entry.id not in accepted and entry.license.spdx not in accepted
         if needs_acceptance:
@@ -302,17 +302,17 @@ def _cli_args(capabilities: list[str] | None, profile: str, models: list[str], m
 
 def describe(plan: dict[str, Any]) -> str:
     """Human-readable plan for CLI prompts."""
-    lines = [f"Install plan ({plan['profile']}, tier {plan['tier']}) -> {plan['home']}"]
+    lines = [f"安装计划（{plan['profile']}，档位 {plan['tier']}）-> {plan['home']}"]
     for i in plan["items"]:
         if i["kind"] == "model":
             lic = i["license"]
-            flag = "  [LICENSE ACCEPTANCE REQUIRED]" if i["needs_license_acceptance"] else ""
-            lines.append(f"  model  {i['id']:<34} {i['size_mb']:>7.1f} MB  {lic['spdx']}{flag}")
+            flag = "  [需要接受许可]" if i["needs_license_acceptance"] else ""
+            lines.append(f"  模型   {i['id']:<34} {i['size_mb']:>7.1f} MB  {lic['spdx']}{flag}")
             lines.append(f"         {i['reason']}")
             if lic.get("notes"):
-                lines.append(f"         license: {lic['notes']}")
+                lines.append(f"         许可：{lic['notes']}")
         elif i["kind"] == "env":
-            lines.append(f"  env    {i['id']:<34} {i['size_mb'] or 0:>7.1f} MB  ({i['variant']}, Python {i['python']}, {i['lock']})")
+            lines.append(f"  环境   {i['id']:<34} {i['size_mb'] or 0:>7.1f} MB  ({i['variant']}, Python {i['python']}, {i['lock']})")
         elif i["kind"] in ("python", "uv"):
             lines.append(f"  {i['kind']:<6} {i['id']:<34} {i['size_mb']:>7.1f} MB  ({i.get('note', '')})")
         elif i["kind"] == "ffmpeg" and i["action"] == "download":
@@ -320,14 +320,14 @@ def describe(plan: dict[str, Any]) -> str:
                          f"  ({i['note']})")
         elif i["kind"] == "ffmpeg":
             cmd = i["command"] if isinstance(i["command"], str) else " ".join(i["command"])
-            lines.append(f"  ffmpeg missing -> {cmd}  ({i['note']})")
+            lines.append(f"  缺少 ffmpeg -> {cmd}  （{i['note']}）")
             if i.get("fallback"):
                 fb = i["fallback"]
-                lines.append(f"         fallback: {fb['id']} {fb['version']} ({fb['size_mb']:.1f} MB, {fb['license']['spdx']})")
+                lines.append(f"         备选：{fb['id']} {fb['version']} ({fb['size_mb']:.1f} MB, {fb['license']['spdx']})")
     for s in plan["skipped"]:
-        lines.append(f"  skip   {s['id']:<34} {s['reason']}")
-    lines.append(f"  total download ~{plan['total_download_mb']} MB; needs ~{plan['disk_needed_gb']} GB free "
-                 f"(free: {plan['disk_free_gb']} GB)")
+        lines.append(f"  跳过   {s['id']:<34} {s['reason']}")
+    lines.append(f"  总下载量约 {plan['total_download_mb']} MB；需要约 {plan['disk_needed_gb']} GB 空闲空间"
+                 f"（当前空闲：{plan['disk_free_gb']} GB）")
     net = network.describe(plan.get("network"))
     if net:
         lines.append(f"  {net}")

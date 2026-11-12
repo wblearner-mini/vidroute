@@ -16,22 +16,22 @@ from vidroute.core.util.jsonio import read_json, write_json_atomic
 
 # key -> (default, accepted python types, description)
 KNOWN_KEYS: dict[str, tuple[Any, tuple[type, ...], str]] = {
-    "allow_raw_video_handoff": (True, (bool,), "Allow native routes that hand the raw video to the LLM provider."),
-    "budget_fraction": (0.5, (int, float), "Input-token budget as a fraction of the LLM context window."),
-    "budget_tokens": (None, (int,), "Absolute input-token budget; overrides budget_fraction."),
-    "default_llm": (None, (str,), "Model id used when --llm is omitted."),
-    "default_host": (None, (str,), "Host id used when --host is omitted."),
-    "mirror": ("auto", (str,), "Download mirror preference: auto|cn|github|hf|modelscope."),
-    "pypi_index": (None, (str,), "Package index for worker environments (a PyPI mirror URL, or 'official')."),
-    "python_mirror": (None, (str,), "Mirror for uv-managed Python downloads (URL, or 'official')."),
-    "ffmpeg_source": ("auto", (str,), "How a missing ffmpeg is installed on Windows: auto|winget|portable."),
-    "ffmpeg_path": (None, (str,), "Explicit path to the ffmpeg executable."),
-    "ffprobe_path": (None, (str,), "Explicit path to the ffprobe executable."),
-    "out_root": (None, (str,), "Default output root when --out is omitted."),
-    "offline": (False, (bool,), "Never touch the network (doctor skips mirror checks)."),
-    "delegate": (None, (dict,), "D5 delegate endpoint configuration (experimental, Phase 7)."),
-    "llm_profiles": ([], (list,), "User LLM profile overrides (managed by `vidroute llm set`)."),
-    "host_profiles": ([], (list,), "User host profile overrides (managed by `vidroute host set`)."),
+    "allow_raw_video_handoff": (True, (bool,), "允许把原始视频交给 LLM 服务商的原生路线。"),
+    "budget_fraction": (0.5, (int, float), "输入 token 预算占 LLM 上下文窗口的比例。"),
+    "budget_tokens": (None, (int,), "输入 token 预算的绝对值；会覆盖 budget_fraction。"),
+    "default_llm": (None, (str,), "省略 --llm 时使用的模型 id。"),
+    "default_host": (None, (str,), "省略 --host 时使用的宿主 id。"),
+    "mirror": ("auto", (str,), "下载镜像偏好：auto|cn|github|hf|modelscope。"),
+    "pypi_index": (None, (str,), "worker 环境使用的软件包索引（PyPI 镜像 URL，或 'official'）。"),
+    "python_mirror": (None, (str,), "uv 管理的 Python 下载镜像（URL，或 'official'）。"),
+    "ffmpeg_source": ("auto", (str,), "Windows 上缺少 ffmpeg 时的安装方式：auto|winget|portable。"),
+    "ffmpeg_path": (None, (str,), "ffmpeg 可执行文件的明确路径。"),
+    "ffprobe_path": (None, (str,), "ffprobe 可执行文件的明确路径。"),
+    "out_root": (None, (str,), "省略 --out 时的默认输出根目录。"),
+    "offline": (False, (bool,), "从不访问网络（doctor 跳过镜像检查）。"),
+    "delegate": (None, (dict,), "D5 委托端点配置（实验性）。"),
+    "llm_profiles": ([], (list,), "用户的 LLM 档案覆盖（由 `vidroute llm set` 管理）。"),
+    "host_profiles": ([], (list,), "用户的宿主档案覆盖（由 `vidroute host set` 管理）。"),
 }
 
 MIRRORS = ("auto", "cn", "github", "hf", "modelscope")
@@ -50,7 +50,7 @@ def save(data: dict[str, Any]) -> None:
 
 def get(key: str) -> Any:
     if key not in KNOWN_KEYS:
-        raise UsageError(f"Unknown config key {key!r}", hint="vidroute config get")
+        raise UsageError(f"未知配置项 {key!r}", hint="vidroute config get")
     return load().get(key, KNOWN_KEYS[key][0])
 
 
@@ -70,22 +70,22 @@ def parse_value(raw: str) -> Any:
 def set_value(key: str, value: Any) -> dict[str, Any]:
     if key not in KNOWN_KEYS:
         raise UsageError(
-            f"Unknown config key {key!r}. Known keys: {', '.join(sorted(KNOWN_KEYS))}",
+            f"未知配置项 {key!r}。已知的配置项：{', '.join(sorted(KNOWN_KEYS))}",
             hint="vidroute config get",
         )
     _, types, _ = KNOWN_KEYS[key]
     if value is not None and not isinstance(value, types):
-        raise UsageError(f"Config key {key!r} expects {'/'.join(t.__name__ for t in types)}, got {value!r}")
+        raise UsageError(f"配置项 {key!r} 应为 {'/'.join(t.__name__ for t in types)}，实际为 {value!r}")
     if isinstance(value, bool) and bool not in types:
-        raise UsageError(f"Config key {key!r} does not accept booleans")
+        raise UsageError(f"配置项 {key!r} 不接受布尔值")
     if key == "mirror" and value not in MIRRORS:
-        raise UsageError(f"mirror must be one of {', '.join(MIRRORS)}")
+        raise UsageError(f"mirror 必须是 {', '.join(MIRRORS)} 之一")
     if key == "ffmpeg_source" and value not in FFMPEG_SOURCES:
-        raise UsageError(f"ffmpeg_source must be one of {', '.join(FFMPEG_SOURCES)}")
+        raise UsageError(f"ffmpeg_source 必须是 {', '.join(FFMPEG_SOURCES)} 之一")
     if key in ("pypi_index", "python_mirror") and value not in (None, "official") and not str(value).startswith("https://"):
-        raise UsageError(f"{key} must be an https:// URL or 'official'")
+        raise UsageError(f"{key} 必须是 https:// URL 或 'official'")
     if key == "budget_fraction" and value is not None and not (0 < float(value) <= 1):
-        raise UsageError("budget_fraction must be in (0, 1]")
+        raise UsageError("budget_fraction 必须在 (0, 1] 范围内")
     data = load()
     data[key] = value
     save(data)

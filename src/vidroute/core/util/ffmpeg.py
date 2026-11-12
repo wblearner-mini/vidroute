@@ -34,7 +34,7 @@ INTERESTING_FILTERS = ("select", "scdet", "silencedetect", "drawtext", "tile", "
 def install_hint() -> str:
     system = platform.system()
     if system == "Windows":
-        return "vidroute install --capability scene   (plans FFmpeg: winget, or a portable build)"
+        return "vidroute install --capability scene   （会计划安装 FFmpeg：winget 或便携包）"
     if system == "Darwin":
         return "brew install ffmpeg"
     sudo = "" if hasattr(os, "geteuid") and os.geteuid() == 0 else "sudo "
@@ -42,7 +42,7 @@ def install_hint() -> str:
                           ("pacman", "pacman -S ffmpeg"), ("zypper", "zypper install ffmpeg"), ("apk", "apk add ffmpeg")):
         if shutil.which(tool):
             return sudo + command
-    return sudo + "apt install ffmpeg  (or your distribution's package manager)"
+    return sudo + "apt install ffmpeg  （或使用你所用发行版的包管理器）"
 
 
 def _candidates(name: str) -> list[Path]:
@@ -120,10 +120,10 @@ def detect(timeout: float = PROBE_TIMEOUT) -> FFmpegInfo:
     if ffmpeg is None or ffprobe is None:
         missing = "ffmpeg" if ffmpeg is None else "ffprobe"
         return FFmpegInfo(False, str(ffmpeg) if ffmpeg else None, str(ffprobe) if ffprobe else None,
-                          error=f"{missing} not found")
+                          error=f"找不到 {missing}")
     ver = proc.run([ffmpeg, "-hide_banner", "-version"], timeout=timeout)
     if not ver.ok:
-        return FFmpegInfo(False, str(ffmpeg), str(ffprobe), error=(ver.stderr or "ffmpeg -version failed").strip()[:300])
+        return FFmpegInfo(False, str(ffmpeg), str(ffprobe), error=(ver.stderr or "ffmpeg -version 失败").strip()[:300])
     enc = proc.run([ffmpeg, "-hide_banner", "-encoders"], timeout=timeout)
     flt = proc.run([ffmpeg, "-hide_banner", "-filters"], timeout=timeout)
     return FFmpegInfo(
@@ -154,13 +154,13 @@ def require() -> FFmpegInfo:
         if info.ffmpeg and info.ffprobe:  # present, but it does not run: reinstalling is rarely the answer
             broken_libs = "shared libraries" in (info.error or "") and os.environ.get("LD_LIBRARY_PATH")
             raise NeedsInstall(
-                f"{info.ffmpeg} is installed but cannot run: {info.error}"
-                + (" LD_LIBRARY_PATH is set and probably points at incompatible libraries." if broken_libs else ""),
+                f"{info.ffmpeg} 已安装但无法运行：{info.error}"
+                + ("。设置了 LD_LIBRARY_PATH，它很可能指向了不兼容的库。" if broken_libs else ""),
                 code="ffmpeg_broken",
                 hint="env -u LD_LIBRARY_PATH vidroute doctor --refresh" if broken_libs else f'"{info.ffmpeg}" -version',
             )
         raise NeedsInstall(
-            f"ffmpeg/ffprobe are required but were not found ({info.error}).",
+            f"需要 ffmpeg/ffprobe，但没有找到（{info.error}）。",
             code="ffmpeg_missing",
             hint=install_hint(),
         )
@@ -171,14 +171,14 @@ def unreadable_message(path: Path, stderr: str) -> str:
     """Why a file cannot be read, in terms of what the user can do about it."""
     detail = stderr.strip()
     if path.stat().st_size == 0:
-        why = "the file is empty"
+        why = "文件是空的"
     elif "moov atom not found" in detail:
-        why = "the file is incomplete or damaged (it may still be recording or copying, or the download was cut off)"
+        why = "文件不完整或已损坏（可能仍在录制或复制中，或下载被中断）"
     elif "Invalid data" in detail:
-        why = "it is damaged, or not a video or audio file"
+        why = "文件已损坏，或者不是视频或音频文件"
     else:
-        return f"Could not read {path.name}: {detail[:300] or 'ffprobe timed out'}"
-    return f"Could not read {path.name}: {why}. Get a complete copy of the file and try again."
+        return f"无法读取 {path.name}：{detail[:300] or 'ffprobe 超时'}"
+    return f"无法读取 {path.name}：{why}。请获取完整的文件后重试。"
 
 
 def ffprobe_json(path: Path, timeout: float = 60.0) -> dict[str, Any]:
@@ -192,4 +192,4 @@ def ffprobe_json(path: Path, timeout: float = 60.0) -> dict[str, Any]:
     try:
         return json.loads(res.stdout)
     except ValueError as exc:
-        raise RunFailed(f"ffprobe returned invalid JSON: {exc}", code="probe_failed") from exc
+        raise RunFailed(f"ffprobe 返回了无效的 JSON：{exc}", code="probe_failed") from exc

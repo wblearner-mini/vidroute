@@ -133,7 +133,7 @@ def test_claude_plugin_already_brings_the_skill(home):
         json.dumps({"version": 2, "plugins": {"vidroute@vidroute": [{"scope": "user"}]}}), encoding="utf-8")
     p = plan(["claude-code", "opencode"])
     assert [(i["path"], i["hosts"]) for i in p["items"]] == [(str(home / ".agents" / "skills" / "vidroute"), ["opencode"])]
-    assert "plugin" in p["notes"][0]
+    assert "插件" in p["notes"][0]
     status = integrate.status(no_commands)
     claude = next(h for h in status["hosts"] if h["id"] == "claude-code")
     assert claude["skill"]["plugin"] and status["claude_plugin"]

@@ -47,12 +47,12 @@ def exclusive(path: Path, ctx: Ctx, waiting: str, wait_seconds: float = WAIT_SEC
         told = False
         while not _try_lock(fd):
             if not told:
-                ctx.progress("wait", None, None, f"{waiting}: waiting for it to finish")
+                ctx.progress("wait", None, None, f"{waiting}：正在等待它完成")
                 told = True
             ctx.check_cancelled()
             if time.monotonic() >= deadline:
-                raise RunFailed(f"{waiting}, still after {wait_seconds / 60:.0f} minutes. Stop that run, or use another "
-                                "output folder with --out.", code="output_busy")
+                raise RunFailed(f"{waiting}，等了 {wait_seconds / 60:.0f} 分钟仍未结束。请停止那个进程，"
+                                "或用 --out 换一个输出目录。", code="output_busy")
             time.sleep(poll)
         yield
     finally:

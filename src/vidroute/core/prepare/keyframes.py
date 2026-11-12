@@ -162,7 +162,7 @@ def _decode(video: Path, pre: list[str], vf: str, size: tuple[int, int], ctx: Ct
                 if time.monotonic() > deadline:
                     stop = "timeout"
                     break
-                ctx.progress(stage, None, None, f"{len(frames)} candidate frames")
+                ctx.progress(stage, None, None, f"{len(frames)} 个候选帧")
     finally:
         if stop:
             p.kill()
@@ -170,10 +170,10 @@ def _decode(video: Path, pre: list[str], vf: str, size: tuple[int, int], ctx: Ct
         reader.join(timeout=5)
     ctx.check_cancelled()
     if stop == "timeout":
-        raise RunFailed(f"Frame sampling timed out after {timeout:.0f} s", code="ffmpeg_timeout")
+        raise RunFailed(f"抽帧在 {timeout:.0f} 秒后超时", code="ffmpeg_timeout")
     err = "".join(err_lines)
     if p.returncode != 0 and not frames and not stop:
-        raise RunFailed(f"Frame sampling failed: {err.strip()[-300:]}", code="ffmpeg_failed")
+        raise RunFailed(f"抽帧失败：{err.strip()[-300:]}", code="ffmpeg_failed")
     times = [float(m.group(1)) for m in _PTS.finditer(err)][:len(frames)]
     if len(times) != len(frames):  # showinfo should print one line per frame; fall back to an even grid
         step = span / max(1, len(frames))
@@ -208,7 +208,7 @@ def sample(video: Path, duration: float, size: tuple[int, int], rules: dict[str,
     vf = f"fps={rate:.6f}," + base_vf
     cands, _ = _decode(video, ["-skip_loop_filter", "all"], vf, size, ctx, start, span, timeout, "keyframes")
     if not cands:
-        raise RunFailed("No video frames could be decoded", code="no_frames")
+        raise RunFailed("无法解码任何视频帧", code="no_frames")
     return cands, {"method": f"decoded@{rate:.3g}fps", "candidates": len(cands), "interval": round(want, 2),
                    "keyframes_seen": len(kf), "keyframes_truncated": truncated}
 
@@ -409,7 +409,7 @@ def contact_sheets(frames: list[Keyframe], thumbs_dir: Path, out_dir: Path, rule
                         "-i", str(work / "%02d.jpg"), "-vf", f"tile={c}x{r}:padding=6:margin=6:color=white",
                         "-frames:v", "1", "-q:v", "3", str(out_dir / name)], timeout=120)
         if not res.ok:
-            raise RunFailed(f"Contact sheet failed: {res.stderr.strip()[-300:]}", code="ffmpeg_failed")
+            raise RunFailed(f"生成拼图失败：{res.stderr.strip()[-300:]}", code="ffmpeg_failed")
         sheets.append({"file": name, "frames": [k.index for k in group], "grid": [c, r],
                        "start": group[0].t, "end": group[-1].t,
                        "tiles": [{"tile": j, "row": (j - 1) // c + 1, "col": (j - 1) % c + 1, "frame": k.index,
@@ -419,19 +419,19 @@ def contact_sheets(frames: list[Keyframe], thumbs_dir: Path, out_dir: Path, rule
 
 
 def write_index(frames: list[Keyframe], sheets: list[dict[str, Any]], path: Path, labels: bool) -> None:
-    lines = ["# Contact sheets", "",
-             "Tiles are read left to right, top to bottom. "
-             + ("Each tile is labelled with its global timestamp. " if labels else "Tiles carry no labels: use the table. ")
-             + "Full-resolution frames are in `frames/`; open one when a tile is too small to read.", ""]
+    lines = ["# 拼图", "",
+             "小图按从左到右、从上到下的顺序阅读。"
+             + ("每张小图都标有全局时间戳。" if labels else "小图没有标签：请使用下表。")
+             + "全分辨率帧在 `frames/` 中；小图太小看不清时打开对应的帧。", ""]
     by_index = {k.index: k for k in frames}
     for s in sheets:
-        lines += [f"## {s['file']}  ({fmt_ts(s['start'])}–{fmt_ts(s['end'])}, {len(s['frames'])} frames)", "",
-                  "| tile | time | on screen | frame |", "|---|---|---|---|"]
+        lines += [f"## {s['file']}  （{fmt_ts(s['start'])}–{fmt_ts(s['end'])}，{len(s['frames'])} 帧）", "",
+                  "| 小图 | 时间 | 在屏幕上 | 帧 |", "|---|---|---|---|"]
         for t in s["tiles"]:
             k = by_index[t["frame"]]
             span = f"{fmt_ts(k.start)}–{fmt_ts(k.end)}"
             if k.repeats:
-                span += " (again " + ", ".join(f"{fmt_ts(a)}–{fmt_ts(b)}" for a, b in k.repeats[:3]) + ")"
+                span += "（重复于 " + "、".join(f"{fmt_ts(a)}–{fmt_ts(b)}" for a, b in k.repeats[:3]) + "）"
             lines.append(f"| {t['tile']} (r{t['row']}c{t['col']}) | {fmt_ts(k.t)} | {span} | frames/{k.file} |")
         lines.append("")
     path.write_text("\n".join(lines), encoding="utf-8")

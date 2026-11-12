@@ -136,7 +136,7 @@ def install(target: Path, force: bool = False) -> dict[str, Any]:
     if state.get("foreign"):
         if not force:
             return {"path": str(target), "status": "skipped",
-                    "reason": "a vidroute skill folder that vidroute did not create is already there"}
+                    "reason": "那里已有一个不是 vidroute 创建的 vidroute 技能目录"}
         backup = target.with_name(f"{target.name}.bak-{time.strftime('%Y%m%d-%H%M%S')}")
         os.replace(target, backup)
     src = source_dir()
@@ -158,6 +158,6 @@ def remove(target: Path) -> dict[str, Any]:
     if not target.exists():
         return {"path": str(target), "status": "absent"}
     if read_marker(target) is None:
-        return {"path": str(target), "status": "skipped", "reason": "not created by vidroute; left untouched"}
+        return {"path": str(target), "status": "skipped", "reason": "不是 vidroute 创建的；保持不动"}
     shutil.rmtree(target)
     return {"path": str(target), "status": "removed"}

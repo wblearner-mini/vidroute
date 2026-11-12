@@ -1,31 +1,31 @@
-name: LLM or host profile correction
-description: A model's modalities/limits or a host's attachment behaviour is wrong or missing
+name: LLM 或宿主档案更正
+description: 某个模型的模态/限额或某个宿主的附件行为有误或缺失
 labels: [profiles]
 body:
   - type: input
     id: subject
     attributes:
-      label: Model id or host id
+      label: 模型 id 或宿主 id
       placeholder: gemini-3.8-flash / qwen-code
     validations:
       required: true
   - type: textarea
     id: change
     attributes:
-      label: What should change?
-      description: Field, current value, correct value.
+      label: 应该改什么？
+      description: 字段、当前值、正确值。
     validations:
       required: true
   - type: input
     id: source
     attributes:
-      label: Official source URL
-      description: Provider/host documentation, API reference, model card or a specific source file and version.
+      label: 官方来源 URL
+      description: 服务商/宿主的文档、API 参考、模型卡，或具体的源码文件及版本。
     validations:
       required: true
   - type: input
     id: checked
     attributes:
-      label: Date you checked it (YYYY-MM-DD)
+      label: 你核实的日期（YYYY-MM-DD）
     validations:
       required: true

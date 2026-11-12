@@ -1,4 +1,4 @@
-"""Engine adapter interface (spec §3.2).
+"""Engine adapter interface.
 
 Every local engine implements ``probe()``, ``ensure_installed()``, ``run()``
 (capability-specific: ``detect`` / ``transcribe`` / ``recognize``) and
@@ -77,7 +77,7 @@ class Engine:
         info = self.probe()
         if not info["installed"]:
             raise NeedsInstall(
-                f"{self.capability} engine {self.id} is not installed.",
+                f"{self.capability} 引擎 {self.id} 未安装。",
                 code="needs_install",
                 hint=f"vidroute install --model {self.id}",
                 data={"needs": [self.id]},
@@ -88,7 +88,7 @@ class Engine:
         return pool.get(self.group, self.worker, stage=self.capability)
 
     def smoke_test(self, ctx: Ctx) -> dict[str, Any]:  # pragma: no cover - overridden
-        return {"status": "skipped", "detail": "no smoke test"}
+        return {"status": "skipped", "detail": "没有冒烟测试"}
 
 
 def write_wav(path: Path, seconds: float, freq: float | None = None, sr: int = 16000) -> Path:

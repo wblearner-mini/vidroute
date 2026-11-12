@@ -50,7 +50,7 @@ def test_raw_json_rpc():
     init = s.call(1, "initialize", {"protocolVersion": "2099-01-01", "capabilities": {},
                                     "clientInfo": {"name": "t", "version": "0"}})
     assert init["result"]["protocolVersion"] == mcp_server.SUPPORTED_VERSIONS[0]  # counter-offer: our latest
-    assert init["result"]["serverInfo"]["name"] == "vidroute" and "Workflow" in init["result"]["instructions"]
+    assert init["result"]["serverInfo"]["name"] == "vidroute" and "流程" in init["result"]["instructions"]
     s.send({"jsonrpc": "2.0", "method": "notifications/initialized"})  # no reply
     assert s.call(2, "ping") == {"jsonrpc": "2.0", "id": 2, "result": {}}
     tools = s.call(3, "tools/list")["result"]["tools"]
@@ -110,10 +110,10 @@ def test_read_outputs_stays_inside_the_output_folder(tmp_path):
     assert errors
     assert blocks[0] == {"type": "text", "text": "--- SUMMARY.md ---\n# hi"}
     assert blocks[2]["type"] == "image" and blocks[2]["mimeType"] == "image/jpeg"
-    assert "not a file inside" in blocks[3]["text"] and "no" not in blocks[3]["text"].split(":")[0]
+    assert "不是" in blocks[3]["text"] and "内的文件" in blocks[3]["text"]
     assert blocks[-1]["type"] == "audio"
     old, _ = mcp_server.read_outputs(str(root), ["audio.mp3"], 20, "2024-11-05")
-    assert old[0]["type"] == "text" and "attach it from disk" in old[0]["text"]  # no audio content before 2025-03-26
+    assert old[0]["type"] == "text" and "请从磁盘附带" in old[0]["text"]  # no audio content before 2025-03-26
     with pytest.raises(Exception):
         mcp_server.read_outputs(str(tmp_path), ["secret.txt"], 20, "2025-11-25")  # not an output folder
 

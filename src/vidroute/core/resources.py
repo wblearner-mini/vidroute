@@ -33,7 +33,7 @@ def data_file(rel: str) -> Path:
         if candidate.exists():
             return candidate
     raise DataFileError(
-        f"Bundled data file not found: {rel}",
+        f"找不到内置数据文件：{rel}",
         hint="pipx reinstall vidroute",
         data={"searched": [str(r) for r in _roots()]},
     )

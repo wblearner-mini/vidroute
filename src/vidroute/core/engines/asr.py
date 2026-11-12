@@ -47,7 +47,7 @@ class AsrEngine(Engine):
             if not wavs:
                 silent = write_wav(Path(tmp) / "silence.wav", 2.0)
                 self.transcribe(ctx, pool, silent, [[0.0, 2.0]])
-                return {"status": "passed", "detail": "model loaded and decoded 2 s of silence"}
+                return {"status": "passed", "detail": "模型已加载，并解码了 2 秒静音"}
             texts = []
             for wav in wavs:
                 import wave
@@ -108,14 +108,14 @@ class FasterWhisper(AsrEngine):
                 client = self.client(pool)
                 info = client.call("cuda_check")
                 if not info.get("cuda_devices"):
-                    raise RuntimeError("CTranslate2 sees no CUDA device")
+                    raise RuntimeError("CTranslate2 看不到任何 CUDA 设备")
                 key = client.call("asr_load", {"model_dir": str(self.model.model_dir), "device": "cuda",
                                                 "compute_type": "float16"})["key"]
                 wavs = self._test_wavs()
                 with tempfile.TemporaryDirectory() as tmp:
                     wav = wavs[0] if wavs else write_wav(Path(tmp) / "s.wav", 2.0)
                     client.call("asr", {"key": key, "wav": str(wav), "segments": [[0.0, 2.0]]})
-            result = {"status": "passed", "detail": f"{info['cuda_devices']} CUDA device(s)"}
+            result = {"status": "passed", "detail": f"{info['cuda_devices']} 个 CUDA 设备"}
         except Exception as exc:  # noqa: BLE001 - any failure means "use CPU"
             result = {"status": "failed", "reason": f"{type(exc).__name__}: {str(exc)[:300]}"}
         result["at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -128,6 +128,6 @@ class FasterWhisper(AsrEngine):
         if self.model.requires_gpu == "cuda":
             res = self.cuda_smoke(ctx)
             if res["status"] != "passed":
-                return {"status": "fallback_cpu", "detail": f"GPU smoke failed, CPU will be used: {res.get('reason')}"}
+                return {"status": "fallback_cpu", "detail": f"GPU 冒烟测试失败，将使用 CPU：{res.get('reason')}"}
             return res
         return super().smoke_test(ctx)

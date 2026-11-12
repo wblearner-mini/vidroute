@@ -1,54 +1,47 @@
-# Third-party licenses
+# 第三方许可
 
-vidroute itself is MIT-licensed and has **no runtime Python dependencies**. Neither this repository
-nor the Python package contains third-party code, binaries or model weights. Everything below is
-downloaded by the user, on their own machine, after they confirm an install plan
-(`vidroute install`), from the sources pinned in `models/manifest.yaml` and `envs/*.lock.txt`.
-Each output folder's `manifest.json` records which models produced it.
+vidroute 本身采用 MIT 许可，**没有任何运行时 Python 依赖**。本仓库和 Python 包都不包含第三方代码、二进制文件或模型权重。
+下面列出的所有内容，都是用户确认安装计划（`vidroute install`）之后，在自己的机器上从 `models/manifest.yaml` 和
+`envs/*.lock.txt` 中固定的来源下载的。每个输出目录的 `manifest.json` 都记录了生成它所用的模型。
 
-Regenerate the package tables with `python tools/license_report.py <lock files>`; CI runs it with
-`--check` against an allow-list of permissive and weak-copyleft licenses.
+用 `python tools/license_report.py <锁文件>` 重新生成包列表；CI 会加 `--check` 运行它，对照宽松许可与弱 copyleft 许可的白名单进行检查。
 
-## Models
+## 模型
 
-| model | status | license | license text | downloaded from |
+| 模型 | 状态 | 许可 | 许可原文 | 下载来源 |
 |---|---|---|---|---|
-| `vad-silero` | default | MIT | [Silero VAD](https://github.com/snakers4/silero-vad/blob/master/LICENSE) | sherpa-onnx releases (GitHub) |
-| `diarize-pyannote-campplus` | default | MIT (pyannote segmentation-3.0) + Apache-2.0 (3D-Speaker CAM++) | [3D-Speaker](https://github.com/modelscope/3D-Speaker/blob/main/LICENSE) | Hugging Face, hf-mirror (sherpa-onnx exports) |
-| `asr-sensevoice-small-int8` | default | FunASR Model Open Source License v1.1 | [MODEL_LICENSE](https://github.com/modelscope/FunASR/blob/main/MODEL_LICENSE) | sherpa-onnx releases (GitHub), Hugging Face, hf-mirror |
-| `asr-sensevoice-yue-int8` | alternative | Apache-2.0 (+ FunASR attribution) | [WSYue-ASR](https://huggingface.co/ASLP-lab/WSYue-ASR) | sherpa-onnx releases (GitHub) |
-| `asr-whisper-small-int8` | default (non-Chinese) | MIT | [OpenAI Whisper](https://github.com/openai/whisper/blob/main/LICENSE) | Hugging Face (`csukuangfj/sherpa-onnx-whisper-small`), hf-mirror |
-| `asr-faster-whisper-small` | alternative | MIT | [Systran/faster-whisper-small](https://huggingface.co/Systran/faster-whisper-small) | Hugging Face |
-| `asr-faster-whisper-large-v3-turbo` | alternative (CUDA) | MIT | [model card](https://huggingface.co/dropbox-dash/faster-whisper-large-v3-turbo) | Hugging Face |
-| `asr-funasr-nano-int8` | experimental | FunASR Model Open Source License v1.1 | [MODEL_LICENSE](https://github.com/modelscope/FunASR/blob/main/MODEL_LICENSE) | sherpa-onnx releases (GitHub) |
-| `asr-qwen3-asr-0.6b-int8` | experimental | Apache-2.0 | [Qwen3-ASR](https://huggingface.co/Qwen/Qwen3-ASR-0.6B) | sherpa-onnx releases (GitHub) |
-| `ocr-ppocrv6-small`, `ocr-ppocrv6-tiny` | default / alternative | Apache-2.0 | [PaddleOCR / RapidOCR](https://github.com/RapidAI/RapidOCR/blob/main/python/MODEL_LICENSES.md) | bundled in the `rapidocr` wheel, else ModelScope (`RapidAI/RapidOCR@v3.10.0`) |
+| `vad-silero` | 默认 | MIT | [Silero VAD](https://github.com/snakers4/silero-vad/blob/master/LICENSE) | sherpa-onnx 发布页（GitHub） |
+| `diarize-pyannote-campplus` | 默认 | MIT (pyannote segmentation-3.0) + Apache-2.0 (3D-Speaker CAM++) | [3D-Speaker](https://github.com/modelscope/3D-Speaker/blob/main/LICENSE) | Hugging Face, hf-mirror （sherpa-onnx 导出版） |
+| `asr-sensevoice-small-int8` | 默认 | FunASR Model Open Source License v1.1 | [MODEL_LICENSE](https://github.com/modelscope/FunASR/blob/main/MODEL_LICENSE) | sherpa-onnx 发布页（GitHub）, Hugging Face, hf-mirror |
+| `asr-sensevoice-yue-int8` | 备选 | Apache-2.0（+ FunASR 署名） | [WSYue-ASR](https://huggingface.co/ASLP-lab/WSYue-ASR) | sherpa-onnx 发布页（GitHub） |
+| `asr-whisper-small-int8` | 默认（非中文） | MIT | [OpenAI Whisper](https://github.com/openai/whisper/blob/main/LICENSE) | Hugging Face (`csukuangfj/sherpa-onnx-whisper-small`), hf-mirror |
+| `asr-faster-whisper-small` | 备选 | MIT | [Systran/faster-whisper-small](https://huggingface.co/Systran/faster-whisper-small) | Hugging Face |
+| `asr-faster-whisper-large-v3-turbo` | 备选（CUDA） | MIT | [模型卡](https://huggingface.co/dropbox-dash/faster-whisper-large-v3-turbo) | Hugging Face |
+| `asr-funasr-nano-int8` | 实验 | FunASR Model Open Source License v1.1 | [MODEL_LICENSE](https://github.com/modelscope/FunASR/blob/main/MODEL_LICENSE) | sherpa-onnx 发布页（GitHub） |
+| `asr-qwen3-asr-0.6b-int8` | 实验 | Apache-2.0 | [Qwen3-ASR](https://huggingface.co/Qwen/Qwen3-ASR-0.6B) | sherpa-onnx 发布页（GitHub） |
+| `ocr-ppocrv6-small`, `ocr-ppocrv6-tiny` | 默认 / 备选 | Apache-2.0 | [PaddleOCR / RapidOCR](https://github.com/RapidAI/RapidOCR/blob/main/python/MODEL_LICENSES.md) | 随 `rapidocr` wheel 自带，否则来自 ModelScope (`RapidAI/RapidOCR@v3.10.0`) |
 
-**Attribution.** SenseVoice-Small and Fun-ASR-Nano come from Alibaba's FunASR / FunAudioLLM
-projects. Their license allows free use, modification and redistribution, including
-commercial use, provided the source and the model name are credited; vidroute keeps the original
-model names in install plans, `vidroute models list` and every output `manifest.json`. Whisper is
-© OpenAI (MIT). Silero VAD is © Silero Team (MIT). PP-OCR models are © PaddlePaddle authors
-(Apache-2.0), converted to ONNX by RapidAI.
+**署名。** SenseVoice-Small 与 Fun-ASR-Nano 来自阿里巴巴的 FunASR / FunAudioLLM 项目。其许可允许免费使用、修改和再分发
+（含商用），前提是注明来源和模型名称；vidroute 在安装计划、`vidroute models list` 和每个输出的 `manifest.json`
+中都保留了原始模型名。Whisper © OpenAI（MIT）。Silero VAD © Silero Team（MIT）。PP-OCR 模型 © PaddlePaddle 作者
+（Apache-2.0），由 RapidAI 转换为 ONNX。
 
-## External tools
+## 外部工具
 
-| tool | license | how it gets there |
+| 工具 | 许可 | 获取方式 |
 |---|---|---|
-| FFmpeg / ffprobe | LGPL-2.1-or-later or GPL-2.0-or-later, depending on the build | installed by the user (`winget install --id Gyan.FFmpeg`, Homebrew, apt, ...); vidroute only runs it |
-| FFmpeg 9.0.2 essentials build by gyan.dev (Windows, optional) | GPL-3.0-or-later (static build incl. libx264, libmp3lame, freetype) | downloaded only after the user confirms a plan, from `github.com/GyanD/codexffmpeg` (SHA-256 pinned), into `$VIDROUTE_HOME/runtimes/ffmpeg` with its `LICENSE`; never redistributed by vidroute; source: FFmpeg commit 946fcce07b |
-| uv 0.13.4 (installers, worker environments) | MIT OR Apache-2.0 | downloaded by `install.ps1` / `install.sh` or vidroute's bootstrap (SHA-256 pinned) |
-| CPython 3.12 for worker environments | PSF-2.0 | python-build-standalone, installed by `uv` into `VIDROUTE_HOME` |
-| uv | MIT OR Apache-2.0 | PyPI (hash-pinned in `envs/uv.lock.txt`) when not already on PATH |
+| FFmpeg / ffprobe | LGPL-2.1-or-later 或 GPL-2.0-or-later，取决于构建 | 由用户安装（`winget install --id Gyan.FFmpeg`、Homebrew、apt……）；vidroute 只负责调用 |
+| gyan.dev 的 FFmpeg 9.0.2 essentials 构建（Windows，可选） | GPL-3.0-or-later（静态构建，含 libx264、libmp3lame、freetype） | 仅在用户确认计划后从 `github.com/GyanD/codexffmpeg` 下载（固定 SHA-256），连同其 `LICENSE` 放入 `$VIDROUTE_HOME/runtimes/ffmpeg`；vidroute 从不再分发；源码：FFmpeg 提交 946fcce07b |
+| uv 0.13.4（安装脚本、worker 环境） | MIT OR Apache-2.0 | 由 `install.ps1` / `install.sh` 或 vidroute 的引导程序下载（固定 SHA-256） |
+| worker 环境用的 CPython 3.12 | PSF-2.0 | python-build-standalone，由 `uv` 安装到 `VIDROUTE_HOME` |
+| uv | MIT OR Apache-2.0 | PATH 上没有时从 PyPI 获取（在 `envs/uv.lock.txt` 中固定哈希） |
 
-## Python packages in the worker environments
+## worker 环境中的 Python 包
 
-Installed with `uv pip install --require-hashes` into isolated environments under
-`VIDROUTE_HOME/envs` (`sherpa`: VAD/ASR, `ocr`: OCR, `whisper`/`whisper-cuda`: faster-whisper).
-The NVIDIA libraries are only installed for the optional CUDA path and are governed by NVIDIA's
-license agreements.
+用 `uv pip install --require-hashes` 安装到 `VIDROUTE_HOME/envs` 下的隔离环境（`sherpa`：VAD/ASR，`ocr`：OCR，
+`whisper`/`whisper-cuda`：faster-whisper）。NVIDIA 的库只在可选的 CUDA 路径中安装，受 NVIDIA 许可协议约束。
 
-| package | version | license | used in |
+| 包 | 版本 | 许可 | 用于 |
 |---|---|---|---|
 | anyio | 4.15.1 | MIT | whisper, whisper-cuda |
 | av | 19.0.2 | BSD-3-Clause | whisper, whisper-cuda |
@@ -94,12 +87,11 @@ license agreements.
 | urllib3 | 2.8.0 | MIT | ocr |
 | uv | 0.13.4 | MIT OR Apache-2.0 | uv |
 
-## Development and test tools (not shipped)
+## 开发与测试工具（不随包分发）
 
-Used only to build and test vidroute (`requirements-dev.lock.txt`), including the official MCP SDK
-as a test client and `skills-ref` to validate the Agent Skill.
+只用于构建和测试 vidroute（`requirements-dev.lock.txt`），包括作为测试客户端的官方 MCP SDK，以及用来校验 Agent Skill 的 `skills-ref`。
 
-| package | version | license | used in |
+| 包 | 版本 | 许可 | 用于 |
 |---|---|---|---|
 | annotated-types | 0.8.0 | MIT | requirements-dev |
 | anyio | 4.15.1 | MIT | requirements-dev |
