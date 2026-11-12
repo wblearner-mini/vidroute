@@ -81,12 +81,12 @@ hosts:
     max_images_per_turn: null
     shell: true
     confidence: source-verified
-    verified_at: "2026-10-21"
+    verified_at: "2026-11-12"
     source:
-      - "https://github.com/google-gemini/gemini-cli/blob/v0.65.0/packages/core/src/utils/fileUtils.ts"
-      - "https://github.com/google-gemini/gemini-cli/blob/v0.65.0/packages/core/src/utils/constants.ts"
+      - "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/utils/fileUtils.ts"
+      - "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/utils/constants.ts"
     notes: >-
-      v0.65.0: detectFileType() classifies video/* files and
+      v0.68.0 (re-checked 2026-11-12, unchanged since v0.65.0): detectFileType() classifies video/* files and
       processSingleFileContent() returns them as inlineData parts (the whole
       file, audio included); MAX_FILE_SIZE_MB = 20. The read_file docs still list
       only text/images/audio/PDF, so the docs lag the code. Not yet tested live

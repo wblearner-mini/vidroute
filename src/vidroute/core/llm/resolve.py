@@ -111,6 +111,10 @@ def resolve_llm(
         ctx.warn("unverified_profile",
                  f"{model_id!r} 的档案（{prof.get('id')}）未经核实；限额为保守估计。",
                  f"vidroute llm set {model_id} --video-max-seconds N ...")
+    elif origin == "builtin" and not user_prof and (age := P.stale_age_days(prof.get("verified_at"))):
+        ctx.warn("stale_profile",
+                 f"{model_id!r} 的档案（{prof.get('id')}）核实于 {prof['verified_at']}，已过去 {age} 天，模型能力可能已有变化。",
+                 f"按官方文档核对后用 vidroute llm set {model_id} ... 覆盖，或升级 vidroute")
 
     mods = list(prof.get("modalities_in") or ["text"])
     if "video" in mods and not prof.get("video"):
@@ -177,6 +181,10 @@ def resolve_host(host_id: str | None, ctx: Ctx | None = None) -> dict[str, Any]:
     if host.get("confidence") == "unverified" and source != "config":
         ctx.warn("unverified_host", f"宿主档案 {host['id']!r} 未经核实；采用保守假设。",
                  f"vidroute host set {host['id']} ...")
+    elif source != "config" and (age := P.stale_age_days(host.get("verified_at"))):
+        ctx.warn("stale_host",
+                 f"宿主档案 {host['id']!r} 核实于 {host['verified_at']}，已过去 {age} 天，宿主能力可能已有变化。",
+                 f"按宿主文档核对后用 vidroute host set {host['id']} ... 覆盖，或升级 vidroute")
     host["requested"] = host_id
     host["source"] = source
     return host

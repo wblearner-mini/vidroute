@@ -237,7 +237,7 @@ profiles:
       audio_in_video: true
       max_seconds: 10800
       delivery: [inline_base64, file_api]
-      inline_max_mb: 20
+      inline_max_mb: 100
       inline_is_base64: true
       upload_max_mb: 2048
       fps: 1
@@ -249,24 +249,28 @@ profiles:
       tokens_per_image: 258
       patch_px: null
       max_side_px: null
-      inline_max_mb: 20
+      inline_max_mb: 100
     audio:
       max_seconds: 34200
       tokens_per_second: 32
-      inline_max_mb: 20
+      inline_max_mb: 100
     context_tokens: 1048576
     source: builtin
-    verified_at: "2026-10-21"
+    verified_at: "2026-11-12"
     evidence:
-      - "https://ai.google.dev/gemini-api/docs/video-understanding"
-      - "https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash"
+      - "https://aistudio.google.com/docs/video-understanding"
+      - "https://aistudio.google.com/docs/file-input-methods"
+      - "https://aistudio.google.com/docs/models"
     notes: >-
       Static mode samples 1 FPS: 66 tokens/frame at low media resolution (the
       default) or 258 otherwise, plus 32 tokens/s of audio: ~100 tokens/s by
       default, ~300 at high resolution. 1M-context models take up to 3 h of video
-      at low resolution (1 h at high). Use the File API when the request exceeds
-      20 MB (2 GB per file on the free tier, 20 GB paid). Image-generation, TTS
-      and Live models share the prefix but are not chat models.
+      at low resolution (1 h at high). Inline data is limited to 100 MB per
+      request (the file-input-methods table, 2026-11-12; the video page still
+      says 20 MB in one paragraph); the File API takes 2 GB per file. Covers the
+      Gemini 3.x and Gemini 4 (gemini-4-carbon, gemini-4-argon) chat models.
+      Image-generation, TTS and Live models share the prefix but are not chat
+      models.
     unverified_fields: [audio.max_seconds, image.max_images]
 
   # ---------------------------------------------------------- image-only APIs

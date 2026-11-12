@@ -20,8 +20,8 @@ vidroute 唯一的前提是 [uv](https://docs.astral.sh/uv/)；uv 自带 Python�
    你的 shell 还是旧的 PATH，所以之后请用完整路径调用 uv：Windows 上是
    `%USERPROFILE%\.local\bin\uv.exe` 或 `%LOCALAPPDATA%\Microsoft\WinGet\Links\uv.exe`，其他系统是
    `~/.local/bin/uv`。
-2. 从 [v0.1.1 Release](https://github.com/wblearner-mini/vidroute/releases/tag/v0.1.1) 安装稳定版。
-   运行 `uv tool install https://github.com/wblearner-mini/vidroute/releases/download/v0.1.1/vidroute-0.1.1-py3-none-any.whl`
+2. 从[最新 Release](https://github.com/wblearner-mini/vidroute/releases/latest)安装稳定版：打开这个页面，找到 `vidroute-<版本>-py3-none-any.whl` 的下载地址，
+   运行 `uv tool install <该地址>`
    （不需要 git；在中国大陆请为这条命令设置
    `UV_DEFAULT_INDEX=https://mirrors.aliyun.com/pypi/simple/`）。
 3. vidroute 现在位于 `~/.local/bin`（Windows：`%USERPROFILE%\.local\bin\vidroute.exe`）。本次会话剩下的步骤都用这个完整路径。

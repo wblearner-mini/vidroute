@@ -48,10 +48,23 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist
           path: dist/
+      # Release copies of the installers default to this release's wheel, so the README can point at
+      # releases/latest/download/install.sh (and install.ps1) without naming a version.
+      - name: Installers pinned to this release
+        run: |
+          WHEEL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/vidroute-${GITHUB_REF_NAME#v}-py3-none-any.whl"
+          test -f "dist/vidroute-${GITHUB_REF_NAME#v}-py3-none-any.whl"
+          MAIN="https://github.com/${GITHUB_REPOSITORY}/archive/refs/heads/main.tar.gz"
+          for f in install.sh install.ps1; do
+            sed "s#${MAIN}#${WHEEL}#" "$f" > "dist/$f"
+            grep -qF "$WHEEL" "dist/$f" || { echo "$f: default source not replaced"; exit 1; }
+          done
+          cd dist && sha256sum * | grep -v ' SHA256SUMS.txt$' > SHA256SUMS.txt && cat SHA256SUMS.txt
       - name: Create the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
