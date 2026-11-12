@@ -61,6 +61,9 @@ def test_route_table(case):
     assert d["route"] == expected, d["reasons"] + [str(x) for x in d["degraded_from"]]
     assert [g["route"] for g in d["degraded_from"]] == degraded
     assert d["uploads_raw_video"] == expected.startswith("native")
+    if prefer == "privacy":
+        assert not d["uploads_raw_audio"] and not d["audio_attachment"]["enabled"]
+        assert d["transcript"]["role"] == "sole_source"
     assert d["reasons"], "every decision must be explained"
 
 

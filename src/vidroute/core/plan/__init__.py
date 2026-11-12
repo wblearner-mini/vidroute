@@ -123,5 +123,6 @@ def summarize(plan: dict[str, Any]) -> list[str]:
     for s in d.get("suggestions") or []:
         lines.append(f"  - 建议（{s['route']}）：{s['why']} {s['how']}")
     lines.append(f"  - 上传原始视频：{'是' if plan['uploads_raw_video'] else '否'}；"
+                 f"上传原始音轨：{'是' if d['uploads_raw_audio'] else '否'}；"
                  f"估计输入约 {plan['budget']['est_input_tokens']:,} token（预算 {plan['budget']['budget_tokens']:,}）")
     return lines

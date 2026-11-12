@@ -73,15 +73,19 @@ def _plan_for(video: Path, layout: Layout, plan_path: str | None, route: str, re
     elif not replan and kw.get("llm") is None and kw.get("host") is None and layout.file("plan.json").exists():
         try:
             data, source = load_plan(layout.file("plan.json"), video), "out_dir"
-            ctx.warn("plan_reused", f"使用 {layout.root} 中的计划（LLM {data['request']['llm']}，任务 "
-                                    f"{data['request']['task']}）；传入 --llm 可重新计划。")
         except UsageError:
             data = None
-    if data is not None and route in ("auto", data["route"]):
-        return data, source
-    if data is not None:  # same request, forced route
+    if data is not None:
         req = data["request"]
-        kw = {"llm": req["llm"], "host": req["host"], "task": req["task"], "prefer": req["prefer"],
+        prefer = "privacy" if kw.get("prefer") == "privacy" else req["prefer"]
+        # Replan v0.1.0 privacy plans that still included a source audio attachment.
+        privacy_replan = prefer == "privacy" and (req["prefer"] != "privacy" or data["delivery"]["uploads_raw_audio"])
+        if route in ("auto", data["route"]) and not privacy_replan:
+            if source == "out_dir":
+                ctx.warn("plan_reused", f"使用 {layout.root} 中的计划（LLM {req['llm']}，任务 "
+                                        f"{req['task']}）；传入 --llm 可重新计划。")
+            return data, source
+        kw = {"llm": req["llm"], "host": req["host"], "task": req["task"], "prefer": prefer,
               "language": req["language"], "modalities": req.get("modalities"),
               "audio_in_video": req.get("audio_in_video"), "ocr": req.get("ocr", "auto"),
               "force_asr": bool(req.get("force_asr")), "diarize": req.get("diarize", "auto")}

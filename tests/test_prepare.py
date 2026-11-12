@@ -308,11 +308,12 @@ def test_native_route_requires_consent(media, tmp_path, fake, capsys):
                "--out", str(tmp_path), "--json"])
     out = json.loads(capsys.readouterr().out)
     assert rc == 3 and out["error"]["code"] == "raw_video_handoff" and out["data"]["uploads_raw_video"] is True
-    # Privacy preference keeps the raw video local: frames route, no consent needed.
-    env = prepare(str(media["slides"]), llm="gemini-3.8-flash", host="gemini-cli", prefer="privacy",
-                  out=str(tmp_path))
+    # A privacy request replans even when the output directory has a saved native plan.
+    env = prepare(str(media["slides"]), prefer="privacy", out=str(tmp_path))
     assert env.ok and env.data["route"] == "frames"
-    assert env.data["handoff"]["degraded_from"][0]["route"] == "native-av"
+    handoff = env.data["handoff"]
+    assert handoff["degraded_from"][0]["route"] == "native-av"
+    assert not handoff["uploads_raw_video"] and not handoff["uploads_raw_audio"]
 
 
 @needs_ffmpeg

@@ -171,3 +171,14 @@ def test_frames_with_audio_track_needs_the_same_consent(media, tmp_path):
     assert _streams(Path(env.data["out_dir"]) / audio[0]["path"]) == ["audio"]
     guide = (Path(env.data["out_dir"]) / "ANALYSIS_GUIDE.md").read_text(encoding="utf-8")
     assert "你能听到音频**（以单独的音频文件附带）" in guide and "你听不到音频" not in guide
+
+    # v0.1.0 privacy plans could still include audio, even on a frames-only host.
+    plan_path = Path(env.data["plan_path"])
+    legacy_plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    legacy_plan["request"]["prefer"] = "privacy"
+    plan_path.write_text(json.dumps(legacy_plan), encoding="utf-8")
+    env = prepare(str(media["slides"]), plan=str(plan_path), accept_raw_video_handoff=True)
+    assert env.ok, env.error
+    handoff = env.data["handoff"]
+    assert not handoff["uploads_raw_audio"] and handoff["transcript_role"] == "sole_source"
+    assert not (plan_path.parent / "audio" / "attach").exists()

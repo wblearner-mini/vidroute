@@ -54,12 +54,16 @@ sh "<技能目录>/scripts/vidroute" <命令> [选项] --json        # Linux、m
    只有得到同意后，才加 `--yes` 运行同一条命令。
 3. **计划。** `vidroute plan "<视频>" --llm <id> --host <宿主> --task <minutes|summary|qa|transcript>
    [--prefer quality|privacy|cost] [--language zh|en|auto] --out "<目录>" --json`
-   用一两句话告诉用户选了哪条路线以及原因（`data.delivery.reasons`、`degraded_from`）。**如果 `data.uploads_raw_video`
-   为 true，继续之前先询问用户**：整个视频会被发给你的 LLM 服务商。如果用户拒绝，用 `--prefer privacy` 重新计划。
+   用一两句话告诉用户选了哪条路线以及原因（`data.delivery.reasons`、`degraded_from`）。查看
+   `data.delivery.uploads_raw_video` 和 `data.delivery.uploads_raw_audio`。任一为 true，先说明会交给 LLM 服务商的是
+   带音轨的视频、无音轨的视频，还是单独的原始音轨，并征得用户同意。用户拒绝时，用 `--prefer privacy` 重新计划，
+   原始视频和音轨留在本机，仍可使用关键帧和转写等文本。
 4. **准备。** `vidroute prepare "<视频>" --out "<目录>" --json` 会复用保存在 `<目录>` 中的计划。只有用户在第 3 步同意后才加
-   `--accept-raw-video-handoff`。退出码 3 且错误码为 `raw_video_handoff`，表示缺少这一同意。`data.out_dir` 是输出目录。
+   `--accept-raw-video-handoff`。缺少同意时，原生视频路线以 `raw_video_handoff`（退出码 3）停止，
+   关键帧路线会跳过原始音轨。`data.out_dir` 是输出目录。
 5. **阅读** `data.out_dir` 中的 `SUMMARY.md`，然后是 `ANALYSIS_GUIDE.md`。接着严格按照 `handoff.json` 的列表读取/附带：
-   `attachments` 中的每一项，以及 `"attach": true` 的 `text_context` 项。`on_demand` 列出的单帧只在拼图里的小图太小时才打开。
+   `attachments` 中的每一项，以及 `"attach": true` 的 `text_context` 项。路线变化时，若有用户尚未同意的原始媒体，
+   先征得同意再附带。`on_demand` 列出的单帧只在拼图里的小图太小时才打开。
    如何在你的宿主里附带图片、音频或视频：[references/hosts.md](references/hosts.md)。
 6. **按 `ANALYSIS_GUIDE.md` 撰写**回答：每条陈述都带全局 `[mm:ss]` 时间戳；只凭看得见（或听得见）的证据修正转写；
    保留纠错清单和"待核实事项"清单；说明哪些内容只依据了转写。
@@ -67,8 +71,8 @@ sh "<技能目录>/scripts/vidroute" <命令> [选项] --json        # Linux、m
    `vidroute drill "<out_dir>" --range 01:20-02:00 [--fps 1] [--asr] [--ocr] --json`
    并读取 `data.attachments` / `data.text_context` 列出的内容（路径相对于 `out_dir`）。逐步缩小范围；不要一次附带所有内容。
 
-`vidroute run "<视频>" --llm <id> --host <宿主> --out "<目录>" --json` 一次完成 plan + prepare；只在不可能出现需要用户同意的问题时
-使用（如果出现，它仍会以退出码 3 停下）。
+`vidroute run "<视频>" --llm <id> --host <宿主> --out "<目录>" --json` 一次完成 plan + prepare。需要先确认
+原始媒体交付范围时，先用 `plan` 查看计划。
 
 ## 退出码与错误
 

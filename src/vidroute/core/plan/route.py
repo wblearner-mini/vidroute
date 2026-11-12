@@ -262,7 +262,7 @@ def decide(
     for r in order:
         if r.startswith("native"):
             if prefer == "privacy":
-                degraded.append({"route": r, "why": "--prefer privacy：原始视频留在本机（只交出帧/文本）"})
+                degraded.append({"route": r, "why": "--prefer privacy：原始视频和音轨留在本机（只交出帧/文本）"})
                 continue
             if not allow_raw:
                 degraded.append({"route": r, "why": "配置 allow_raw_video_handoff=false"})
@@ -291,7 +291,7 @@ def decide(
             break
         if r == "frames":
             frames = frames_plan(probe, eff, rules)
-            if eff["audio"] and probe.get("has_audio") and speech:
+            if prefer != "privacy" and eff["audio"] and speech:
                 audio_att = audio_attachment_plan(probe, eff, rules)
             total = frames["est_tokens"] + t_tokens + ocr_tokens + overhead + (audio_att.get("est_tokens", 0)
                                                                               if audio_att.get("enabled") else 0)
@@ -333,7 +333,7 @@ def decide(
         "reasons": reasons,
         "degraded_from": degraded,
         "uploads_raw_video": chosen.startswith("native"),
-        "uploads_raw_audio": chosen.startswith("native-av") or bool(audio_att.get("enabled")),
+        "uploads_raw_audio": (chosen == "native-av" and bool(probe.get("has_audio"))) or bool(audio_att.get("enabled")),
         "native": native,
         "frames": frames,
         "audio_attachment": audio_att,
