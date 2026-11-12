@@ -7,7 +7,7 @@ authors:
     website: "https://github.com/wblearner-mini/vidroute"
 repository-code: "https://github.com/wblearner-mini/vidroute"
 license: MIT
-version: "0.1.0"
+version: "0.1.1"
 date-released: "2026-11-12"
 keywords:
   - video understanding

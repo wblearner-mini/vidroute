@@ -5,9 +5,17 @@
 
 ## [未发布]
 
+## [0.1.1] - 2026-11-12
+
 ### 修复
 
-- `--prefer privacy` 在规划时排除原始视频和单独的音轨，继续保留本地转写。Skill 和 MCP 在交付前提示分别确认视频和音轨。
+- `--prefer privacy` 在规划时排除原始视频和单独的音轨，仍可交付关键帧和本地转写。切换到隐私模式时会重新规划，
+  旧版保存的隐私计划如果仍含音轨也会重新规划。
+- Skill 和 MCP 会在交付前说明计划包含的是带音轨的视频、无音轨的视频还是单独的音轨，并按实际内容征得用户同意。
+
+### 变更
+
+- README 和 Agent 安装指南的稳定版入口指向 `v0.1.1` 的 GitHub Release。
 
 ## [0.1.0] - 2026-11-12
 
@@ -67,5 +75,6 @@
   `vidroute ...` 命令与真实 CLI 对照。
 - `vidroute install --force` 现在会真正重建 worker 环境。
 
-[未发布]: https://github.com/wblearner-mini/vidroute/compare/v0.1.0...main
+[未发布]: https://github.com/wblearner-mini/vidroute/compare/v0.1.1...main
+[0.1.1]: https://github.com/wblearner-mini/vidroute/releases/tag/v0.1.1
 [0.1.0]: https://github.com/wblearner-mini/vidroute/releases/tag/v0.1.0

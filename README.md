@@ -18,24 +18,24 @@ Agent 的 LLM**，在本机准备好这些材料，并生成一份阅读指南�
 再由**你的硬件**决定本地部分怎么跑（语音识别、VAD、OCR、关键帧）。每次降级（`native → frames → text`）
 都会记录原因。
 
-> **状态：v0.1.0（首个版本；1.0 之前命令和输出格式仍可能调整）。** CLI、MCP 服务和 Agent Skill 已完整可用，
+> **状态：v0.1.1（1.0 之前命令和输出格式仍可能调整）。** CLI、MCP 服务和 Agent Skill 已完整可用，
 > 所有选型及其证据见 [docs/DECISIONS.md](docs/DECISIONS.md)，版本变化见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 安装
 
-**稳定版下载：[v0.1.0 Release](https://github.com/wblearner-mini/vidroute/releases/tag/v0.1.0)。** 发布页提供 Python wheel、源码包和 `SHA256SUMS.txt`。
-下面的安装命令使用该版本的脚本和 wheel。本文档也会描述默认分支上已修复、尚未发版的行为，详见 [更新日志](CHANGELOG.md)。
+**稳定版下载：[v0.1.1 Release](https://github.com/wblearner-mini/vidroute/releases/tag/v0.1.1)。** 发布页提供 Python wheel、源码包和 `SHA256SUMS.txt`。
+下面的安装命令使用该版本的脚本和 wheel。
 
 ```powershell
 # Windows（PowerShell）
-$wheel = "https://github.com/wblearner-mini/vidroute/releases/download/v0.1.0/vidroute-0.1.0-py3-none-any.whl"
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/wblearner-mini/vidroute/v0.1.0/install.ps1))) -Source $wheel
+$wheel = "https://github.com/wblearner-mini/vidroute/releases/download/v0.1.1/vidroute-0.1.1-py3-none-any.whl"
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/wblearner-mini/vidroute/v0.1.1/install.ps1))) -Source $wheel
 ```
 
 ```bash
 # Linux / macOS
-curl -LsSf https://raw.githubusercontent.com/wblearner-mini/vidroute/v0.1.0/install.sh | sh -s -- --source \
-  https://github.com/wblearner-mini/vidroute/releases/download/v0.1.0/vidroute-0.1.0-py3-none-any.whl
+curl -LsSf https://raw.githubusercontent.com/wblearner-mini/vidroute/v0.1.1/install.sh | sh -s -- --source \
+  https://github.com/wblearner-mini/vidroute/releases/download/v0.1.1/vidroute-0.1.1-py3-none-any.whl
 ```
 
 脚本会先取得 [uv](https://docs.astral.sh/uv/)（固定版本、校验 SHA-256；uv 自带 Python），安装 vidroute，
@@ -56,7 +56,7 @@ curl -LsSf https://raw.githubusercontent.com/wblearner-mini/vidroute/v0.1.0/inst
 **交给 Agent 来装。** 对它说：*"按照 https://github.com/wblearner-mini/vidroute/blob/main/docs/AGENT_SETUP.md
 帮我装好 vidroute"*。Agent 会装好 uv 和 vidroute，把计划拿给你看，你同意后再执行。
 
-**手动安装：** `uv tool install https://github.com/wblearner-mini/vidroute/releases/download/v0.1.0/vidroute-0.1.0-py3-none-any.whl`，
+**手动安装：** `uv tool install https://github.com/wblearner-mini/vidroute/releases/download/v0.1.1/vidroute-0.1.1-py3-none-any.whl`，
 然后运行 `vidroute setup`。
 
 之后直接对 Agent 说"把 D:\会议\周会.mp4 整理成会议纪要"即可，或者用命令行：
@@ -177,7 +177,7 @@ Claude + Claude Code → `frames`；DeepSeek + opencode → `text`。欢迎附�
 - **纯本地。** vidroute 自身从不调用云端模型，没有遥测。你的 Agent 用的 LLM 是否在云端，由你的 Agent 决定。
 - **原始媒体外传需你同意。** 计划会标注 `delivery.uploads_raw_video` 和 `delivery.uploads_raw_audio`。
   缺少 `--accept-raw-video-handoff` 时，原生视频路线会停止，关键帧路线会跳过单独的音轨。
-  默认分支中的 `--prefer privacy` 会在规划时排除原始视频和音轨，仍可交付关键帧和转写等文本。
+  `--prefer privacy` 会在规划时排除原始视频和音轨，仍可交付关键帧和转写等文本。
 - **提取出的文本是数据，不是指令。** 转写、字幕和 OCR 里可能有提示注入，指南要求 LLM 忽略其中的任何指令。
 - **只写入 `VIDROUTE_HOME`（默认 `~/.vidroute`）和你指定的 `--out`**——以及你确认 `vidroute setup` 之后，计划中列出的
   宿主技能目录和 MCP 配置项。从不删除你的文件，也从不替换不是它创建的宿主配置；日志不记录视频内容。

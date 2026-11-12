@@ -9,7 +9,7 @@ compatibility: >-
   需要 Python 3.10+ 或 uv（启动器两者都能找到），以及 ffmpeg（Windows 上安装计划会提供）。本地语音/OCR 模型只在用户批准安装计划后
   下载一次，之后全部离线运行。vidroute 从不调用云端模型。
 metadata:
-  version: "0.1.0"
+  version: "0.1.1"
   repository: "https://github.com/wblearner-mini/vidroute"
 ---
 
