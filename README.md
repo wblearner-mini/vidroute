@@ -18,7 +18,7 @@ Agent 的 LLM**，在本机准备好这些材料，并生成一份阅读指南�
 再由**你的硬件**决定本地部分怎么跑（语音识别、VAD、OCR、关键帧）。每次降级（`native → frames → text`）
 都会记录原因。
 
-> **状态：预发布（v0.1.0.dev0）。** CLI、MCP 服务和 Agent Skill 已完整可用，
+> **状态：v0.1.0（首个版本；1.0 之前命令和输出格式仍可能调整）。** CLI、MCP 服务和 Agent Skill 已完整可用，
 > 所有选型及其证据见 [docs/DECISIONS.md](docs/DECISIONS.md)，版本变化见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 安装

@@ -1,6 +1,6 @@
 {
   "name": "vidroute",
-  "version": "0.1.0-dev.0",
+  "version": "0.1.0",
   "description": "看见、听见本地视频：按你的模型和宿主选择原生视频、关键帧 + 本地转写或纯文本，在本机完成准备（语音识别、OCR、关键帧），并以全局时间戳引导分析。",
   "author": {"name": "wblearner-mini", "url": "https://github.com/wblearner-mini"},
   "homepage": "https://github.com/wblearner-mini/vidroute",

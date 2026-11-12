@@ -5,6 +5,10 @@
 
 ## [未发布]
 
+## [0.1.0] - 2026-11-12
+
+首个公开版本。
+
 ### 变更
 
 - 文档、技能、分析指南以及 CLI/MCP 面向用户的输出全部改为中文；README 只保留一份中文版（原 `README.zh-CN.md` 已合并）。
@@ -59,4 +63,5 @@
   `vidroute ...` 命令与真实 CLI 对照。
 - `vidroute install --force` 现在会真正重建 worker 环境。
 
-[未发布]: https://github.com/wblearner-mini/vidroute/commits/main
+[未发布]: https://github.com/wblearner-mini/vidroute/compare/v0.1.0...main
+[0.1.0]: https://github.com/wblearner-mini/vidroute/releases/tag/v0.1.0
