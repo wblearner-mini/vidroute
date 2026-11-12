@@ -251,3 +251,36 @@ def test_budget_from_config():
     assert budget_tokens(1_000_000, RULES) == 100_000
     config.set_value("budget_tokens", 4242)
     assert budget_tokens(1_000_000, RULES) == 4242
+
+
+def test_stale_age_days_only_counts_old_dates():
+    import datetime as dt
+    today = dt.date(2026, 11, 12)
+    assert P.stale_age_days("2026-10-21", today) is None
+    assert P.stale_age_days("2026-08-14", today) is None  # exactly STALE_AFTER_DAYS (90) days
+    assert P.stale_age_days("2026-08-13", today) == P.STALE_AFTER_DAYS + 1
+    assert P.stale_age_days(None, today) is None
+    assert P.stale_age_days("not-a-date", today) is None
+
+
+def test_old_builtin_profiles_warn(monkeypatch):
+    monkeypatch.setattr(P, "STALE_AFTER_DAYS", -1)
+    ctx = Ctx()
+    resolve_llm("claude-opus-5-5", ctx=ctx)
+    resolve_host("claude-code", ctx=ctx)
+    codes = {w["code"] for w in ctx.warnings}
+    assert {"stale_profile", "stale_host"} <= codes
+
+
+def test_user_overrides_and_unverified_profiles_do_not_warn_as_stale(monkeypatch):
+    monkeypatch.setattr(P, "STALE_AFTER_DAYS", -1)
+    manage.llm_set("claude-opus-5-5", modalities="text,image")
+    ctx = Ctx()
+    resolve_llm("claude-opus-5-5", ctx=ctx)
+    resolve_llm("totally-new-model-9", ctx=ctx)
+    assert not any(w["code"] == "stale_profile" for w in ctx.warnings)
+
+
+def test_bundled_profiles_are_fresh_today():
+    stale = [p["id"] for p in (*P.builtin_llm_profiles(), *P.builtin_host_profiles()) if P.stale_age_days(p.get("verified_at"))]
+    assert not stale or pytest.skip(f"profiles need re-verification: {stale}")

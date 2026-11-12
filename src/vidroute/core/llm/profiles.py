@@ -8,6 +8,7 @@ sync``) > bundled profiles > conservative defaults.
 from __future__ import annotations
 
 import copy
+import datetime as _dt
 import fnmatch
 import os
 import re
@@ -21,6 +22,22 @@ from vidroute.core.util.jsonio import read_json
 from vidroute.core.util.yamlish import YamlError, load_file
 
 MODALITIES = ("text", "image", "audio", "video")
+
+# Model and host capabilities change quickly; a bundled profile checked longer ago than this
+# triggers a warning (and the scheduled profile-freshness workflow fails) so it gets re-verified.
+STALE_AFTER_DAYS = 90
+
+
+def stale_age_days(verified_at: str | None, today: _dt.date | None = None) -> int | None:
+    """Days since ``verified_at`` when that is more than STALE_AFTER_DAYS, else None (also for unknown dates)."""
+    if not verified_at:
+        return None
+    try:
+        checked = _dt.date.fromisoformat(verified_at)
+    except ValueError:
+        return None
+    age = ((today or _dt.date.today()) - checked).days
+    return age if age > STALE_AFTER_DAYS else None
 
 
 def _load(rel: str, key: str, schema: str) -> list[dict[str, Any]]:

@@ -1,0 +1,22 @@
+name: Profile freshness
+
+# Fails when a bundled LLM or host profile has not been re-verified for STALE_AFTER_DAYS,
+# so GitHub notifies the maintainer to check it against official docs.
+on:
+  schedule:
+    - cron: "17 3 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - run: python -I tools/profile_freshness.py

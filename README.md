@@ -2,6 +2,12 @@
 
 **让编程 Agent 能"看"和"听"本地视频。**
 
+## 30 秒上手
+
+1. 安装：`curl -LsSf https://github.com/wblearner-mini/vidroute/releases/latest/download/install.sh | sh`（Windows 的命令见[安装](#安装)）。
+2. 按 `vidroute setup` 给出的计划确认一次：补齐 ffmpeg、下载本地模型、接入你的 Agent。
+3. 对你的 Agent 说"把 ~/会议/周会.mp4 整理成会议纪要"，它会给出带 `[mm:ss]` 时间戳的回答。
+
 大多数 Agent 宿主（Claude Code、Codex CLI、opencode、Cursor……）只能把图片交给模型，交不了视频——
 哪怕模型本身看得懂视频。vidroute 根据"**你用的大模型 × 你的宿主**"，确定性地、可解释地决定**该把什么交给
 Agent 的 LLM**，在本机准备好这些材料，并生成一份阅读指南，让最终回答带全局时间戳、按证据校对。
@@ -23,19 +29,17 @@ Agent 的 LLM**，在本机准备好这些材料，并生成一份阅读指南�
 
 ## 安装
 
-**稳定版下载：[v0.1.1 Release](https://github.com/wblearner-mini/vidroute/releases/tag/v0.1.1)。** 发布页提供 Python wheel、源码包和 `SHA256SUMS.txt`。
-下面的安装命令使用该版本的脚本和 wheel。
+**稳定版下载：[最新 Release](https://github.com/wblearner-mini/vidroute/releases/latest)。** 发布页提供 Python wheel、源码包、两个安装脚本和 `SHA256SUMS.txt`。
+下面的命令总是指向最新版本，不需要改版本号：发布页附带的安装脚本默认安装同一版本的 wheel。
 
 ```powershell
 # Windows（PowerShell）
-$wheel = "https://github.com/wblearner-mini/vidroute/releases/download/v0.1.1/vidroute-0.1.1-py3-none-any.whl"
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/wblearner-mini/vidroute/v0.1.1/install.ps1))) -Source $wheel
+& ([scriptblock]::Create((irm https://github.com/wblearner-mini/vidroute/releases/latest/download/install.ps1)))
 ```
 
 ```bash
 # Linux / macOS
-curl -LsSf https://raw.githubusercontent.com/wblearner-mini/vidroute/v0.1.1/install.sh | sh -s -- --source \
-  https://github.com/wblearner-mini/vidroute/releases/download/v0.1.1/vidroute-0.1.1-py3-none-any.whl
+curl -LsSf https://github.com/wblearner-mini/vidroute/releases/latest/download/install.sh | sh
 ```
 
 脚本会先取得 [uv](https://docs.astral.sh/uv/)（固定版本、校验 SHA-256；uv 自带 Python），安装 vidroute，
@@ -56,7 +60,7 @@ curl -LsSf https://raw.githubusercontent.com/wblearner-mini/vidroute/v0.1.1/inst
 **交给 Agent 来装。** 对它说：*"按照 https://github.com/wblearner-mini/vidroute/blob/main/docs/AGENT_SETUP.md
 帮我装好 vidroute"*。Agent 会装好 uv 和 vidroute，把计划拿给你看，你同意后再执行。
 
-**手动安装：** `uv tool install https://github.com/wblearner-mini/vidroute/releases/download/v0.1.1/vidroute-0.1.1-py3-none-any.whl`，
+**手动安装：** 从[最新 Release](https://github.com/wblearner-mini/vidroute/releases/latest)下载 `vidroute-<版本>-py3-none-any.whl`，运行 `uv tool install ./vidroute-<版本>-py3-none-any.whl`，
 然后运行 `vidroute setup`。
 
 之后直接对 Agent 说"把 D:\会议\周会.mp4 整理成会议纪要"即可，或者用命令行：
@@ -113,6 +117,13 @@ Agent 的工作流（见 [skills/vidroute/SKILL.md](skills/vidroute/SKILL.md)）
 `error.hint` 如果有，就是一条能解决问题的命令；用户只能自己处理时（比如文件损坏）为空，原因写在 `message` 里。
 
 ## `prepare` 的输出
+
+**示例：** 一段 1 分钟的周会录像（演示用合成视频），模型为 `claude-opus-5-5`、宿主为 Claude Code。vidroute 选择了 `frames` 路线，
+在 `SUMMARY.md` 里写明原因："claude-opus-5-5 不接受视频输入"，于是改用"关键帧 + 拼图 + 本地转写"。下面是交给 LLM 的拼图，
+每格左下角是全局时间戳：
+
+![frames 路线生成的带时间标签的关键帧拼图](docs/images/contact-sheet-example.jpg)
+
 
 ```text
 <out>/<slug>/

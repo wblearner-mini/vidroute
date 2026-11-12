@@ -5,6 +5,18 @@
 
 ## [未发布]
 
+### 新增
+
+- 内置档案核实超过 90 天时，`llm resolve`、`plan` 会给出 `stale_profile` / `stale_host` 警告；新增每月运行的
+  `Profile freshness` 工作流和 `tools/profile_freshness.py`，有过期档案时失败，提醒维护者重新核实。
+- GitHub Release 附带 `install.sh` 和 `install.ps1`，默认安装同一版本的 wheel。
+
+### 变更
+
+- Gemini 档案：内联数据上限按官方文件输入表改为每个请求 100 MB，覆盖 Gemini 4 模型（2026-11-12 核实）。
+- Gemini CLI 档案：按 v0.68.0 源码重新核实，附件上限仍为 20 MB（2026-11-12）。
+- README 顶部新增"30 秒上手"，安装命令改为指向最新 Release，新增 `frames` 路线的拼图示例。
+
 ## [0.1.1] - 2026-11-12
 
 ### 修复
